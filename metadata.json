@@ -1,0 +1,6 @@
+{
+  "name": "KounKour - Concours & Communauté Maroc",
+  "description": "Plateforme mobile-first bilingue (arabe/français) centralisant les concours publics marocains, ressources de préparation QCM et communauté d'entraide.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
