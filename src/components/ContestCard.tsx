@@ -164,9 +164,11 @@ export const ContestCard: React.FC<ContestCardProps> = ({
               </span>
             )}
 
-            <span className="text-[10px] font-mono text-gray-400">
-              {contest.referenceCode}
-            </span>
+            {contest.referenceCode && (
+              <span className="text-[10px] font-mono text-gray-400">
+                {contest.referenceCode}
+              </span>
+            )}
           </div>
 
           {/* Contest Title */}

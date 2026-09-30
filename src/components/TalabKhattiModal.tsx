@@ -40,7 +40,7 @@ export const TalabKhattiModal: React.FC<TalabKhattiModalProps> = ({
   const adminNameFr = contest?.administration?.name?.fr || 'Ministère des Affaires Étrangères';
   const gradeAr = contest?.grade || contest?.title?.ar || 'تقني من الدرجة الرابعة';
   const gradeFr = contest?.grade || contest?.title?.fr || 'Technicien de 4ème grade';
-  const refCode = contest?.referenceCode || 'C43033/26';
+  const refCode = contest?.referenceCode || '[réf. de l’arrêté à compléter]';
   const contestDate = contest?.contestDate || '2026';
 
   const todayAr = new Date().toLocaleDateString('ar-MA', {

@@ -213,18 +213,28 @@ app.get('/api/radar/scrape-live', async (req, res) => {
         // Specialty: extract exact verified specialty from announcement
         const { fr: specFr, ar: specAr } = extractVerifiedSpecialty(textBlock, title, admin);
 
-        // Determine status
+        // Determine status from the REAL parsed deadline date (no hardcoded guess).
+        const FR_MONTHS: Record<string, number> = {
+          janvier: 0, février: 1, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5,
+          juillet: 6, août: 7, aout: 7, septembre: 8, octobre: 9, novembre: 10,
+          décembre: 11, decembre: 11,
+        };
+        const dm = deadlineText.match(/(\d{1,2})\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
+        const deadlineDateObj = dm && FR_MONTHS[dm[2].toLowerCase()] !== undefined
+          ? new Date(parseInt(dm[3], 10), FR_MONTHS[dm[2].toLowerCase()], parseInt(dm[1], 10), 23, 59, 59)
+          : null;
         let status = 'open';
-        let daysRemaining = 8;
+        let daysRemaining = 0;
         if (isConvocation) {
           status = 'in_progress';
-          daysRemaining = 0;
-        } else if (deadlineText.includes('30 Septembre')) {
-          status = 'closing_soon';
-          daysRemaining = 1;
-        } else if (deadlineText.includes('Septembre')) {
-          status = 'closed';
-          daysRemaining = 0;
+        } else if (deadlineDateObj) {
+          daysRemaining = Math.ceil((deadlineDateObj.getTime() - Date.now()) / 86_400_000);
+          if (daysRemaining < 0) { status = 'closed'; daysRemaining = 0; }
+          else if (daysRemaining <= 7) status = 'closing_soon';
+          else status = 'open';
+        } else {
+          // Date non parsable : on ne devine pas → à vérifier (traité comme ouvert).
+          status = 'open';
         }
 
         const logoPath = resolveLogo(admin);
@@ -235,7 +245,8 @@ app.get('/api/radar/scrape-live', async (req, res) => {
           sourceName: 'emploi-public.ma',
           sourceUrl: `https://www.emploi-public.ma/fr/concours/details/${uuid}`,
           scrapedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-          referenceCode: `C${Math.floor(40000 + Math.random() * 5000)}/26`,
+          // Référence jamais inventée : vide tant qu'elle n'est pas extraite de l'arrêté.
+          referenceCode: '',
           image: logoPath,
           title: {
             fr: title,
@@ -262,10 +273,11 @@ app.get('/api/radar/scrape-live', async (req, res) => {
             fr: 'National (Royaume du Maroc)',
             ar: 'المملكة المغربية',
           },
-          publicationDate: 'Septembre 2026',
+          publicationDate: '',
           deadlineDate: deadlineText,
           daysRemaining,
-          parsingConfidence: 100,
+          // Confiance honnête : haute seulement si la date limite a pu être parsée.
+          parsingConfidence: deadlineDateObj ? 90 : 60,
           status: 'pending_review',
           stage: isConvocation ? (isOral ? 'oral' : 'ecrit') : 'depot',
           stageLabel: isConvocation ? {

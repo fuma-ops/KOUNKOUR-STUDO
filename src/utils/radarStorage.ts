@@ -127,9 +127,52 @@ export const OFFICIAL_RADAR_SOURCES: ScrapeSource[] = [
 
 import realScrapedFeedData from '../data/realScrapedFeed.json';
 
+// Parse une date FR ("5 Octobre 2026 - 16:30", "19 Septembre 2026") en Date, ou
+// null si non parsable (on ne devine JAMAIS une date).
+const FR_MONTHS: Record<string, number> = {
+  janvier: 0, février: 1, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5,
+  juillet: 6, août: 7, aout: 7, septembre: 8, octobre: 9, novembre: 10,
+  décembre: 11, decembre: 11,
+};
+export function parseFrenchDate(text: any): Date | null {
+  if (!text || typeof text !== 'string') return null;
+  const m = text.match(/(\d{1,2})\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
+  if (!m) return null;
+  const day = parseInt(m[1], 10);
+  const month = FR_MONTHS[m[2].toLowerCase()];
+  const year = parseInt(m[3], 10);
+  if (month === undefined || day < 1 || day > 31) return null;
+  return new Date(year, month, day, 23, 59, 59);
+}
+
+// Jours restants RÉELS calculés depuis la date limite (plus de valeur figée).
+function computeDaysRemaining(deadlineDate: any, fallback: any): number {
+  const d = parseFrenchDate(deadlineDate);
+  if (!d) return typeof fallback === 'number' ? fallback : 0;
+  const diff = Math.ceil((d.getTime() - Date.now()) / 86_400_000);
+  return diff > 0 ? diff : 0;
+}
+
+// Confiance d'extraction HONNÊTE : proportion des champs clés réellement présents
+// (plus de « 100 » codé en dur).
+function computeConfidence(item: any): number {
+  const checks = [
+    !!(item.title?.fr || typeof item.title === 'string'),
+    !!(item.administration?.name?.fr || item.administration?.name),
+    !!parseFrenchDate(item.deadlineDate),
+    !!(item.specialty?.fr || item.specialty),
+    !!item.degreeLevel,
+    typeof item.postsCount === 'number',
+  ];
+  const score = checks.filter(Boolean).length / checks.length;
+  return Math.round(score * 100);
+}
+
 export function normalizeScrapedItem(item: any): ScrapedContestItem {
   if (!item) return {} as any;
-  const rawId = item.id || `scrape-${Math.random().toString(36).slice(2, 8)}`;
+  // ID déterministe (jamais aléatoire) : dérivé de l'URL source si pas d'id.
+  const extFromUrl = (item.officialSourceUrl || item.sourceUrl || '').match(/details\/([0-9a-f-]{8,})/i)?.[1];
+  const rawId = item.id || (extFromUrl ? `scrape-${extFromUrl}` : `scrape-${item.slug || 'inconnu'}`);
   const cleanId = rawId.startsWith('scrape-') ? rawId : `scrape-${rawId.replace(/^c-scraped-/, '').replace(/^c-/, '')}`;
   
   const titleFr = item.title?.fr || (typeof item.title === 'string' ? item.title : 'Concours de recrutement');
@@ -171,7 +214,8 @@ export function normalizeScrapedItem(item: any): ScrapedContestItem {
     sourceName: item.sourceName || 'emploi-public.ma',
     sourceUrl: item.sourceUrl || item.officialSourceUrl || 'https://www.emploi-public.ma',
     scrapedAt: item.scrapedAt || 'Aujourd’hui',
-    referenceCode: item.referenceCode || `C${Math.floor(40000 + Math.random() * 5000)}/26`,
+    // Référence : jamais inventée. Vide si non extraite → l'UI affiche « à vérifier ».
+    referenceCode: item.referenceCode || '',
     title: { fr: titleFr, ar: titleAr },
     administration: {
       id: item.administration?.id || 'adm-ep',
@@ -183,10 +227,10 @@ export function normalizeScrapedItem(item: any): ScrapedContestItem {
     degreeLevel: item.degreeLevel || 'Licence / Master',
     specialty: { fr: specFr, ar: specAr },
     region: { fr: regFr, ar: regAr },
-    publicationDate: item.publicationDate || 'Septembre 2026',
-    deadlineDate: item.deadlineDate || 'Octobre 2026',
-    daysRemaining: typeof item.daysRemaining === 'number' ? item.daysRemaining : 5,
-    parsingConfidence: item.parsingConfidence || 100,
+    publicationDate: item.publicationDate || '',
+    deadlineDate: item.deadlineDate || '',
+    daysRemaining: computeDaysRemaining(item.deadlineDate, item.daysRemaining),
+    parsingConfidence: computeConfidence(item),
     status: (item.status === 'imported' ? 'imported' : 'pending_review'),
     matchedRules: Array.isArray(item.matchedRules) ? item.matchedRules : ['arrete:verified'],
     rawSnippet: { fr: snippetFr, ar: snippetAr || snippetFr },
@@ -488,9 +532,9 @@ function sanitizeContestFields(c: Contest): Contest {
     updated.postsCount = pm ? parseInt(pm[1], 10) : 1;
   }
 
-  // Ensure referenceCode is valid
+  // Référence : jamais inventée au hasard. Vide si absente (l'UI gère l'absence).
   if (!updated.referenceCode || updated.referenceCode.length < 3) {
-    updated.referenceCode = `C${Math.floor(40000 + Math.random() * 5000)}/26`;
+    updated.referenceCode = '';
   }
 
   // Specific fixes for user's screenshot test cases

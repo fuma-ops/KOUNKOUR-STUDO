@@ -545,7 +545,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                           <span>{language === 'fr' ? 'Code du concours :' : 'رمز المباراة :'}</span>
                         </div>
                         <p className="text-xs sm:text-sm font-mono font-black text-[#242126] ps-2">
-                          {contest.referenceCode}
+                          {contest.referenceCode || (language === 'fr' ? 'À vérifier sur l’arrêté officiel' : 'يُتحقق منه في القرار الرسمي')}
                         </p>
                       </div>
                     </div>
@@ -566,9 +566,11 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                         {language === 'fr' ? 'Exigences et Spécialités Officielles de l’Arrêté' : 'شروط وتخصصات قرار فتح المباراة'}
                       </h3>
                     </div>
-                    <span className="text-[11px] font-mono font-bold bg-[#8D174B]/10 text-[#8D174B] px-2.5 py-0.5 rounded-full">
-                      {contest.referenceCode}
-                    </span>
+                    {contest.referenceCode && (
+                      <span className="text-[11px] font-mono font-bold bg-[#8D174B]/10 text-[#8D174B] px-2.5 py-0.5 rounded-full">
+                        {contest.referenceCode}
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs sm:text-sm">

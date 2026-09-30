@@ -751,13 +751,13 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                           <span className="text-gray-300">•</span>
 
                           <span className="text-[11px] text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded">
-                            {item.referenceCode || 'C/2026'}
+                            {item.referenceCode || (language === 'fr' ? 'Réf. à vérifier' : 'المرجع غير مؤكد')}
                           </span>
 
                           <span className="text-gray-300">•</span>
 
                           <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
-                            {item.parsingConfidence || 100}% {language === 'fr' ? 'Précision OCR' : 'دقة التحليل'}
+                            {item.parsingConfidence}% {language === 'fr' ? 'champs extraits' : 'حقول مستخرجة'}
                           </span>
 
                           {item.status === 'imported' && (
@@ -782,7 +782,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                           </span>
                           <span>•</span>
                           <span className="text-[#8D174B] font-semibold">
-                            <strong>{language === 'fr' ? 'Dernier délai :' : 'آخر أجل :'}</strong> {item.deadlineDate || 'Octobre 2026'} ({item.daysRemaining || 0} {language === 'fr' ? 'jours restants' : 'يوم متبقي'})
+                            <strong>{language === 'fr' ? 'Dernier délai :' : 'آخر أجل :'}</strong> {item.deadlineDate || (language === 'fr' ? 'à vérifier' : 'غير مؤكد')}{item.daysRemaining > 0 ? ` (${item.daysRemaining} ${language === 'fr' ? 'jours restants' : 'يوم متبقي'})` : ''}
                           </span>
                         </div>
 
