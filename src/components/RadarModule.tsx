@@ -11,12 +11,13 @@ import {
 import { 
   ScrapeSource, ScrapedContestItem, ScrapeLogEntry 
 } from '../types/radar';
-import { 
+import {
   OFFICIAL_RADAR_SOURCES, loadScrapedItems, saveScrapedItems,
   loadScrapeLogs, saveScrapeLogs, importScrapedContestToCatalog,
   loadImportedContests, normalizeScrapedItem,
   importMultipleScrapedContestsToCatalog, ignoreMultipleScrapedContests
 } from '../utils/radarStorage';
+import { getSupabase } from '../lib/supabase';
 
 interface RadarModuleProps {
   language: Language;
@@ -86,8 +87,17 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     try {
       setScanProgress(35);
       addLog('info', `[HTTP GET] Envoi de la requête de crawl réel vers /api/radar/scrape-live ...`);
-      
-      const response = await fetch('/api/radar/scrape-live');
+
+      // Jeton de l'admin connecté → autorise l'écriture en base (RLS staff).
+      let authHeaders: Record<string, string> = {};
+      const sb = getSupabase();
+      if (sb) {
+        const { data } = await sb.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) authHeaders = { Authorization: `Bearer ${token}` };
+      }
+
+      const response = await fetch('/api/radar/scrape-live', { headers: authHeaders });
       setScanProgress(70);
 
       if (!response.ok) {
