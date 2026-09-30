@@ -74,7 +74,7 @@ function mapRow(row: any): Contest {
     specialty: { fr: specFr, ar: specAr },
     region: { fr: regionFr, ar: regionAr },
     location: { fr: regionFr, ar: regionAr },
-    publicationDate: formatFr(row.published_at ? String(row.published_at).slice(0, 10) : null),
+    publicationDate: formatFr(row.publication_date),
     deadlineDate: formatFr(row.deadline_date),
     daysRemaining: daysFromISO(row.deadline_date),
     contestDate: formatFr(row.exam_date),

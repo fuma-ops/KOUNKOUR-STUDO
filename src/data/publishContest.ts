@@ -79,6 +79,8 @@ export async function publishScrapedToSupabase(item: ScrapedContestItem): Promis
       positions: typeof item.postsCount === 'number' ? item.postsCount : null,
       region_fr: item.region?.fr || null,
       deadline_date: toISODate(item.deadlineDate),
+      exam_date: toISODate((item as any).contestDate),
+      publication_date: toISODate(item.publicationDate),
       source_url: item.sourceUrl || 'https://www.emploi-public.ma',
       source_org: adminName,
       published_at: new Date().toISOString(),
