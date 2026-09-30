@@ -186,42 +186,69 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
     score += 40;
   }
 
-  // 3. Specialty matching (checks specialty, specialtiesList and title)
-  const profileSpecLower = (profile.specialty || '').toLowerCase().trim();
-  const contestSpecFr = (contest.specialty?.fr || '').toLowerCase().trim();
-  const contestSpecList = (contest.specialtiesList || []).map(s => s.toLowerCase());
-  const contestTitle = (contest.title?.fr || '').toLowerCase();
+  // 3. Specialty matching — par mots-clés DISTINCTIFS (généralisable à toute
+  //    spécialité, pas seulement une liste codée en dur).
+  //    3 états : 'match' (correspond) / 'unknown' (concours "toutes spécialités"
+  //    ou profil vide → à vérifier, on ne rate pas) / 'different' (spécialité
+  //    précise clairement différente → on n'affiche pas comme adapté).
+  const strip = (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '');
+  // Mots trop génériques pour distinguer une spécialité.
+  const STOP = new Set([
+    'genie', 'sciences', 'science', 'technique', 'techniques', 'specialite',
+    'specialites', 'option', 'etat', 'grade', 'echelle', 'niveau', 'poste',
+    'concours', 'recrutement', 'appliquee', 'appliquees', 'generale', 'mentionnee',
+    'mentionnees', 'arrete', 'annonce', 'officiel', 'officielle', 'officielles',
+    'dans', 'pour', 'avec', 'des', 'les', 'une', 'aux', 'sur', 'par',
+  ]);
+  const toks = (s: string) =>
+    strip(s)
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 4 && !STOP.has(t));
 
-  if (profileSpecLower && contestSpecFr && contestSpecFr !== 'non spécifié') {
-    const listMatch = contestSpecList.some(s => s.includes(profileSpecLower) || profileSpecLower.includes(s));
-    
-    if (
-      listMatch ||
-      contestSpecFr.includes(profileSpecLower) ||
-      profileSpecLower.includes(contestSpecFr) ||
-      contestTitle.includes(profileSpecLower) ||
-      (profileSpecLower.includes('agron') && (contestSpecFr.includes('agron') || contestTitle.includes('agric'))) ||
-      (profileSpecLower.includes('civil') && contestSpecFr.includes('civil')) ||
-      (profileSpecLower.includes('droit') && (contestSpecFr.includes('droit') || contestSpecFr.includes('juridique'))) ||
-      (profileSpecLower.includes('informatique') && (contestSpecFr.includes('informatique') || contestSpecFr.includes('développement') || contestSpecFr.includes('cyber') || contestSpecFr.includes('réseaux'))) ||
-      (profileSpecLower.includes('secrétariat') && (contestSpecFr.includes('secrétariat') || contestSpecFr.includes('bureautique') || contestSpecFr.includes('gestion'))) ||
-      (profileSpecLower.includes('mécanique') && (contestSpecFr.includes('mécanique') || contestSpecFr.includes('automobile') || contestSpecFr.includes('véhicule'))) ||
-      (profileSpecLower.includes('économie') && (contestSpecFr.includes('gestion') || contestSpecFr.includes('audit') || contestSpecFr.includes('comptab') || contestSpecFr.includes('finance'))) ||
-      (profileSpecLower.includes('santé') && (contestSpecFr.includes('santé') || contestSpecFr.includes('infirmier') || contestSpecFr.includes('médic')))
-    ) {
-      specialtyMatch = true;
-      score += 40;
-    } else {
-      specialtyMatch = false;
-      reasons.push({
-        fr: `Spécialité officielle requise : ${contest.specialty.fr} (Votre spécialité : ${profile.specialty || 'Non précisée'}).`,
-        ar: `التخصص الرسمي المطلوب: ${contest.specialty.ar} (تخصصك: ${profile.specialty || 'غير محدد'}).`,
-      });
-    }
+  const profileSpecRaw = profile.specialty || '';
+  const contestSpecRaw = contest.specialty?.fr || '';
+  const contestSpecStrip = strip(contestSpecRaw);
+
+  // Concours "toutes spécialités" / non précisées → inconnu (à vérifier).
+  const genericSpecialty =
+    !contestSpecStrip ||
+    contestSpecStrip.includes('mentionn') ||
+    contestSpecStrip.includes('arrete') ||
+    contestSpecStrip.includes('annonce') ||
+    contestSpecStrip.includes('non specifie');
+
+  let specialtyStatus: 'match' | 'unknown' | 'different';
+  if (!profileSpecRaw.trim() || genericSpecialty) {
+    specialtyStatus = 'unknown';
   } else {
-    // If contest has no specific specialty, consider neutral match
+    const pt = toks(profileSpecRaw);
+    const haystack = toks(
+      `${contestSpecRaw} ${(contest.specialtiesList || []).join(' ')} ${contest.title?.fr || ''}`
+    );
+    const shared = pt.some((t) => haystack.includes(t));
+    specialtyStatus = shared ? 'match' : 'different';
+  }
+
+  if (specialtyStatus === 'match') {
     specialtyMatch = true;
-    score += 35;
+    score += 40;
+  } else if (specialtyStatus === 'unknown') {
+    specialtyMatch = true; // à vérifier : on ne rate pas
+    score += 15;
+    reasons.push({
+      fr: `Spécialité à vérifier sur l'arrêté officiel (le concours ne précise pas de filière unique).`,
+      ar: `يُنصح بالتحقق من التخصص في القرار الرسمي (المباراة لا تحدد شعبة وحيدة).`,
+    });
+  } else {
+    specialtyMatch = false;
+    reasons.push({
+      fr: `Spécialité officielle requise : ${contest.specialty.fr} (Votre spécialité : ${profile.specialty}).`,
+      ar: `التخصص الرسمي المطلوب: ${contest.specialty.ar} (تخصصك: ${profile.specialty}).`,
+    });
   }
 
   // 4. Regional matching
@@ -234,12 +261,13 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
     regionMatch = false;
   }
 
-  // Rigueur « ne jamais rater un concours » (cahier §14) : le SEUL filtre dur est
-  // le diplôme, et seulement quand il est connu et clairement insuffisant. L'âge et
-  // la spécialité ne sont jamais éliminatoires ici — en cas de doute le concours
-  // reste proposé et signalé « à vérifier ». isHighMatch reste strict (mise en avant).
-  const isEligible = degreeMatch;
-  const isHighMatch = degreeMatch && ageMatch && specialtyMatch && score >= 85;
+  // Rigueur (cahier §14) : on exclut uniquement les cas CERTAINS de non-éligibilité
+  //  - diplôme connu et clairement insuffisant ;
+  //  - spécialité précise clairement DIFFÉRENTE de celle du candidat.
+  // On ne rate jamais un concours "toutes spécialités" ou incertain (→ à vérifier).
+  // L'âge n'est jamais éliminatoire ici (seulement signalé).
+  const isEligible = degreeMatch && specialtyStatus !== 'different';
+  const isHighMatch = isEligible && ageMatch && specialtyStatus === 'match' && score >= 80;
 
   if (isEligible) {
     reasons.push({
