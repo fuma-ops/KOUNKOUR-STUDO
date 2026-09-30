@@ -18,6 +18,7 @@ import {
   importMultipleScrapedContestsToCatalog, ignoreMultipleScrapedContests
 } from '../utils/radarStorage';
 import { getSupabase } from '../lib/supabase';
+import { publishScrapedToSupabase, publishManyScrapedToSupabase } from '../data/publishContest';
 
 interface RadarModuleProps {
   language: Language;
@@ -163,14 +164,23 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     }
   };
 
-  const handleImportToCatalog = (item: ScrapedContestItem) => {
+  const handleImportToCatalog = async (item: ScrapedContestItem) => {
     const newContest = importScrapedContestToCatalog(item);
     setScrapedItems(loadScrapedItems());
-    addLog('success', `[IMPORT CATALOGUE] Concours "${item.title[language]}" injecté avec succès dans le catalogue actif.`);
+    // Publication réelle vers Supabase → visible sur le site public (staff requis).
+    const ok = await publishScrapedToSupabase(item);
+    addLog(
+      ok ? 'success' : 'warn',
+      ok
+        ? `[PUBLICATION] "${item.title[language]}" publié sur le site (Supabase).`
+        : `[PUBLICATION] "${item.title[language]}" ajouté localement — connexion admin requise pour publier en ligne.`
+    );
     setImportedToast(
-      language === 'fr' 
-        ? `Le concours "${item.title.fr}" est désormais visible dans votre catalogue public !` 
-        : `تمت إضافة المباراة إلى الدليل العام بنجاح !`
+      language === 'fr'
+        ? ok
+          ? `Le concours "${item.title.fr}" est désormais visible sur le site public !`
+          : `Ajouté localement. Connecte-toi en admin pour le publier en ligne.`
+        : `تمت إضافة المباراة بنجاح !`
     );
     if (onContestImported) {
       onContestImported(newContest);
@@ -192,17 +202,18 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     }
   };
 
-  const handleBatchImport = () => {
+  const handleBatchImport = async () => {
     if (selectedIds.length === 0) return;
     const selectedItems = scrapedItems.filter((i) => selectedIds.includes(i.id));
     const importedList = importMultipleScrapedContestsToCatalog(selectedItems);
     setScrapedItems(loadScrapedItems());
     setSelectedIds([]);
-    addLog('success', `[ACTION REGROUPÉE] ${importedList.length} concours importés avec succès dans le catalogue.`);
+    const published = await publishManyScrapedToSupabase(selectedItems);
+    addLog('success', `[PUBLICATION] ${published}/${selectedItems.length} concours publiés en ligne (Supabase).`);
     setImportedToast(
       language === 'fr'
-        ? `✅ ${importedList.length} concours ont été ajoutés à votre catalogue public !`
-        : `✅ تم إدراج ${importedList.length} مباراة بنجاح في الدليل العام !`
+        ? `✅ ${published} concours publiés sur le site public !`
+        : `✅ تم نشر ${published} مباراة على الموقع !`
     );
     if (onContestImported && importedList.length > 0) {
       onContestImported(importedList[0]);
@@ -210,17 +221,18 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     setTimeout(() => setImportedToast(null), 4500);
   };
 
-  const handleImportAllPending = () => {
+  const handleImportAllPending = async () => {
     const pendingItems = scrapedItems.filter((i) => i.status === 'pending_review');
     if (pendingItems.length === 0) return;
     const importedList = importMultipleScrapedContestsToCatalog(pendingItems);
     setScrapedItems(loadScrapedItems());
     setSelectedIds([]);
-    addLog('success', `[IMPORT MASSIF] ${importedList.length} concours en attente ont été importés.`);
+    const published = await publishManyScrapedToSupabase(pendingItems);
+    addLog('success', `[PUBLICATION MASSIVE] ${published}/${pendingItems.length} concours publiés en ligne.`);
     setImportedToast(
       language === 'fr'
-        ? `🎉 Les ${importedList.length} concours ont été ajoutés à votre catalogue !`
-        : `🎉 تمت إضافة جميع المباريات (${importedList.length}) إلى الدليل العام بنجاح !`
+        ? `🎉 ${published} concours publiés sur le site public !`
+        : `🎉 تم نشر ${published} مباراة على الموقع !`
     );
     if (onContestImported && importedList.length > 0) {
       onContestImported(importedList[0]);
