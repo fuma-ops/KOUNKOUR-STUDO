@@ -1,16 +1,23 @@
 /**
  * Fonction serverless Vercel — scraper Radar opérationnel côté serveur.
  *
- * Rôle : va chercher les concours sur emploi-public.ma (comme le faisait le
- * serveur AI Studio), NETTOIE les données (aucune invention — cf. cahier §0/§7),
- * et dépose les nouveautés dans la file de validation Supabase `radar_candidates`
- * (statut pending_review). Rien n'est publié automatiquement (§13.2) : un admin
- * valide ensuite depuis le back-office.
+ * GET /api/radar/scrape-live?source=emploi-public   (défaut)
+ * GET /api/radar/scrape-live?source=dreamjob
+ *
+ * C'est l'admin qui choisit la source et déclenche le scan depuis le Radar :
+ * rien ne tourne automatiquement. Chaque scan :
+ *   1. vérifie robots.txt de la source (cahier : respecter robots/CGU) ;
+ *   2. lit les pages liste et NETTOIE les données (aucune invention — §0/§7) ;
+ *   3. dépose les nouveautés dans `radar_candidates` (pending_review). Rien n'est
+ *      publié automatiquement (§13.2) : un admin valide ensuite.
+ *
+ * dreamjob.ma est un AGRÉGATEUR, pas une source officielle : il sert à DÉCOUVRIR
+ * des concours absents d'emploi-public.ma. À la publication, la source officielle
+ * (emploi-public / site .gov.ma / PDF de l'arrêté) est obligatoire.
  *
  * Écriture en base réservée au STAFF : la requête doit porter le jeton de session
  * de l'admin (Authorization: Bearer <access_token>) ; les RLS re-vérifient le rôle.
- * Sans jeton, le scrape s'exécute quand même mais renvoie seulement les items
- * (affichage), sans écrire en base.
+ * Sans jeton, le scrape s'exécute quand même mais renvoie seulement les items.
  */
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
@@ -24,8 +31,18 @@ const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY ||
   'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 
-// Identifiant de la source « emploi-public.ma » déjà présente en base.
-const SOURCE_ID = '11111111-1111-4111-8111-111111111111';
+// Identifiants des sources dans la table radar_sources.
+const EMPLOI_PUBLIC_SOURCE_ID = '11111111-1111-4111-8111-111111111111';
+const DREAMJOB_SOURCE_ID = '33333333-3333-4333-8333-333333333333';
+
+const BROWSER_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml',
+  'Accept-Language': 'fr-FR,fr;q=0.9,ar;q=0.8',
+};
+
+type AddLog = (level: string, message: string) => void;
 
 const FR_MONTHS: Record<string, number> = {
   janvier: 0, février: 1, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5,
@@ -33,16 +50,26 @@ const FR_MONTHS: Record<string, number> = {
   décembre: 11, decembre: 11,
 };
 
-function parseFrDateISO(text: string): string | null {
+// "15 octobre 2026", "1er octobre 2026" ou "15/10/2026" → "2026-10-15".
+export function parseFrDateISO(text: string): string | null {
   if (!text) return null;
-  const m = text.match(/(\d{1,2})\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
-  if (!m) return null;
-  const month = FR_MONTHS[m[2].toLowerCase()];
-  if (month === undefined) return null;
-  const y = parseInt(m[3], 10);
-  const d = parseInt(m[1], 10);
-  if (d < 1 || d > 31) return null;
-  return `${y}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const m = text.match(/(\d{1,2})(?:er)?\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
+  if (m) {
+    const month = FR_MONTHS[m[2].toLowerCase()];
+    const d = parseInt(m[1], 10);
+    if (month !== undefined && d >= 1 && d <= 31) {
+      return `${m[3]}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  const n = text.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/);
+  if (n) {
+    const d = parseInt(n[1], 10);
+    const mo = parseInt(n[2], 10);
+    if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) {
+      return `${n[3]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  return null;
 }
 
 // Spécialité extraite STRICTEMENT du texte scrapé — jamais devinée.
@@ -66,10 +93,427 @@ function detectCategory(admin: string, isDouanes: boolean): string {
   return 'administration';
 }
 
+// Niveau déduit du GRADE cité dans le titre (null si rien de sûr).
+function degreeFromTitle(title: string): string | null {
+  const tl = title.toLowerCase();
+  if (tl.includes('ingénieur') || tl.includes('master') || tl.includes('conférences')) return 'Master / Ingénieur';
+  if (tl.includes('technicien') || tl.includes('3ème grade')) return 'Bac+2';
+  if (tl.includes('adjoint') || tl.includes('agent')) return 'Niveau Bac';
+  if (tl.includes('médecin') || tl.includes('pharmacien') || tl.includes('docteur')) return 'Doctorat';
+  return null;
+}
+
+function statusFromDeadline(deadlineISO: string | null): string {
+  if (!deadlineISO) return 'open';
+  const days = Math.ceil((new Date(`${deadlineISO}T23:59:59`).getTime() - Date.now()) / 86_400_000);
+  return days < 0 ? 'closed' : days <= 7 ? 'closing_soon' : 'open';
+}
+
+// ─── robots.txt (RFC 9309) ────────────────────────────────────────────────────
+
+function ruleMatches(pattern: string, path: string): boolean {
+  const anchored = pattern.endsWith('$');
+  const body = anchored ? pattern.slice(0, -1) : pattern;
+  const re = new RegExp(
+    '^' + body.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + (anchored ? '$' : '')
+  );
+  return re.test(path);
+}
+
+// true si `path` est autorisé pour les robots génériques (groupe "User-agent: *").
+// Règle la plus longue gagnante ; à égalité, Allow l'emporte.
+export function robotsAllows(robotsTxt: string, path: string): boolean {
+  const rules: { allow: boolean; pattern: string }[] = [];
+  let groupAgents: string[] = [];
+  let inRules = false;
+  for (const rawLine of robotsTxt.split(/\r?\n/)) {
+    const line = rawLine.replace(/#.*$/, '').trim();
+    if (!line) continue;
+    const idx = line.indexOf(':');
+    if (idx < 0) continue;
+    const key = line.slice(0, idx).trim().toLowerCase();
+    const value = line.slice(idx + 1).trim();
+    if (key === 'user-agent') {
+      if (inRules) {
+        groupAgents = [];
+        inRules = false;
+      }
+      groupAgents.push(value.toLowerCase());
+    } else if (key === 'allow' || key === 'disallow') {
+      inRules = true;
+      if (!groupAgents.includes('*')) continue;
+      if (key === 'disallow' && value === '') continue; // "Disallow:" vide = tout autorisé
+      rules.push({ allow: key === 'allow', pattern: value });
+    }
+  }
+  let best: { allow: boolean; len: number } | null = null;
+  for (const r of rules) {
+    if (!ruleMatches(r.pattern, path)) continue;
+    const len = r.pattern.length;
+    if (!best || len > best.len || (len === best.len && r.allow)) best = { allow: r.allow, len };
+  }
+  return best ? best.allow : true;
+}
+
+// 2xx → règles du fichier ; 4xx → pas de robots.txt = autorisé ;
+// 5xx / injoignable → interdit (RFC 9309 §2.3.1.4).
+async function checkRobots(origin: string, path: string, addLog: AddLog): Promise<boolean> {
+  try {
+    const r = await fetch(`${origin}/robots.txt`, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(6000) });
+    if (r.status >= 200 && r.status < 300) {
+      const allowed = robotsAllows(await r.text(), path);
+      addLog(allowed ? 'info' : 'warn', `robots.txt ${origin} : ${path} ${allowed ? 'autorisé' : 'INTERDIT'}.`);
+      return allowed;
+    }
+    if (r.status >= 400 && r.status < 500) {
+      addLog('info', `robots.txt ${origin} absent (HTTP ${r.status}) : exploration autorisée.`);
+      return true;
+    }
+    addLog('warn', `robots.txt ${origin} en erreur (HTTP ${r.status}) : scan suspendu par prudence.`);
+    return false;
+  } catch (e: any) {
+    addLog('warn', `robots.txt ${origin} injoignable (${e?.message || 'erreur'}) : scan suspendu par prudence.`);
+    return false;
+  }
+}
+
+async function fetchPages(urls: string[]): Promise<{ page: number; url: string; html: string; ok: boolean; status: number }[]> {
+  return Promise.all(
+    urls.map((url, i) =>
+      fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(7000) })
+        .then(async (r) => ({ page: i + 1, url, html: r.ok ? await r.text() : '', ok: r.ok, status: r.status }))
+        .catch(() => ({ page: i + 1, url, html: '', ok: false, status: 0 }))
+    )
+  );
+}
+
+// ─── emploi-public.ma ─────────────────────────────────────────────────────────
+
+function parseEmploiPublicPage(html: string, pageNo: number, seen: Set<string>, addLog: AddLog): any[] {
+  const items: any[] = [];
+  const $ = cheerio.load(html);
+  const cards = $('a.card.card-scale, a[href*="/fr/concours/details/"]');
+  addLog('parser', `[PAGE ${pageNo}] ${cards.length} annonces détectées.`);
+
+  for (let i = 0; i < cards.length; i++) {
+    const el = cards[i];
+    const href = $(el).attr('href') || '';
+    const uuidMatch = href.match(/([a-f0-9-]{36})/i);
+    if (!uuidMatch) continue;
+    const uuid = uuidMatch[1];
+    if (seen.has(uuid)) continue;
+    seen.add(uuid);
+
+    const textBlock = $(el).text().replace(/\s+/g, ' ').trim();
+    const lower = textBlock.toLowerCase();
+
+    // Exclut résultats définitifs et annulations.
+    if (
+      lower.includes('résultats pour le concours') ||
+      lower.includes('résultats définitifs') ||
+      lower.includes('liste des admis') ||
+      lower.includes('annulation')
+    )
+      continue;
+
+    const isConvocation =
+      lower.includes('convoqués pour') || lower.includes('convoqués à l') || lower.includes('convocation');
+
+    let title = $(el).find('.card-title, h5, h4').text().trim();
+    if (!title || title.includes('Publication de la liste')) {
+      const tm =
+        textBlock.match(/concours de recrutement d['’]un ([^M\n]+) Ministère/i) ||
+        textBlock.match(/concours de recrutement de ([^M\n]+) Ministère/i) ||
+        textBlock.match(/concours de recrutement d['’]un ([^\n]+)/i);
+      title = tm ? tm[1].replace(/Convocation.*/, '').trim() : textBlock.slice(0, 60);
+    }
+    if (!title) continue;
+
+    let admin = $(el).find('.card-text, .administration').text().trim();
+    if (!admin || admin.length < 5) {
+      const am = textBlock.match(/Ministère[^\n]+/i);
+      admin = am ? am[0].replace('Convocation', '').replace('Annonce', '').trim() : '';
+    }
+    const isDouanes = lower.includes('douan');
+    if (isDouanes) admin = "Ministère de l'Économie et des Finances - Administration des Douanes et Impôts Indirects (ADII)";
+
+    const postsMatch = textBlock.match(/(\d+)\s*postes?/i);
+    const postsCount = postsMatch ? parseInt(postsMatch[1], 10) : null;
+
+    const deadlineMatch = textBlock.match(/Limite de d[ée]p[ôo]t\s*:\s*([^\n\r-]+)/i);
+    const deadlineText = deadlineMatch ? deadlineMatch[1].trim() : '';
+    const deadlineISO = parseFrDateISO(deadlineText);
+
+    const degreeLevel = degreeFromTitle(title);
+    const specialty = extractSpecialty(textBlock);
+    const scrapedStatus = isConvocation ? 'in_progress' : statusFromDeadline(deadlineISO);
+    const category = detectCategory(admin, isDouanes);
+
+    const sourceUrl = `https://www.emploi-public.ma/fr/concours/details/${uuid}`;
+    items.push({
+      external_id: uuid,
+      // Forme attendue par l'UI (normalizeScrapedItem) — référence JAMAIS inventée.
+      id: `scrape-${uuid}`,
+      sourceId: 'src-emploi-public',
+      sourceName: 'emploi-public.ma',
+      officialSourceUrl: sourceUrl,
+      sourceUrl,
+      title: { fr: title, ar: `مباراة توظيف ${title}` },
+      administration: { name: { fr: admin || 'Administration publique', ar: admin || '' }, category },
+      postsCount: postsCount ?? 1,
+      degreeLevel: degreeLevel || '',
+      specialty: { fr: specialty || 'Spécialité mentionnée dans l’annonce officielle', ar: '' },
+      region: { fr: 'National (Royaume du Maroc)', ar: 'المملكة المغربية' },
+      publicationDate: '',
+      deadlineDate: deadlineText,
+      status: 'pending_review',
+      _db: {
+        source_id: EMPLOI_PUBLIC_SOURCE_ID,
+        external_id: uuid,
+        source_url: sourceUrl,
+        title_original: title,
+        title_ar: null,
+        administration_name: admin || null,
+        administration_category: category,
+        degree_level: degreeLevel,
+        specialty,
+        region: null,
+        positions: postsCount,
+        deadline_text: deadlineText || null,
+        deadline_date: deadlineISO,
+        publication_text: null,
+        raw: { scraped_status: scrapedStatus, is_verified_source: true, source: 'vercel-serverless' },
+        status: 'pending_review',
+      },
+    });
+  }
+  return items;
+}
+
+// ─── dreamjob.ma (agrégateur — découverte uniquement) ─────────────────────────
+
+export const DREAMJOB_LIST_URLS = [
+  'https://www.dreamjob.ma/emploi-public/',
+  'https://www.dreamjob.ma/emploi-public/page/2/',
+  'https://www.dreamjob.ma/emploi-public/page/3/',
+];
+
+export interface DreamjobEntry {
+  title: string;
+  url: string;
+  slug: string;
+  excerpt: string;
+}
+
+// Chemins qui ne sont PAS des annonces (navigation WordPress, pages fixes…).
+const DJ_NON_POST =
+  /^\/(?:category|categorie|tag|page|author|auteur|wp-[a-z-]+|feed|search|contact|a-propos|about|mentions-legales|politique[a-z-]*|cgu|login|register)(?:\/|$)/i;
+
+function dreamjobPostUrl(href: string, base: string): { url: string; slug: string } | null {
+  let u: URL;
+  try {
+    u = new URL(href, base);
+  } catch {
+    return null;
+  }
+  if (!/(^|\.)dreamjob\.ma$/i.test(u.hostname)) return null;
+  const path = u.pathname;
+  // La page liste elle-même (/emploi-public/) n'est pas une annonce ; ses articles
+  // (/emploi-public/<slug>/) en sont.
+  if (path === '/' || /^\/emploi-public\/?$/i.test(path) || DJ_NON_POST.test(path)) return null;
+  if (/\/(?:page|feed|amp)\/?$/i.test(path) || /\.(?:jpe?g|png|gif|webp|pdf|xml)$/i.test(path)) return null;
+  const segs = path.split('/').filter(Boolean);
+  const slug = segs[segs.length - 1];
+  if (!slug || slug.length < 8 || !slug.includes('-')) return null;
+  return { url: `https://www.dreamjob.ma${path.endsWith('/') ? path : path + '/'}`, slug: slug.toLowerCase() };
+}
+
+// Pure et testable : extrait les annonces d'une page liste dreamjob.
+// Stratégie 1 : blocs <article> WordPress (titre dans h1/h2/h3/.entry-title).
+// Stratégie 2 (repli) : tout lien d'article dont le texte parle de concours/recrutement.
+export function parseDreamjobList(html: string, baseUrl = 'https://www.dreamjob.ma/emploi-public/'): {
+  entries: DreamjobEntry[];
+  strategy: 'article' | 'links' | 'none';
+} {
+  const $ = cheerio.load(html);
+  const seen = new Set<string>();
+  const entries: DreamjobEntry[] = [];
+
+  $('article').each((_i, art) => {
+    const a = $(art).find('h1 a, h2 a, h3 a, .entry-title a, .post-title a').first();
+    const href = a.attr('href');
+    if (!href) return;
+    const post = dreamjobPostUrl(href, baseUrl);
+    if (!post || seen.has(post.slug)) return;
+    const title = a.text().replace(/\s+/g, ' ').trim();
+    if (title.length < 10) return;
+    seen.add(post.slug);
+    const excerpt = $(art).find('.entry-summary, .entry-content, .excerpt, p').text().replace(/\s+/g, ' ').trim();
+    entries.push({ title, url: post.url, slug: post.slug, excerpt: excerpt.slice(0, 600) });
+  });
+  if (entries.length > 0) return { entries, strategy: 'article' };
+
+  $('a[href]').each((_i, el) => {
+    const post = dreamjobPostUrl($(el).attr('href') || '', baseUrl);
+    if (!post || seen.has(post.slug)) return;
+    const title = $(el).text().replace(/\s+/g, ' ').trim();
+    if (title.length < 15 || !/concours|recrut|poste/i.test(title)) return;
+    seen.add(post.slug);
+    entries.push({ title, url: post.url, slug: post.slug, excerpt: '' });
+  });
+  return { entries, strategy: entries.length > 0 ? 'links' : 'none' };
+}
+
+// Annonces qui ne sont pas des ouvertures de concours (résultats, listes…).
+export function isDreamjobNonOpening(title: string): boolean {
+  return /r[ée]sultats?|liste des (?:candidats|admis|convoqu)|convoqu|admis|annulation|report(?:é|e)? du concours/i.test(title);
+}
+
+// Administration citée dans le titre (null si rien de sûr — jamais devinée).
+export function extractDreamjobAdmin(title: string): string | null {
+  const t = title.replace(/\s+/g, ' ').trim();
+  const rec = t.match(/^(.{4,90}?)\s+recrute\b/i);
+  if (rec) return rec[1].replace(/^(?:le|la|les|l['’])\s+/i, '').trim();
+  const kw = t.match(
+    /\b((?:Minist[èe]re|Commune|Conseil|Agence|Office|Universit[ée]|Direction|Caisse|Centre Hospitalier|CHU|Tr[ée]sorerie|Haut[- ]Commissariat|Province|Pr[ée]fecture|R[ée]gion|Fondation|Institut|[ÉE]cole|Cour|Tribunal|Chambre|Acad[ée]mie|Administration|D[ée]l[ée]gation|Inspection|Gendarmerie|Forces Arm[ée]es|S[ûu]ret[ée] Nationale|Bank Al-Maghrib|ONCF|ONEE|ONSSA|ANAPEC|OFPPT|CNSS|CDG|Barid Al-Maghrib|DGSN|DGI|ADII)\b[^()\d,:–|]{0,80})/i
+  );
+  if (!kw) return null;
+  return kw[1].replace(/\s+(?:recrute|concours|pour|au titre).*$/i, '').replace(/[\s\-–]+$/, '').trim() || null;
+}
+
+export function extractDreamjobPosts(text: string): number | null {
+  const m = text.match(/\b(\d{1,4})\s*postes?\b/i) || text.match(/\brecrute\s+(\d{1,3})\b/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return n > 0 && n < 5000 ? n : null;
+}
+
+export function extractDreamjobDeadline(text: string): string | null {
+  const m = text.match(
+    /(?:dernier d[ée]lai|date limite|limite de d[ée]p[ôo]t|avant le|jusqu['’]au)[^0-9]{0,25}(\d{1,2}(?:er)?\s+[A-Za-zÀ-ÿ]+\s+\d{4}|\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4})/i
+  );
+  return m ? m[1].trim() : null;
+}
+
+function normTokens(s: string): Set<string> {
+  return new Set(
+    s
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 4 && !/^(concours|recrutement|poste|postes|2025|2026|2027|pour|dans|des|avec|grade|echelle)$/.test(w))
+  );
+}
+
+function overlap(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  a.forEach((w) => {
+    if (b.has(w)) inter++;
+  });
+  return inter / Math.min(a.size, b.size);
+}
+
+export interface DuplicateRef {
+  kind: 'publie' | 'emploi-public';
+  title: string;
+  admin: string | null;
+  deadline: string | null;
+  url: string | null;
+}
+
+// Doublon POSSIBLE (signalé à l'admin, jamais supprimé automatiquement — cahier l.239).
+export function findPossibleDuplicate(
+  title: string,
+  admin: string | null,
+  deadlineISO: string | null,
+  refs: DuplicateRef[]
+): DuplicateRef | null {
+  const mine = normTokens(`${title} ${admin || ''}`);
+  let best: { ref: DuplicateRef; score: number } | null = null;
+  for (const ref of refs) {
+    const score = overlap(mine, normTokens(`${ref.title} ${ref.admin || ''}`));
+    const sameDeadline = !!deadlineISO && deadlineISO === ref.deadline;
+    if ((sameDeadline && score >= 0.3) || score >= 0.6) {
+      if (!best || score > best.score) best = { ref, score };
+    }
+  }
+  return best ? best.ref : null;
+}
+
+function buildDreamjobItem(e: DreamjobEntry, dup: DuplicateRef | null): any {
+  const text = `${e.title} ${e.excerpt}`;
+  const admin = extractDreamjobAdmin(e.title);
+  const postsCount = extractDreamjobPosts(text);
+  const deadlineText = extractDreamjobDeadline(text) || '';
+  const deadlineISO = parseFrDateISO(deadlineText);
+  const degreeLevel = degreeFromTitle(e.title);
+  const specialty = extractSpecialty(e.excerpt);
+  const category = detectCategory(admin || '', /douan/i.test(text));
+  const externalId = `dj-${e.slug}`.slice(0, 180);
+
+  return {
+    external_id: externalId,
+    id: `scrape-${externalId}`,
+    sourceId: 'src-dreamjob',
+    sourceName: 'dreamjob.ma',
+    sourceUrl: e.url,
+    title: { fr: e.title, ar: e.title },
+    administration: { name: { fr: admin || 'Administration publique', ar: admin || '' }, category },
+    postsCount: postsCount ?? 1,
+    degreeLevel: degreeLevel || '',
+    specialty: { fr: specialty || 'Spécialité mentionnée dans l’annonce officielle', ar: '' },
+    region: { fr: 'National (Royaume du Maroc)', ar: 'المملكة المغربية' },
+    publicationDate: '',
+    deadlineDate: deadlineText,
+    status: 'pending_review',
+    rawSnippet: {
+      fr: `Découvert via dreamjob.ma (agrégateur) — source officielle à confirmer avant publication.${e.excerpt ? ' ' + e.excerpt.slice(0, 220) : ''}`,
+      ar: 'مصدر ثانوي (dreamjob.ma) — يجب تأكيد المصدر الرسمي قبل النشر.',
+    },
+    matchedRules: dup ? ['aggregator:dreamjob', `duplicate:${dup.kind}`] : ['aggregator:dreamjob'],
+    possibleDuplicate: dup,
+    _db: {
+      source_id: DREAMJOB_SOURCE_ID,
+      external_id: externalId,
+      source_url: e.url,
+      title_original: e.title,
+      title_ar: null,
+      administration_name: admin,
+      administration_category: category,
+      degree_level: degreeLevel,
+      specialty,
+      region: null,
+      positions: postsCount,
+      deadline_text: deadlineText || null,
+      deadline_date: deadlineISO,
+      publication_text: null,
+      raw: {
+        scraped_status: statusFromDeadline(deadlineISO),
+        is_verified_source: false,
+        discovered_via: 'dreamjob',
+        official_source_required: true,
+        possible_duplicate_of: dup,
+        source: 'vercel-serverless',
+      },
+      status: 'pending_review',
+    },
+  };
+}
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
+
+const SOURCES = {
+  'emploi-public': { label: 'emploi-public.ma', origin: 'https://www.emploi-public.ma', robotsPath: '/fr/concours-liste' },
+  dreamjob: { label: 'dreamjob.ma', origin: 'https://www.dreamjob.ma', robotsPath: '/emploi-public/' },
+} as const;
+type SourceKey = keyof typeof SOURCES;
+
 export default async function handler(req: any, res: any) {
   const startTime = Date.now();
   const logs: { id: string; timestamp: string; level: string; message: string }[] = [];
-  const addLog = (level: string, message: string) =>
+  const addLog: AddLog = (level, message) =>
     logs.push({
       id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: new Date().toTimeString().split(' ')[0],
@@ -77,143 +521,106 @@ export default async function handler(req: any, res: any) {
       message,
     });
 
+  const requested = typeof req.query?.source === 'string' ? req.query.source : 'emploi-public';
+  if (!(requested in SOURCES)) {
+    res.status(400).json({ error: `Source inconnue : ${requested}. Valeurs : ${Object.keys(SOURCES).join(', ')}.` });
+    return;
+  }
+  const sourceKey = requested as SourceKey;
+  const src = SOURCES[sourceKey];
+  const reply = (extra: Record<string, unknown>) =>
+    res.status(200).json({
+      source: src.label,
+      sourceKey,
+      items: [],
+      count: 0,
+      inserted: 0,
+      persisted: false,
+      robotsAllowed: true,
+      ...extra,
+      logs,
+      executionTimeMs: Date.now() - startTime,
+    });
+
   try {
-    addLog('info', 'Démarrage du crawler KounKour sur emploi-public.ma ...');
-    const maxPages = 6;
-    const pagePromises = [];
-    for (let p = 1; p <= maxPages; p++) {
-      const pageUrl = `https://www.emploi-public.ma/fr/concours-liste?page=${p}`;
-      pagePromises.push(
-        fetch(pageUrl, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-            Accept: 'text/html,application/xhtml+xml',
-            'Accept-Language': 'fr-FR,fr;q=0.9,ar;q=0.8',
-          },
-          signal: AbortSignal.timeout(7000),
-        })
-          .then(async (r) => ({ page: p, html: r.ok ? await r.text() : '', ok: r.ok }))
-          .catch(() => ({ page: p, html: '', ok: false }))
-      );
+    addLog('info', `Démarrage du crawler KounKour sur ${src.label} ...`);
+
+    if (!(await checkRobots(src.origin, src.robotsPath, addLog))) {
+      reply({ robotsAllowed: false });
+      return;
     }
-    const pageResults = await Promise.all(pagePromises);
 
-    const items: any[] = [];
-    const seen = new Set<string>();
+    const authHeader = req.headers?.authorization || req.headers?.Authorization;
+    const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
-    for (const pr of pageResults) {
-      if (!pr.ok || !pr.html) {
-        addLog('warn', `Page ${pr.page} : non reçue.`);
-        continue;
-      }
-      const $ = cheerio.load(pr.html);
-      const cards = $('a.card.card-scale, a[href*="/fr/concours/details/"]');
-      addLog('parser', `[PAGE ${pr.page}] ${cards.length} annonces détectées.`);
+    let items: any[] = [];
 
-      for (let i = 0; i < cards.length; i++) {
-        const el = cards[i];
-        const href = $(el).attr('href') || '';
-        const uuidMatch = href.match(/([a-f0-9-]{36})/i);
-        if (!uuidMatch) continue;
-        const uuid = uuidMatch[1];
-        if (seen.has(uuid)) continue;
-        seen.add(uuid);
-
-        const textBlock = $(el).text().replace(/\s+/g, ' ').trim();
-        const lower = textBlock.toLowerCase();
-
-        // Exclut résultats définitifs et annulations.
-        if (
-          lower.includes('résultats pour le concours') ||
-          lower.includes('résultats définitifs') ||
-          lower.includes('liste des admis') ||
-          lower.includes('annulation')
-        )
+    if (sourceKey === 'emploi-public') {
+      const urls = Array.from({ length: 6 }, (_v, i) => `https://www.emploi-public.ma/fr/concours-liste?page=${i + 1}`);
+      const pages = await fetchPages(urls);
+      const seen = new Set<string>();
+      for (const pr of pages) {
+        if (!pr.ok || !pr.html) {
+          addLog('warn', `Page ${pr.page} : non reçue${pr.status ? ` (HTTP ${pr.status})` : ''}.`);
           continue;
-
-        const isConvocation =
-          lower.includes('convoqués pour') || lower.includes('convoqués à l') || lower.includes('convocation');
-
-        let title = $(el).find('.card-title, h5, h4').text().trim();
-        if (!title || title.includes('Publication de la liste')) {
-          const tm =
-            textBlock.match(/concours de recrutement d['’]un ([^M\n]+) Ministère/i) ||
-            textBlock.match(/concours de recrutement de ([^M\n]+) Ministère/i) ||
-            textBlock.match(/concours de recrutement d['’]un ([^\n]+)/i);
-          title = tm ? tm[1].replace(/Convocation.*/, '').trim() : textBlock.slice(0, 60);
         }
-        if (!title) continue;
-
-        let admin = $(el).find('.card-text, .administration').text().trim();
-        if (!admin || admin.length < 5) {
-          const am = textBlock.match(/Ministère[^\n]+/i);
-          admin = am ? am[0].replace('Convocation', '').replace('Annonce', '').trim() : '';
-        }
-        const isDouanes = lower.includes('douan');
-        if (isDouanes) admin = "Ministère de l'Économie et des Finances - Administration des Douanes et Impôts Indirects (ADII)";
-
-        const postsMatch = textBlock.match(/(\d+)\s*postes?/i);
-        const postsCount = postsMatch ? parseInt(postsMatch[1], 10) : null;
-
-        const deadlineMatch = textBlock.match(/Limite de d[ée]p[ôo]t\s*:\s*([^\n\r-]+)/i);
-        const deadlineText = deadlineMatch ? deadlineMatch[1].trim() : '';
-        const deadlineISO = parseFrDateISO(deadlineText);
-
-        let degreeLevel: string | null = null;
-        const tl = title.toLowerCase();
-        if (tl.includes('ingénieur') || tl.includes('master') || tl.includes('conférences')) degreeLevel = 'Master / Ingénieur';
-        else if (tl.includes('technicien') || tl.includes('3ème grade')) degreeLevel = 'Bac+2';
-        else if (tl.includes('adjoint') || tl.includes('agent')) degreeLevel = 'Niveau Bac';
-        else if (tl.includes('médecin') || tl.includes('pharmacien') || tl.includes('docteur')) degreeLevel = 'Doctorat';
-
-        const specialty = extractSpecialty(textBlock);
-
-        // Statut d'affichage dérivé de la vraie date.
-        let scrapedStatus = 'open';
-        if (isConvocation) scrapedStatus = 'in_progress';
-        else if (deadlineISO) {
-          const days = Math.ceil((new Date(`${deadlineISO}T23:59:59`).getTime() - Date.now()) / 86_400_000);
-          scrapedStatus = days < 0 ? 'closed' : days <= 7 ? 'closing_soon' : 'open';
-        }
-
-        const sourceUrl = `https://www.emploi-public.ma/fr/concours/details/${uuid}`;
-        items.push({
-          external_id: uuid,
-          // Forme attendue par l'UI (normalizeScrapedItem) — référence JAMAIS inventée.
-          id: `scrape-${uuid}`,
-          officialSourceUrl: sourceUrl,
-          sourceUrl,
-          title: { fr: title, ar: `مباراة توظيف ${title}` },
-          administration: { name: { fr: admin || 'Administration publique', ar: admin || '' }, category: detectCategory(admin, isDouanes) },
-          postsCount: postsCount ?? 1,
-          degreeLevel: degreeLevel || '',
-          specialty: { fr: specialty || 'Spécialité mentionnée dans l’annonce officielle', ar: '' },
-          region: { fr: 'National (Royaume du Maroc)', ar: 'المملكة المغربية' },
-          publicationDate: '',
-          deadlineDate: deadlineText,
-          status: 'pending_review',
-          // Champs pour l'insertion en base :
-          _db: {
-            source_id: SOURCE_ID,
-            external_id: uuid,
-            source_url: sourceUrl,
-            title_original: title,
-            title_ar: null,
-            administration_name: admin || null,
-            administration_category: detectCategory(admin, isDouanes),
-            degree_level: degreeLevel,
-            specialty,
-            region: null,
-            positions: postsCount,
-            deadline_text: deadlineText || null,
-            deadline_date: deadlineISO,
-            publication_text: null,
-            raw: { scraped_status: scrapedStatus, is_verified_source: true, source: 'vercel-serverless' },
-            status: 'pending_review',
-          },
-        });
+        items.push(...parseEmploiPublicPage(pr.html, pr.page, seen, addLog));
       }
+    } else {
+      const pages = await fetchPages(DREAMJOB_LIST_URLS);
+      const seen = new Set<string>();
+      const entries: DreamjobEntry[] = [];
+      let skipped = 0;
+      for (const pr of pages) {
+        if (!pr.ok || !pr.html) {
+          addLog('warn', `Page ${pr.page} : non reçue${pr.status ? ` (HTTP ${pr.status})` : ''}.`);
+          continue;
+        }
+        const { entries: found, strategy } = parseDreamjobList(pr.html, pr.url);
+        addLog(
+          found.length > 0 ? 'parser' : 'warn',
+          `[PAGE ${pr.page}] ${found.length} annonces détectées (stratégie : ${strategy}).` +
+            (found.length === 0 ? ' Structure de page non reconnue — à signaler.' : '')
+        );
+        for (const e of found) {
+          if (seen.has(e.slug)) continue;
+          seen.add(e.slug);
+          if (isDreamjobNonOpening(e.title)) {
+            skipped++;
+            continue;
+          }
+          entries.push(e);
+        }
+      }
+      if (skipped > 0) addLog('info', `${skipped} annonce(s) de résultats/convocations ignorée(s).`);
+
+      // Références pour signaler les doublons possibles : concours déjà publiés
+      // (lecture publique) + file emploi-public (staff seulement).
+      const refs: DuplicateRef[] = [];
+      const { data: published } = await supabase
+        .from('contests')
+        .select('title_fr, title_original, source_org, deadline_date, source_url')
+        .in('status', ['publie', 'mis_a_jour']);
+      for (const c of published || []) {
+        refs.push({ kind: 'publie', title: c.title_fr || c.title_original || '', admin: c.source_org, deadline: c.deadline_date, url: c.source_url });
+      }
+      if (token) {
+        const { data: epCands } = await supabase
+          .from('radar_candidates')
+          .select('title_original, administration_name, deadline_date, source_url')
+          .eq('source_id', EMPLOI_PUBLIC_SOURCE_ID);
+        for (const c of epCands || []) {
+          refs.push({ kind: 'emploi-public', title: c.title_original || '', admin: c.administration_name, deadline: c.deadline_date, url: c.source_url });
+        }
+      }
+
+      items = entries.map((e) => buildDreamjobItem(e, findPossibleDuplicate(e.title, extractDreamjobAdmin(e.title), parseFrDateISO(extractDreamjobDeadline(`${e.title} ${e.excerpt}`) || ''), refs)));
+      const dups = items.filter((it) => it.possibleDuplicate).length;
+      if (dups > 0) addLog('info', `${dups} annonce(s) signalée(s) comme doublon possible (déjà sur le site ou sur emploi-public).`);
     }
 
     addLog('success', `${items.length} annonces valides extraites.`);
@@ -221,20 +628,12 @@ export default async function handler(req: any, res: any) {
     // Écriture en base — seulement si un admin connecté a fourni son jeton.
     let inserted = 0;
     let persisted = false;
-    const authHeader = req.headers?.authorization || req.headers?.Authorization;
-    const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-
     if (token && items.length > 0) {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        global: { headers: { Authorization: `Bearer ${token}` } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const rows = items.map((it) => it._db);
       // ignoreDuplicates : les concours déjà en file/importés/ignorés ne sont pas
       // réinsérés — seuls les NOUVEAUX entrent dans la file de validation.
       const { data, error } = await supabase
         .from('radar_candidates')
-        .upsert(rows, { onConflict: 'source_id,external_id', ignoreDuplicates: true })
+        .upsert(items.map((it) => it._db), { onConflict: 'source_id,external_id', ignoreDuplicates: true })
         .select('id');
       if (error) {
         addLog('warn', `Écriture base refusée (${error.message}). Résultats affichés sans sauvegarde.`);
@@ -247,20 +646,11 @@ export default async function handler(req: any, res: any) {
       addLog('info', 'Non connecté : résultats affichés sans écriture en base.');
     }
 
-    // Nettoie le champ interne _db avant de renvoyer au client.
+    // Retire le champ interne _db avant de renvoyer au client.
     const clientItems = items.map(({ _db, ...rest }) => rest);
-
-    res.status(200).json({
-      source: 'emploi-public.ma',
-      items: clientItems,
-      logs,
-      count: clientItems.length,
-      inserted,
-      persisted,
-      executionTimeMs: Date.now() - startTime,
-    });
+    reply({ items: clientItems, count: clientItems.length, inserted, persisted });
   } catch (err: any) {
     addLog('warn', `Erreur crawler : ${err?.message || 'inconnue'}`);
-    res.status(200).json({ source: 'emploi-public.ma', items: [], logs, count: 0, inserted: 0, persisted: false, executionTimeMs: Date.now() - startTime });
+    reply({});
   }
 }

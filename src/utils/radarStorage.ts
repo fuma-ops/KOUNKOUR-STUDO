@@ -2,128 +2,83 @@ import { Contest } from '../types';
 import { ScrapeSource, ScrapedContestItem, ScrapeLogEntry } from '../types/radar';
 import { mockContests } from '../data/mockContests';
 
+// Sources RÉELLEMENT scrapables par /api/radar/scrape-live (?source=scanKey).
+// Aucune statistique inventée : dernier scan et nombre d'annonces sont calculés
+// à partir des scans réellement lancés (voir loadSourceScanStats).
 export const OFFICIAL_RADAR_SOURCES: ScrapeSource[] = [
   {
     id: 'src-emploi-public',
+    scanKey: 'emploi-public',
     name: {
       fr: 'Portail National emploi-public.ma',
       ar: 'البوابة الوطنية للتشغيل العمومي',
     },
     domain: 'emploi-public.ma',
-    url: 'https://www.emploi-public.ma',
+    url: 'https://www.emploi-public.ma/fr/concours-liste',
     category: 'official_portal',
     status: 'online',
-    lastScrapeTime: 'Il y a 3 min',
-    itemsDetectedCount: 14,
-    frequencyMinutes: 15,
-    uptimePercent: 99.8,
+    lastScrapeTime: '',
+    itemsDetectedCount: 0,
+    frequencyMinutes: 0,
+    uptimePercent: 0,
     logo: '🏛️',
     description: {
-      fr: 'Source officielle centrale pour tous les concours de la fonction publique et des collectivités territoriales.',
-      ar: 'المصدر الرسمي المركزي لجميع مباريات الوظيفة العمومية والجماعات الترابية بالمغرب.',
+      fr: 'Source officielle centrale des concours de la fonction publique et des collectivités territoriales.',
+      ar: 'المصدر الرسمي المركزي لمباريات الوظيفة العمومية والجماعات الترابية.',
     },
   },
   {
-    id: 'src-sgg-bo',
+    id: 'src-dreamjob',
+    scanKey: 'dreamjob',
     name: {
-      fr: 'Bulletin Officiel du Royaume (SGG)',
-      ar: 'الجريدة الرسمية للمملكة المغربية',
+      fr: 'dreamjob.ma — Emploi public',
+      ar: 'dreamjob.ma — التوظيف العمومي',
     },
-    domain: 'sgg.gov.ma',
-    url: 'http://www.sgg.gov.ma',
-    category: 'official_bulletin',
+    domain: 'dreamjob.ma',
+    url: 'https://www.dreamjob.ma/emploi-public/',
+    category: 'aggregator',
     status: 'online',
-    lastScrapeTime: 'Il y a 18 min',
-    itemsDetectedCount: 6,
-    frequencyMinutes: 60,
-    uptimePercent: 99.9,
-    logo: '📜',
+    lastScrapeTime: '',
+    itemsDetectedCount: 0,
+    frequencyMinutes: 0,
+    uptimePercent: 0,
+    logo: '🔎',
     description: {
-      fr: 'Publication légale des arrêtés fixant les conditions et le nombre de postes des concours nationaux.',
-      ar: 'النشر القانوني للقرارات المحددة لشروط وعدد مناصب المباريات الوطنية.',
-    },
-  },
-  {
-    id: 'src-men-aref',
-    name: {
-      fr: 'Portail Recrutement Éducation & AREF',
-      ar: 'بوابة توظيف وزارة التربية والتعليم والأكاديميات',
-    },
-    domain: 'men.gov.ma',
-    url: 'https://www.men.gov.ma',
-    category: 'ministry',
-    status: 'online',
-    lastScrapeTime: 'Il y a 8 min',
-    itemsDetectedCount: 12,
-    frequencyMinutes: 30,
-    uptimePercent: 99.5,
-    logo: '🎓',
-    description: {
-      fr: 'Suivi des concours d’enseignants des cadres des AREF et des cadres d’appui administratif et pédagogique.',
-      ar: 'تتبع مباريات أطر التدريس بالأكاديميات الجهوية وأطر الدعم الإداري والتربوي.',
-    },
-  },
-  {
-    id: 'src-sante-chur',
-    name: {
-      fr: 'Ministère de la Santé & CHU',
-      ar: 'وزارة الصحة والحماية الاجتماعية والمراكز الاستشفائية',
-    },
-    domain: 'sante.gov.ma',
-    url: 'https://www.sante.gov.ma',
-    category: 'ministry',
-    status: 'online',
-    lastScrapeTime: 'Il y a 25 min',
-    itemsDetectedCount: 8,
-    frequencyMinutes: 30,
-    uptimePercent: 99.7,
-    logo: '🏥',
-    description: {
-      fr: 'Concours pour infirmiers diplômés d’État, techniciens de santé et médecins résidents.',
-      ar: 'مباريات الممرضين المجازين من الدولة، تقنيي الصحة والأطباء المقيمين.',
-    },
-  },
-  {
-    id: 'src-finances',
-    name: {
-      fr: 'Ministère de l’Économie & Finances',
-      ar: 'وزارة الاقتصاد والمالية',
-    },
-    domain: 'finances.gov.ma',
-    url: 'https://www.finances.gov.ma',
-    category: 'ministry',
-    status: 'online',
-    lastScrapeTime: 'Il y a 42 min',
-    itemsDetectedCount: 5,
-    frequencyMinutes: 60,
-    uptimePercent: 99.9,
-    logo: '💼',
-    description: {
-      fr: 'Concours des Administrateurs, Inspecteurs des Finances et Douanes.',
-      ar: 'مباريات المتصرفين ومفتشي المالية والجمارك.',
-    },
-  },
-  {
-    id: 'src-oncf-eep',
-    name: {
-      fr: 'Établissements Publics (ONCF, OCP, RAM)',
-      ar: 'المؤسسات والشركات العمومية (ONCF, OCP)',
-    },
-    domain: 'oncf.ma',
-    url: 'https://www.oncf.ma',
-    category: 'public_enterprise',
-    status: 'online',
-    lastScrapeTime: 'Il y a 55 min',
-    itemsDetectedCount: 4,
-    frequencyMinutes: 120,
-    uptimePercent: 99.4,
-    logo: '🚆',
-    description: {
-      fr: 'Offres et concours d’ingénieurs, conducteurs, techniciens et spécialistes du secteur public marchand.',
-      ar: 'عروض ومباريات المهندسين والتقنيين بالشركات والمؤسسات العمومية.',
+      fr: 'Agrégateur (non officiel) : sert à découvrir les concours absents d’emploi-public. La source officielle est exigée avant publication.',
+      ar: 'موقع تجميعي غير رسمي لاكتشاف المباريات الغائبة؛ يشترط المصدر الرسمي قبل النشر.',
     },
   },
 ];
+
+// Dernier scan réel par source (sur cet appareil).
+export interface SourceScanStat {
+  at: string; // ISO
+  found: number;
+  inserted: number;
+  persisted: boolean;
+  robotsAllowed: boolean;
+}
+const SOURCE_STATS_KEY = 'kounkour_radar_source_stats_v1';
+
+export function loadSourceScanStats(): Record<string, SourceScanStat> {
+  try {
+    const raw = localStorage.getItem(SOURCE_STATS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveSourceScanStat(sourceId: string, stat: SourceScanStat): Record<string, SourceScanStat> {
+  const all = { ...loadSourceScanStats(), [sourceId]: stat };
+  try {
+    localStorage.setItem(SOURCE_STATS_KEY, JSON.stringify(all));
+  } catch {
+    /* stockage indisponible : l'affichage reste correct pour la session */
+  }
+  return all;
+}
 
 import realScrapedFeedData from '../data/realScrapedFeed.json';
 
@@ -136,13 +91,20 @@ const FR_MONTHS: Record<string, number> = {
 };
 export function parseFrenchDate(text: any): Date | null {
   if (!text || typeof text !== 'string') return null;
-  const m = text.match(/(\d{1,2})\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
-  if (!m) return null;
-  const day = parseInt(m[1], 10);
-  const month = FR_MONTHS[m[2].toLowerCase()];
-  const year = parseInt(m[3], 10);
-  if (month === undefined || day < 1 || day > 31) return null;
-  return new Date(year, month, day, 23, 59, 59);
+  const m = text.match(/(\d{1,2})(?:er)?\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
+  if (m) {
+    const day = parseInt(m[1], 10);
+    const month = FR_MONTHS[m[2].toLowerCase()];
+    const year = parseInt(m[3], 10);
+    if (month !== undefined && day >= 1 && day <= 31) return new Date(year, month, day, 23, 59, 59);
+  }
+  const n = text.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/);
+  if (n) {
+    const day = parseInt(n[1], 10);
+    const month = parseInt(n[2], 10) - 1;
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 11) return new Date(parseInt(n[3], 10), month, day, 23, 59, 59);
+  }
+  return null;
 }
 
 // Jours restants RÉELS calculés depuis la date limite (plus de valeur figée).
@@ -224,7 +186,7 @@ export function normalizeScrapedItem(item: any): ScrapedContestItem {
       logo: item.administration?.logo || item.image || '/images/administrations/logo-013.png',
     },
     postsCount: typeof item.postsCount === 'number' ? item.postsCount : 1,
-    degreeLevel: item.degreeLevel || 'Licence / Master',
+    degreeLevel: item.degreeLevel || '',
     specialty: { fr: specFr, ar: specAr },
     region: { fr: regFr, ar: regAr },
     publicationDate: item.publicationDate || '',
@@ -232,7 +194,8 @@ export function normalizeScrapedItem(item: any): ScrapedContestItem {
     daysRemaining: computeDaysRemaining(item.deadlineDate, item.daysRemaining),
     parsingConfidence: computeConfidence(item),
     status: (item.status === 'imported' ? 'imported' : 'pending_review'),
-    matchedRules: Array.isArray(item.matchedRules) ? item.matchedRules : ['arrete:verified'],
+    matchedRules: Array.isArray(item.matchedRules) ? item.matchedRules : [],
+    possibleDuplicate: item.possibleDuplicate || null,
     rawSnippet: { fr: snippetFr, ar: snippetAr || snippetFr },
   };
 }
@@ -271,39 +234,9 @@ export function saveScrapedItems(items: ScrapedContestItem[]): void {
 export function loadScrapeLogs(): ScrapeLogEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOGS);
-    if (!raw) {
-      return [
-        {
-          id: 'log-1',
-          timestamp: '11:15:02',
-          sourceId: 'src-emploi-public',
-          level: 'success',
-          message: 'GET https://www.emploi-public.ma/fr/concours.aspx -> HTTP 200 OK (384 ms)',
-        },
-        {
-          id: 'log-2',
-          timestamp: '11:15:04',
-          sourceId: 'src-emploi-public',
-          level: 'parser',
-          message: 'DOM Parser: 1 nouvelle annonce détectée [Réf: MJ/DRH/2026/GREF-3] -> Confiance 98%',
-        },
-        {
-          id: 'log-3',
-          timestamp: '10:48:19',
-          sourceId: 'src-finances',
-          level: 'success',
-          message: 'Analyse flux Ministère de l’Économie et des Finances: 1 concours Douanes extrait.',
-        },
-        {
-          id: 'log-4',
-          timestamp: '10:12:44',
-          sourceId: 'src-sgg-bo',
-          level: 'info',
-          message: 'Bulletin Officiel n° 7382: Décret d’application scanné sans anomalie de structure.',
-        },
-      ];
-    }
-    return JSON.parse(raw);
+    // Pas de journal d'exemple : seuls les vrais scans y figurent.
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter((l: any) => !/^log-[1-4]$/.test(l?.id)) : [];
   } catch (e) {
     return [];
   }

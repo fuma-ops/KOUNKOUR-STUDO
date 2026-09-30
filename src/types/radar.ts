@@ -3,10 +3,13 @@ export type ScrapeSourceCategory =
   | 'official_bulletin'
   | 'ministry'
   | 'public_enterprise'
-  | 'university';
+  | 'university'
+  | 'aggregator';
 
 export interface ScrapeSource {
   id: string;
+  /** Valeur de ?source= pour /api/radar/scrape-live. */
+  scanKey: 'emploi-public' | 'dreamjob';
   name: {
     fr: string;
     ar: string;
@@ -80,6 +83,14 @@ export interface ScrapedContestItem {
   depositType?: string;
   depositSite?: string;
   contestDate?: string;
+  /** Concours proche déjà connu (signalé, jamais fusionné automatiquement). */
+  possibleDuplicate?: {
+    kind: 'publie' | 'emploi-public';
+    title: string;
+    admin: string | null;
+    deadline: string | null;
+    url: string | null;
+  } | null;
 }
 
 export interface ScrapeLogEntry {

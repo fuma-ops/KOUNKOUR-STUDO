@@ -15,7 +15,8 @@ import {
   OFFICIAL_RADAR_SOURCES, loadScrapedItems, saveScrapedItems,
   loadScrapeLogs, saveScrapeLogs, importScrapedContestToCatalog,
   loadImportedContests, normalizeScrapedItem,
-  importMultipleScrapedContestsToCatalog, ignoreMultipleScrapedContests
+  importMultipleScrapedContestsToCatalog, ignoreMultipleScrapedContests,
+  loadSourceScanStats, saveSourceScanStat, SourceScanStat
 } from '../utils/radarStorage';
 import { getSupabase } from '../lib/supabase';
 import { publishScrapedToSupabase, publishManyScrapedToSupabase } from '../data/publishContest';
@@ -34,7 +35,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
   const isRTL = language === 'ar';
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
 
-  const [sources, setSources] = useState<ScrapeSource[]>(OFFICIAL_RADAR_SOURCES);
+  const [sources] = useState<ScrapeSource[]>(OFFICIAL_RADAR_SOURCES);
   const [scrapedItems, setScrapedItems] = useState<ScrapedContestItem[]>(loadScrapedItems());
   const [logs, setLogs] = useState<ScrapeLogEntry[]>(loadScrapeLogs());
   const [isScanning, setIsScanning] = useState(false);
@@ -45,6 +46,10 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isTerminalExpanded, setIsTerminalExpanded] = useState(false);
   const [importedToast, setImportedToast] = useState<string | null>(null);
+  // Source choisie par l'admin pour le prochain scan (aucun scan automatique).
+  const [scanSourceId, setScanSourceId] = useState<string>(OFFICIAL_RADAR_SOURCES[0].id);
+  const [scanningSourceId, setScanningSourceId] = useState<string | null>(null);
+  const [scanStats, setScanStats] = useState<Record<string, SourceScanStat>>(loadSourceScanStats());
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -75,19 +80,16 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
 
   const handleStartScan = async (targetSourceId?: string) => {
     if (isScanning) return;
+    const src = sources.find((x) => x.id === (targetSourceId || scanSourceId)) || sources[0];
     setIsScanning(true);
+    setScanningSourceId(src.id);
     setScanProgress(15);
     setIsTerminalExpanded(true);
 
-    const sourceName = targetSourceId 
-      ? sources.find(s => s.id === targetSourceId)?.domain || targetSourceId
-      : 'emploi-public.ma & portails ministériels';
-
-    addLog('info', `[RADAR LIVE ENGINE] Connexion au serveur backend de scraping pour : ${sourceName}`);
+    addLog('info', `[RADAR] Scan demandé par l’admin : ${src.domain}`, src.id);
 
     try {
       setScanProgress(35);
-      addLog('info', `[HTTP GET] Envoi de la requête de crawl réel vers /api/radar/scrape-live ...`);
 
       // Jeton de l'admin connecté → autorise l'écriture en base (RLS staff).
       let authHeaders: Record<string, string> = {};
@@ -98,7 +100,9 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
         if (token) authHeaders = { Authorization: `Bearer ${token}` };
       }
 
-      const response = await fetch('/api/radar/scrape-live', { headers: authHeaders });
+      const response = await fetch(`/api/radar/scrape-live?source=${encodeURIComponent(src.scanKey)}`, {
+        headers: authHeaders,
+      });
       setScanProgress(70);
 
       if (!response.ok) {
@@ -109,83 +113,95 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
       setScanProgress(90);
 
       if (data.logs && Array.isArray(data.logs)) {
-        data.logs.forEach((l: any) => addLog(l.level, l.message));
+        data.logs.forEach((l: any) => addLog(l.level, l.message, src.id));
       }
 
-      if (data.items && data.items.length > 0) {
-        // Merge real scraped items into local storage
+      setScanStats(
+        saveSourceScanStat(src.id, {
+          at: new Date().toISOString(),
+          found: data.count || 0,
+          inserted: data.inserted || 0,
+          persisted: !!data.persisted,
+          robotsAllowed: data.robotsAllowed !== false,
+        })
+      );
+
+      if (data.robotsAllowed === false) {
+        setImportedToast(
+          language === 'fr'
+            ? `${src.domain} interdit ce scan (robots.txt) — rien n’a été récupéré.`
+            : `${src.domain} يمنع هذا المسح (robots.txt).`
+        );
+      } else if (data.items && data.items.length > 0) {
+        // Fusion avec les annonces déjà connues (statut conservé).
         const existing = loadScrapedItems();
         const existingMap = new Map(existing.map((e: any) => [e.id, e]));
-        
-        // Keep status if already imported
         const normalizedLive = data.items.map(normalizeScrapedItem);
-        const updatedLiveItems = normalizedLive.map((item: any) => {
-          if (existingMap.has(item.id)) {
-            return { ...item, status: existingMap.get(item.id)?.status || item.status };
-          }
-          return item;
-        });
-
+        const updatedLiveItems = normalizedLive.map((item: any) =>
+          existingMap.has(item.id) ? { ...item, status: existingMap.get(item.id)?.status || item.status } : item
+        );
         const merged = [
           ...updatedLiveItems,
-          ...existing.filter((e: any) => !normalizedLive.some((d: any) => d.id === e.id))
+          ...existing.filter((e: any) => !normalizedLive.some((d: any) => d.id === e.id)),
         ];
-
         saveScrapedItems(merged);
         setScrapedItems(merged);
 
-        addLog('success', `[RADAR REEL] ✅ ${data.items.length} annonces réelles extraites en direct depuis ${data.source} en ${data.executionTimeMs} ms !`);
-        
-        // Update sources timestamps
-        setSources((prev) =>
-          prev.map((s) => ({
-            ...s,
-            lastScrapeTime: language === 'fr' ? 'À l’instant (En direct)' : 'الآن (مباشر)',
-          }))
-        );
-
+        addLog('success', `[RADAR] ${data.items.length} annonces extraites de ${data.source} en ${data.executionTimeMs} ms.`, src.id);
         setImportedToast(
-          language === 'fr' 
-            ? `Crawl réel réussi ! ${data.items.length} concours officiels récupérés en direct de emploi-public.ma` 
-            : `تم استخراج ${data.items.length} مباراة حقيقية مباشرة من البوابة الرسمية !`
+          language === 'fr'
+            ? `${data.items.length} annonces récupérées de ${data.source}` +
+                (data.persisted ? ` — ${data.inserted} nouvelle(s) en file de validation.` : '.')
+            : `تم استخراج ${data.items.length} مباراة من ${data.source}`
         );
       } else {
-        addLog('info', `[RADAR] Aucune nouvelle annonce détectée lors de ce passage.`);
+        addLog('info', `[RADAR] Aucune annonce extraite de ${data.source || src.domain}. Voir le journal ci-dessus.`, src.id);
+        setImportedToast(
+          language === 'fr'
+            ? `Aucune annonce extraite de ${src.domain} — consultez le journal.`
+            : `لم يتم استخراج أي مباراة من ${src.domain}.`
+        );
       }
 
       setScanProgress(100);
       setIsLiveRealScrape(true);
     } catch (err: any) {
-      addLog('warn', `[RADAR WARN] Impossible de joindre le scraper direct (${err.message}). Utilisation des données locales.`);
+      addLog('warn', `[RADAR] Impossible de joindre le scraper (${err.message}).`, src.id);
       setScanProgress(100);
     } finally {
       setIsScanning(false);
-      setTimeout(() => setImportedToast(null), 4500);
+      setScanningSourceId(null);
+      setTimeout(() => setImportedToast(null), 5000);
     }
   };
 
   const handleImportToCatalog = async (item: ScrapedContestItem) => {
-    const newContest = importScrapedContestToCatalog(item);
-    setScrapedItems(loadScrapedItems());
-    // Publication réelle vers Supabase → visible sur le site public (staff requis).
-    const ok = await publishScrapedToSupabase(item);
+    // Publication réelle vers Supabase d'abord : l'annonce n'est marquée « au
+    // catalogue » que si elle est vraiment en ligne (ou déjà en ligne).
+    const result = await publishScrapedToSupabase(item);
+    const alreadyOnline = !result.ok && result.reason.startsWith('déjà publié');
+    if (result.ok || alreadyOnline) {
+      const newContest = importScrapedContestToCatalog(item);
+      setScrapedItems(loadScrapedItems());
+      if (onContestImported) onContestImported(newContest);
+    }
     addLog(
-      ok ? 'success' : 'warn',
-      ok
-        ? `[PUBLICATION] "${item.title[language]}" publié sur le site (Supabase).`
-        : `[PUBLICATION] "${item.title[language]}" ajouté localement — connexion admin requise pour publier en ligne.`
+      result.ok ? 'success' : 'warn',
+      result.ok
+        ? `[PUBLICATION] "${item.title.fr}" publié sur le site (Supabase).`
+        : `[PUBLICATION] "${item.title.fr}" non publié : ${result.reason}.`,
+      item.sourceId
     );
     setImportedToast(
       language === 'fr'
-        ? ok
+        ? result.ok
           ? `Le concours "${item.title.fr}" est désormais visible sur le site public !`
-          : `Ajouté localement. Connecte-toi en admin pour le publier en ligne.`
-        : `تمت إضافة المباراة بنجاح !`
+          : `Non publié : ${result.reason}.`
+        : result.ok
+        ? `تمت إضافة المباراة بنجاح !`
+        : `لم يتم النشر.`
     );
-    if (onContestImported) {
-      onContestImported(newContest);
-    }
-    setTimeout(() => setImportedToast(null), 4000);
+    setTimeout(() => setImportedToast(null), 5000);
   };
 
   const handleToggleSelectItem = (id: string) => {
@@ -202,42 +218,41 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     }
   };
 
-  const handleBatchImport = async () => {
-    if (selectedIds.length === 0) return;
-    const selectedItems = scrapedItems.filter((i) => selectedIds.includes(i.id));
-    const importedList = importMultipleScrapedContestsToCatalog(selectedItems);
+  // Publication groupée : seuls les concours réellement publiés (ou déjà en ligne)
+  // passent « au catalogue » ; les autres restent en file avec la raison au journal.
+  const publishBatch = async (items: ScrapedContestItem[], label: string) => {
+    const { published, failures } = await publishManyScrapedToSupabase(items);
+    const failed = new Map(failures.map((f) => [f.id, f.reason]));
+    const done = items.filter((it) => {
+      const reason = failed.get(it.id);
+      return reason === undefined || reason.startsWith('déjà publié');
+    });
+    const importedList = done.length > 0 ? importMultipleScrapedContestsToCatalog(done) : [];
     setScrapedItems(loadScrapedItems());
     setSelectedIds([]);
-    const published = await publishManyScrapedToSupabase(selectedItems);
-    addLog('success', `[PUBLICATION] ${published}/${selectedItems.length} concours publiés en ligne (Supabase).`);
+    addLog('success', `[${label}] ${published}/${items.length} concours publiés en ligne (Supabase).`);
+    failures.forEach((f) => addLog('warn', `[${label}] Non publié « ${f.title} » : ${f.reason}.`));
     setImportedToast(
       language === 'fr'
-        ? `✅ ${published} concours publiés sur le site public !`
+        ? `✅ ${published} concours publiés sur le site public` +
+            (failures.length > 0 ? ` — ${failures.length} restés en file (voir journal).` : ' !')
         : `✅ تم نشر ${published} مباراة على الموقع !`
     );
     if (onContestImported && importedList.length > 0) {
       onContestImported(importedList[0]);
     }
-    setTimeout(() => setImportedToast(null), 4500);
+    setTimeout(() => setImportedToast(null), 5000);
+  };
+
+  const handleBatchImport = async () => {
+    if (selectedIds.length === 0) return;
+    await publishBatch(scrapedItems.filter((i) => selectedIds.includes(i.id)), 'PUBLICATION');
   };
 
   const handleImportAllPending = async () => {
     const pendingItems = scrapedItems.filter((i) => i.status === 'pending_review');
     if (pendingItems.length === 0) return;
-    const importedList = importMultipleScrapedContestsToCatalog(pendingItems);
-    setScrapedItems(loadScrapedItems());
-    setSelectedIds([]);
-    const published = await publishManyScrapedToSupabase(pendingItems);
-    addLog('success', `[PUBLICATION MASSIVE] ${published}/${pendingItems.length} concours publiés en ligne.`);
-    setImportedToast(
-      language === 'fr'
-        ? `🎉 ${published} concours publiés sur le site public !`
-        : `🎉 تم نشر ${published} مباراة على الموقع !`
-    );
-    if (onContestImported && importedList.length > 0) {
-      onContestImported(importedList[0]);
-    }
-    setTimeout(() => setImportedToast(null), 5000);
+    await publishBatch(pendingItems, 'PUBLICATION MASSIVE');
   };
 
   const handleBatchIgnore = () => {
@@ -287,6 +302,16 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     return true;
   });
 
+  const formatLastScan = (stat?: SourceScanStat) => {
+    if (!stat) return language === 'fr' ? 'Jamais scanné sur cet appareil' : 'لم يتم المسح بعد';
+    const mins = Math.max(0, Math.round((Date.now() - new Date(stat.at).getTime()) / 60000));
+    const ago =
+      mins < 1 ? 'à l’instant' : mins < 60 ? `il y a ${mins} min` : mins < 1440 ? `il y a ${Math.round(mins / 60)} h` : `il y a ${Math.round(mins / 1440)} j`;
+    if (!stat.robotsAllowed) return `Scan ${ago} : bloqué par robots.txt`;
+    return `Scan ${ago} : ${stat.found} annonce(s)` + (stat.persisted ? `, ${stat.inserted} nouvelle(s)` : '');
+  };
+  const scanSource = sources.find((x) => x.id === scanSourceId) || sources[0];
+
   const totalPending = scrapedItems.filter((i) => i.status === 'pending_review').length;
   const totalImported = scrapedItems.filter((i) => i.status === 'imported').length;
 
@@ -331,7 +356,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
 
             <span className="text-xs text-emerald-300 font-mono bg-emerald-950/60 px-2.5 py-1 rounded-xl border border-emerald-800/50 flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Live Web Crawler: emploi-public.ma</span>
+              <span>Sources : {sources.map((x) => x.domain).join(' · ')}</span>
             </span>
           </div>
 
@@ -341,12 +366,28 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
 
           <p className="text-xs sm:text-sm text-gray-300 leading-relaxed mb-6">
             {language === 'fr'
-              ? 'Le Radar inspecte en continu les portails officiels (emploi-public.ma, Bulletin Officiel SGG, ministères et établissements publics). Les annonces extraites sont analysées, nettoyées et prêtes à être intégrées au catalogue public.'
-              : 'يقوم الرادار بمسح دوري للبوابات الرسمية واستخراج القرارات والمباريات الجديدة بدقة عالية مع معالجة الشروط وتاريخ انتهاء الآجال.'}
+              ? 'Choisissez le site à scanner puis lancez le scan. Les annonces extraites sont nettoyées et placées en file de validation : rien n’est publié sans votre accord, et toujours avec la source officielle.'
+              : 'اختر الموقع ثم شغّل المسح. توضع المباريات المستخرجة في قائمة التحقق ولا تنشر إلا بموافقتك ومع المصدر الرسمي.'}
           </p>
 
           {/* Action Bar */}
           <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs font-semibold text-gray-300">
+              <span>{language === 'fr' ? 'Site à scanner' : 'الموقع'}</span>
+              <select
+                value={scanSourceId}
+                onChange={(e) => setScanSourceId(e.target.value)}
+                disabled={isScanning}
+                className="bg-black/40 border border-white/20 text-white text-xs sm:text-sm font-bold rounded-2xl px-3 py-3 focus:outline-none focus:border-emerald-400 cursor-pointer"
+              >
+                {sources.map((x) => (
+                  <option key={x.id} value={x.id} className="text-[#242126]">
+                    {x.domain}{x.category === 'aggregator' ? ' (agrégateur)' : ' (officiel)'}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <button
               onClick={() => handleStartScan()}
               disabled={isScanning}
@@ -360,7 +401,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
               <span>
                 {isScanning
                   ? (language === 'fr' ? `Scan en cours (${scanProgress}%)...` : `جارٍ المسح (${scanProgress}%)...`)
-                  : (language === 'fr' ? 'Lancer un scan immédiat (Tous les portails)' : 'تشغيل مسح الرادار الآن')}
+                  : (language === 'fr' ? `Scanner ${scanSource.domain}` : `مسح ${scanSource.domain}`)}
               </span>
             </button>
 
@@ -419,9 +460,9 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
           </div>
 
           <div>
-            <span className="text-xl sm:text-2xl font-extrabold text-[#C73578] block">99.8%</span>
+            <span className="text-xl sm:text-2xl font-extrabold text-[#C73578] block">{totalImported}</span>
             <span className="text-[10px] text-gray-400 uppercase font-semibold">
-              {language === 'fr' ? 'Taux de fiabilité' : 'دقة التحليل الآلي'}
+              {language === 'fr' ? 'Publiés via le Radar' : 'منشورة عبر الرادار'}
             </span>
           </div>
         </div>
@@ -479,17 +520,17 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-bold text-[#242126]">
-              {language === 'fr' ? 'Sources Officielles Surveillées' : 'المصادر الرسمية المعتمدة'}
+              {language === 'fr' ? 'Sites à scanner' : 'المواقع القابلة للمسح'}
             </h2>
             <p className="text-xs text-[#6E6773]">
               {language === 'fr'
-                ? 'Portails institutionnels de l’administration marocaine scannés par le robot'
-                : 'البوابات الحكومية التي تتم مراقبتها بشكل دوري عبر الروبوت'}
+                ? 'Vous choisissez le site et déclenchez le scan vous-même.'
+                : 'أنت من يختار الموقع ويشغّل المسح.'}
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {sources.map((src) => (
             <div
               key={src.id}
@@ -505,10 +546,16 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                     </div>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>99.8%</span>
-                  </span>
+                  {src.category === 'aggregator' ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shrink-0">
+                      {language === 'fr' ? 'Agrégateur — non officiel' : 'غير رسمي'}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                      <ShieldCheck className="w-3 h-3" />
+                      {language === 'fr' ? 'Source officielle' : 'مصدر رسمي'}
+                    </span>
+                  )}
                 </div>
 
                 <p className="text-[11px] text-[#6E6773] line-clamp-2 mb-3">
@@ -518,17 +565,23 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
 
               <div className="pt-3 border-t border-[#F1E5EC] flex items-center justify-between text-xs">
                 <span className="text-[10px] text-gray-500">
-                  {src.lastScrapeTime}
+                  {formatLastScan(scanStats[src.id])}
+                  {' · '}
+                  {scrapedItems.filter((it) => it.sourceId === src.id).length} {language === 'fr' ? 'en liste' : 'بالقائمة'}
                 </span>
 
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => handleStartScan(src.id)}
+                    onClick={() => {
+                      setScanSourceId(src.id);
+                      handleStartScan(src.id);
+                    }}
                     disabled={isScanning}
-                    className="p-1.5 rounded-lg text-[#8D174B] hover:bg-[#FDF2F7] transition-colors cursor-pointer"
-                    title={language === 'fr' ? 'Scanner ce portail' : 'مسح هذا الموقع'}
+                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-[#8D174B] bg-[#FDF2F7] hover:bg-[#F9E1EC] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-wait"
+                    title={language === 'fr' ? 'Scanner ce site' : 'مسح هذا الموقع'}
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-3.5 h-3.5 ${scanningSourceId === src.id ? 'animate-spin' : ''}`} />
+                    <span>{scanningSourceId === src.id ? (language === 'fr' ? 'Scan…' : 'جارٍ…') : (language === 'fr' ? 'Scanner' : 'مسح')}</span>
                   </button>
 
                   <a
@@ -624,6 +677,17 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
 
           {/* Search box & Fast 1-click Mass Import */}
           <div className="flex items-center gap-2">
+            <select
+              value={selectedSourceFilter}
+              onChange={(e) => { setSelectedSourceFilter(e.target.value); setSelectedIds([]); }}
+              className="text-xs bg-white border border-[#F1E5EC] focus:border-[#8D174B] rounded-xl px-2.5 py-1.5 text-[#242126] focus:outline-none shadow-2xs cursor-pointer"
+              title={language === 'fr' ? 'Filtrer par site' : 'تصفية حسب الموقع'}
+            >
+              <option value="all">{language === 'fr' ? 'Tous les sites' : 'كل المواقع'}</option>
+              {sources.map((x) => (
+                <option key={x.id} value={x.id}>{x.domain}</option>
+              ))}
+            </select>
             <div className="relative flex-1 sm:w-64">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute start-3 top-1/2 -translate-y-1/2" />
               <input
@@ -712,14 +776,14 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
               </h4>
               <p className="text-xs text-[#6E6773] max-w-sm mx-auto mb-4">
                 {language === 'fr' 
-                  ? 'Cliquez sur "Lancer un scan immédiat" pour inspecter à nouveau les portails officiels.' 
+                  ? `Choisissez un site puis lancez le scan (site sélectionné : ${scanSource.domain}).` 
                   : 'اضغط على زر تشغيل الرادار لبدء فحص جديد.'}
               </p>
               <button
                 onClick={() => handleStartScan()}
                 className="px-4 py-2 rounded-xl bg-[#8D174B] text-white text-xs font-bold shadow-xs hover:bg-[#75123E] cursor-pointer"
               >
-                {language === 'fr' ? 'Lancer le scan' : 'تشغيل المسح'}
+                {language === 'fr' ? `Scanner ${scanSource.domain}` : `مسح ${scanSource.domain}`}
               </button>
             </div>
           ) : (
@@ -782,6 +846,12 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                             {item.parsingConfidence}% {language === 'fr' ? 'champs extraits' : 'حقول مستخرجة'}
                           </span>
 
+                          {item.sourceId === 'src-dreamjob' && (
+                            <span className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                              {language === 'fr' ? 'Via dreamjob — source officielle à confirmer' : 'عبر dreamjob — المصدر الرسمي للتأكيد'}
+                            </span>
+                          )}
+
                           {item.status === 'imported' && (
                             <span className="text-[11px] text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                               <Check className="w-3 h-3" />
@@ -800,13 +870,37 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                           </span>
                           <span>•</span>
                           <span>
-                            <strong>{language === 'fr' ? 'Diplôme :' : 'الدبلوم :'}</strong> {item.degreeLevel || 'Bac+2 / Bac+5'}
+                            <strong>{language === 'fr' ? 'Diplôme :' : 'الدبلوم :'}</strong> {item.degreeLevel || (language === 'fr' ? 'à vérifier' : 'غير مؤكد')}
                           </span>
                           <span>•</span>
                           <span className="text-[#8D174B] font-semibold">
                             <strong>{language === 'fr' ? 'Dernier délai :' : 'آخر أجل :'}</strong> {item.deadlineDate || (language === 'fr' ? 'à vérifier' : 'غير مؤكد')}{item.daysRemaining > 0 ? ` (${item.daysRemaining} ${language === 'fr' ? 'jours restants' : 'يوم متبقي'})` : ''}
                           </span>
                         </div>
+
+                        {item.possibleDuplicate && (
+                          <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
+                            <strong>{language === 'fr' ? 'Doublon possible' : 'تكرار محتمل'}</strong>
+                            {' — '}
+                            {item.possibleDuplicate.kind === 'publie'
+                              ? (language === 'fr' ? 'déjà sur le site : ' : 'موجود بالموقع : ')
+                              : (language === 'fr' ? 'déjà détecté sur emploi-public : ' : 'مرصود في emploi-public : ')}
+                            {item.possibleDuplicate.url ? (
+                              <a
+                                href={item.possibleDuplicate.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="underline font-semibold"
+                              >
+                                {item.possibleDuplicate.title}
+                              </a>
+                            ) : (
+                              <span className="font-semibold">{item.possibleDuplicate.title}</span>
+                            )}
+                            {language === 'fr' ? '. Vérifiez avant de publier.' : ''}
+                          </div>
+                        )}
 
                         {/* Raw Snippet Box */}
                         <div className="p-3 bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl text-xs text-[#6E6773] italic">

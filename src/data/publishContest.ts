@@ -4,7 +4,7 @@ import { parseFrenchDate } from '../utils/radarStorage';
 
 // Publie un candidat scrapé vers Supabase (table contests, statut publié) afin
 // qu'il apparaisse sur le site public, et marque le candidat comme importé dans
-// radar_candidates. Réservé au staff (RLS re-vérifie le rôle). Renvoie true si OK.
+// radar_candidates. Réservé au staff (RLS re-vérifie le rôle).
 
 function slugify(input: string): string {
   return (
@@ -24,28 +24,96 @@ function toISODate(frText: string | undefined): string | null {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export async function publishScrapedToSupabase(item: ScrapedContestItem): Promise<boolean> {
+export type PublishResult = { ok: true } | { ok: false; reason: string };
+
+const OFFICIAL_URL = /^https:\/\/([a-z0-9-]+\.)*(gov\.ma|ac\.ma|emploi-public\.ma)(\/|$)/i;
+
+// Suffixe de slug court et stable, dérivé de l'identifiant externe.
+function shortHash(input: string): string {
+  let h = 0;
+  for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  return h.toString(36).padStart(6, '0').slice(-6);
+}
+
+// Forme canonique d'une fiche emploi-public (celle stockée en base).
+function canonicalOfficialUrl(url: string): string {
+  const m = url.match(/emploi-public\.ma\/(?:fr|ar)\/concours\/details\/([0-9a-f-]{36})/i);
+  return m ? `https://www.emploi-public.ma/fr/concours/details/${m[1].toLowerCase()}` : url;
+}
+
+function isAggregatorItem(item: ScrapedContestItem): boolean {
+  return item.sourceId === 'src-dreamjob' || /dreamjob\.ma/i.test(item.sourceUrl || '');
+}
+
+async function enrich(query: string): Promise<any> {
+  try {
+    const er = await fetch(`/api/radar/enrich?${query}`);
+    if (er.ok) return await er.json();
+  } catch {
+    /* la page détail peut être injoignable : on publie avec ce qu'on a */
+  }
+  return {};
+}
+
+// interactive=false (publication groupée) : pas de fenêtre de saisie ; un concours
+// dreamjob sans source officielle trouvée est alors laissé en file.
+export async function publishScrapedToSupabase(
+  item: ScrapedContestItem,
+  { interactive = true }: { interactive?: boolean } = {}
+): Promise<PublishResult> {
   const supabase = getSupabase();
-  if (!supabase) return false;
+  if (!supabase) return { ok: false, reason: 'Supabase indisponible' };
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return false;
+  if (!user) return { ok: false, reason: 'connexion admin requise' };
 
-  const uuid = item.id.replace(/^scrape-/, '');
+  const externalId = item.id.replace(/^scrape-/, '');
 
   // Enrichissement depuis la page détail officielle (code du concours, date du
   // concours, date de publication, site de dépôt) — jamais inventé, null si absent.
-  let enriched: any = {};
-  try {
-    const er = await fetch(`/api/radar/enrich?id=${encodeURIComponent(uuid)}`);
-    if (er.ok) enriched = await er.json();
-  } catch {
-    /* la page détail peut être injoignable : on publie avec ce qu'on a */
+  let enriched: any;
+  let sourceUrl: string;
+  if (isAggregatorItem(item)) {
+    // dreamjob n'est PAS une source officielle : on cherche le lien officiel cité
+    // dans l'annonce, sinon l'admin le fournit. Jamais publié avec dreamjob comme source.
+    enriched = await enrich(`url=${encodeURIComponent(item.sourceUrl)}`);
+    let official: string | null = enriched.officialUrl || null;
+    if (!official) {
+      if (!interactive) return { ok: false, reason: 'source officielle introuvable dans l’annonce dreamjob' };
+      const typed = window.prompt(
+        `Source officielle introuvable automatiquement pour :\n« ${item.title?.fr} »\n\n` +
+          'Collez l’URL officielle (fiche emploi-public.ma, site .gov.ma / .ac.ma ou PDF de l’avis) :'
+      );
+      if (!typed) return { ok: false, reason: 'publication annulée : source officielle manquante' };
+      official = typed.trim();
+      if (!OFFICIAL_URL.test(official)) {
+        return { ok: false, reason: 'URL refusée : elle doit venir de emploi-public.ma, d’un site .gov.ma ou .ac.ma' };
+      }
+      if (/emploi-public\.ma\/(fr|ar)\/concours\/details\//i.test(official)) {
+        enriched = { ...(await enrich(`url=${encodeURIComponent(official)}`)), officialUrl: official };
+      }
+    }
+    sourceUrl = canonicalOfficialUrl(official);
+  } else {
+    enriched = await enrich(`id=${encodeURIComponent(externalId)}`);
+    sourceUrl = item.sourceUrl || 'https://www.emploi-public.ma';
   }
 
-  const adminName = item.administration?.name?.fr || null;
+  // Déjà en ligne (même source officielle) → on ne crée pas de doublon.
+  const { data: already } = await supabase.from('contests').select('id').eq('source_url', sourceUrl).limit(1);
+  if (already && already.length > 0) {
+    await supabase
+      .from('radar_candidates')
+      .update({ status: 'imported', imported_contest_id: already[0].id, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+      .eq('external_id', externalId);
+    return { ok: false, reason: 'déjà publié sur le site (même source officielle)' };
+  }
+
+  const rawAdmin = item.administration?.name?.fr?.trim() || '';
+  // Libellé générique = administration non identifiée : on ne crée pas de fiche.
+  const adminName = rawAdmin && !/^administration publique( marocaine)?$/i.test(rawAdmin) ? rawAdmin : null;
 
   // Administration : retrouver ou créer.
   let adminId: string | null = null;
@@ -79,7 +147,7 @@ export async function publishScrapedToSupabase(item: ScrapedContestItem): Promis
   const { data: contest, error: insertError } = await supabase
     .from('contests')
     .insert({
-      slug: `${slugify(item.title?.fr || 'concours')}-${uuid.slice(0, 6)}`,
+      slug: `${slugify(item.title?.fr || 'concours')}-${shortHash(externalId)}`,
       administration_id: adminId,
       title_original: item.title?.fr || 'Concours',
       title_fr: item.title?.fr || null,
@@ -93,20 +161,20 @@ export async function publishScrapedToSupabase(item: ScrapedContestItem): Promis
       exam_date: toISODate(enriched.examDate || (item as any).contestDate),
       publication_date: toISODate(enriched.publicationDate || item.publicationDate),
       apply_url: enriched.applyUrl || null,
-      source_url: item.sourceUrl || 'https://www.emploi-public.ma',
+      source_url: sourceUrl,
       source_org: adminName,
       published_at: new Date().toISOString(),
     })
     .select('id')
     .single();
-  if (insertError || !contest) return false;
+  if (insertError || !contest) return { ok: false, reason: insertError?.message || 'insertion refusée' };
 
   if (specialtyFr) {
     await supabase.from('contest_criteria').insert({
       contest_id: contest.id,
       criterion_type: 'specialite',
       value_fr: specialtyFr,
-      source_page: item.sourceUrl || null,
+      source_page: sourceUrl,
       verification_state: 'a_verifier',
       position: 0,
     });
@@ -121,16 +189,21 @@ export async function publishScrapedToSupabase(item: ScrapedContestItem): Promis
       reviewed_by: user.id,
       reviewed_at: new Date().toISOString(),
     })
-    .eq('external_id', uuid);
+    .eq('external_id', externalId);
 
-  return true;
+  return { ok: true };
 }
 
-export async function publishManyScrapedToSupabase(items: ScrapedContestItem[]): Promise<number> {
-  let ok = 0;
+export async function publishManyScrapedToSupabase(
+  items: ScrapedContestItem[]
+): Promise<{ published: number; failures: { id: string; title: string; reason: string }[] }> {
+  let published = 0;
+  const failures: { id: string; title: string; reason: string }[] = [];
   for (const it of items) {
     // eslint-disable-next-line no-await-in-loop
-    if (await publishScrapedToSupabase(it)) ok++;
+    const r = await publishScrapedToSupabase(it, { interactive: false });
+    if (r.ok) published++;
+    else failures.push({ id: it.id, title: it.title?.fr || it.id, reason: r.reason });
   }
-  return ok;
+  return { published, failures };
 }
