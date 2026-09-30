@@ -34,6 +34,17 @@ export async function publishScrapedToSupabase(item: ScrapedContestItem): Promis
   if (!user) return false;
 
   const uuid = item.id.replace(/^scrape-/, '');
+
+  // Enrichissement depuis la page détail officielle (code du concours, date du
+  // concours, date de publication, site de dépôt) — jamais inventé, null si absent.
+  let enriched: any = {};
+  try {
+    const er = await fetch(`/api/radar/enrich?id=${encodeURIComponent(uuid)}`);
+    if (er.ok) enriched = await er.json();
+  } catch {
+    /* la page détail peut être injoignable : on publie avec ce qu'on a */
+  }
+
   const adminName = item.administration?.name?.fr || null;
 
   // Administration : retrouver ou créer.
@@ -73,14 +84,15 @@ export async function publishScrapedToSupabase(item: ScrapedContestItem): Promis
       title_original: item.title?.fr || 'Concours',
       title_fr: item.title?.fr || null,
       title_ar: item.title?.ar || null,
-      reference: item.referenceCode || null, // jamais inventé (vide si absent)
+      reference: enriched.reference || item.referenceCode || null, // vrai code de la page détail, jamais inventé
       status: 'publie',
       diploma_fr: item.degreeLevel || null,
       positions: typeof item.postsCount === 'number' ? item.postsCount : null,
       region_fr: item.region?.fr || null,
-      deadline_date: toISODate(item.deadlineDate),
-      exam_date: toISODate((item as any).contestDate),
-      publication_date: toISODate(item.publicationDate),
+      deadline_date: toISODate(enriched.deadlineDate || item.deadlineDate),
+      exam_date: toISODate(enriched.examDate || (item as any).contestDate),
+      publication_date: toISODate(enriched.publicationDate || item.publicationDate),
+      apply_url: enriched.applyUrl || null,
       source_url: item.sourceUrl || 'https://www.emploi-public.ma',
       source_org: adminName,
       published_at: new Date().toISOString(),
