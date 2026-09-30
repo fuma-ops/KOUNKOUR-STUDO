@@ -171,11 +171,12 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
     'Médecin': 5,
   };
 
-  const contestDegreeRank = degreeRank[contest.degreeLevel] || 
-    (contest.title.fr.toLowerCase().includes('ingénieur') || contest.degreeLevel.toLowerCase().includes('master') ? 4 : 2);
+  // 0 = niveau inconnu → on n'exclut JAMAIS sur un diplôme non déterminé (ne jamais rater).
+  const contestDegreeRank = degreeRank[contest.degreeLevel] ||
+    (contest.title.fr.toLowerCase().includes('ingénieur') || contest.degreeLevel.toLowerCase().includes('master') ? 4 : 0);
   const profileDegreeRank = degreeRank[profile.degreeLevel] || 3;
 
-  if (profileDegreeRank < contestDegreeRank) {
+  if (contestDegreeRank > 0 && profileDegreeRank < contestDegreeRank) {
     degreeMatch = false;
     reasons.push({
       fr: `Diplôme minimum requis : ${contest.degreeLevel} (Votre profil : ${profile.degreeLevel}).`,
@@ -233,8 +234,12 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
     regionMatch = false;
   }
 
-  const isEligible = degreeMatch && ageMatch && specialtyMatch;
-  const isHighMatch = isEligible && score >= 85;
+  // Rigueur « ne jamais rater un concours » (cahier §14) : le SEUL filtre dur est
+  // le diplôme, et seulement quand il est connu et clairement insuffisant. L'âge et
+  // la spécialité ne sont jamais éliminatoires ici — en cas de doute le concours
+  // reste proposé et signalé « à vérifier ». isHighMatch reste strict (mise en avant).
+  const isEligible = degreeMatch;
+  const isHighMatch = degreeMatch && ageMatch && specialtyMatch && score >= 85;
 
   if (isEligible) {
     reasons.push({

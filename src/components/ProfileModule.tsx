@@ -727,23 +727,70 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                 <label className="text-xs font-bold text-[#242126] block mb-1">
                   {language === 'fr' ? 'Spécialité / Filière' : 'التخصص / الشعبة'}
                 </label>
-                <select
+                <input
+                  type="text"
+                  list="specialties-list"
                   value={profile.specialty}
                   onChange={(e) => setProfile({ ...profile, specialty: e.target.value })}
-                  className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white cursor-pointer font-medium"
-                >
-                  <option value="Droit">Droit Public & Privé / Sciences Juridiques (القانون والعلوم القانونية)</option>
-                  <option value="Économie / Gestion">Économie, Gestion, Finance & Comptabilité (الاقتصاد والتدبير والمحاسبة)</option>
-                  <option value="Secrétariat / Bureautique">Secrétariat, Bureautique & Gestion Administrative (كتابة المكاتب والتدبير الإداري)</option>
-                  <option value="Informatique">Informatique, Développement & Réseaux (المعلوميات وتطوير النظم)</option>
-                  <option value="Génie Civil">Génie Civil, BTP, Eau & Architecture (الهندسة المدنية والبناء)</option>
-                  <option value="Mécanique / Électricité Automobiles">Mécanique, Électricité Automobiles & Maintenance (ميكانيك وكهرباء السيارات والصيانة)</option>
-                  <option value="Agriculture / Agronomie">Agriculture, Agronomie & Élevage (الفلاحة والإنتاج الفلاحي)</option>
-                  <option value="Santé">Santé, Soins Infirmiers & Pharmacie (الصحة والتمريض والصيدلة)</option>
-                  <option value="Éducation">Sciences de l’Éducation & Enseignement (علوم التربية والتعليم)</option>
-                  <option value="Lettres / Langues">Lettres, Traduction & Langues (الآداب واللغات)</option>
-                  <option value="Autre">Autre spécialité officielle (تخصص آخر)</option>
-                </select>
+                  placeholder={language === 'fr' ? 'Choisissez ou tapez votre spécialité…' : 'اختر أو اكتب تخصصك…'}
+                  className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white font-medium"
+                />
+                <datalist id="specialties-list">
+                  <option value="Droit privé" />
+                  <option value="Droit public" />
+                  <option value="Sciences juridiques" />
+                  <option value="Économie" />
+                  <option value="Gestion" />
+                  <option value="Finance" />
+                  <option value="Comptabilité" />
+                  <option value="Audit et contrôle de gestion" />
+                  <option value="Management des systèmes d'information" />
+                  <option value="Gestion des ressources humaines" />
+                  <option value="Secrétariat et bureautique" />
+                  <option value="Informatique" />
+                  <option value="Développement informatique" />
+                  <option value="Réseaux et sécurité" />
+                  <option value="Cybersécurité" />
+                  <option value="Intelligence artificielle et data" />
+                  <option value="Statistique" />
+                  <option value="Génie civil" />
+                  <option value="BTP" />
+                  <option value="Architecture" />
+                  <option value="Génie électrique" />
+                  <option value="Systèmes embarqués" />
+                  <option value="Génie mécanique" />
+                  <option value="Mécanique et électricité automobiles" />
+                  <option value="Génie industriel" />
+                  <option value="Énergétique" />
+                  <option value="Agronomie" />
+                  <option value="Agriculture" />
+                  <option value="Techniques agricoles" />
+                  <option value="Médecine" />
+                  <option value="Pharmacie" />
+                  <option value="Soins infirmiers" />
+                  <option value="Kinésithérapie" />
+                  <option value="Santé publique" />
+                  <option value="Sciences de l'éducation" />
+                  <option value="Enseignement" />
+                  <option value="Mathématiques" />
+                  <option value="Mathématiques appliquées" />
+                  <option value="Physique" />
+                  <option value="Chimie" />
+                  <option value="Biologie" />
+                  <option value="Lettres et langues" />
+                  <option value="Traduction" />
+                  <option value="Sciences politiques" />
+                  <option value="Géographie et SIG" />
+                  <option value="Commerce" />
+                  <option value="Inspection du travail" />
+                  <option value="Douanes" />
+                  <option value="Sécurité (police / protection civile)" />
+                </datalist>
+                <p className="text-[10px] text-[#9A93A0] mt-1">
+                  {language === 'fr'
+                    ? 'Vous pouvez taper librement votre spécialité si elle n’est pas dans la liste.'
+                    : 'يمكنك كتابة تخصصك بحرية إذا لم يكن في القائمة.'}
+                </p>
               </div>
 
               <div>
