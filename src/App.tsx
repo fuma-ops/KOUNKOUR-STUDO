@@ -26,6 +26,8 @@ import { EmptyState } from './components/EmptyState';
 import { OfficialDisclaimer } from './components/OfficialDisclaimer';
 import { getAllActiveContests } from './utils/radarStorage';
 import { fetchPublishedContests } from './data/supabaseContests';
+import { useSession } from './lib/useSession';
+import { AuthModal } from './components/AuthModal';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
@@ -50,6 +52,8 @@ export default function App() {
   const [isAdminCvModalOpen, setIsAdminCvModalOpen] = useState<boolean>(false);
   const [profileVersion, setProfileVersion] = useState(0);
   const [contestsVersion, setContestsVersion] = useState(0);
+  const session = useSession();
+  const [authOpen, setAuthOpen] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('kounkour_bookmarks');
@@ -211,6 +215,51 @@ export default function App() {
   }, [allActiveContests, bookmarkedIds]);
 
   if (activeTab === 'admin') {
+    // Accès réservé au staff (vérifié par le rôle serveur + RLS). Un visiteur
+    // non connecté ou non autorisé ne voit jamais le back-office.
+    if (session.loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE] text-[#6E6773] text-sm">
+          {language === 'fr' ? 'Vérification de l’accès…' : 'جارٍ التحقق من الصلاحية…'}
+        </div>
+      );
+    }
+    if (!session.isStaff) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FFFDFE] px-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[#8D174B] text-white flex items-center justify-center text-2xl">👑</div>
+          <h1 className="text-lg font-extrabold text-[#242126]">
+            {language === 'fr' ? 'Espace administrateur' : 'فضاء الإدارة'}
+          </h1>
+          <p className="max-w-sm text-sm text-[#6E6773]">
+            {language === 'fr'
+              ? 'Cet espace est réservé à l’équipe. Connectez-vous avec un compte autorisé.'
+              : 'هذا الفضاء مخصص للفريق. يرجى تسجيل الدخول بحساب مرخّص.'}
+          </p>
+          <div className="flex gap-2">
+            {!session.user ? (
+              <button
+                onClick={() => setAuthOpen(true)}
+                className="px-5 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#70113B] text-white text-sm font-bold"
+              >
+                {language === 'fr' ? 'Se connecter' : 'تسجيل الدخول'}
+              </button>
+            ) : (
+              <span className="px-4 py-2 rounded-xl bg-[#FDF2F7] text-[#8D174B] text-xs font-semibold">
+                {language === 'fr' ? 'Compte sans droits d’accès' : 'حساب بدون صلاحية'}
+              </span>
+            )}
+            <button
+              onClick={() => setActiveTab('home')}
+              className="px-5 py-2.5 rounded-xl border border-[#F1E5EC] text-[#6E6773] text-sm font-semibold hover:bg-[#F8F2F5]"
+            >
+              {language === 'fr' ? 'Retour' : 'رجوع'}
+            </button>
+          </div>
+          <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} language={language} />
+        </div>
+      );
+    }
     return (
       <AdminDashboard
         language={language}
@@ -241,6 +290,9 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         savedCount={bookmarkedIds.length}
+        isAuthed={!!session.user}
+        onAuthClick={() => setAuthOpen(true)}
+        onSignOut={session.signOut}
       />
 
       {/* Content Body Based on Tab */}
@@ -724,6 +776,9 @@ export default function App() {
         onClose={() => setIsAdminCvModalOpen(false)}
         language={language}
       />
+
+      {/* Modal d'authentification (Supabase) */}
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} language={language} />
 
       {/* Persistent Mobile Bottom Navigation */}
       <BottomNav

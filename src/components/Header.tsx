@@ -1,7 +1,7 @@
 import React from 'react';
 import { Language } from '../types';
 import { translations } from '../i18n/translations';
-import { Bell, Bookmark, Globe } from 'lucide-react';
+import { Bell, Bookmark, Globe, LogIn, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   language: Language;
@@ -11,6 +11,9 @@ interface HeaderProps {
   savedCount: number;
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
+  isAuthed?: boolean;
+  onAuthClick?: () => void;
+  onSignOut?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +22,9 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   savedCount,
+  isAuthed,
+  onAuthClick,
+  onSignOut,
 }) => {
   const t = translations[language];
 
@@ -114,6 +120,27 @@ export const Header: React.FC<HeaderProps> = ({
             <Bell className="w-4 h-4" />
             <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-[#C73578] rounded-full"></span>
           </button>
+
+          {/* Connexion / Déconnexion (Supabase Auth) */}
+          {isAuthed ? (
+            <button
+              onClick={onSignOut}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#F1E5EC] bg-[#FFFDFE] hover:bg-[#F8F2F5] text-xs font-semibold text-[#8D174B] transition-colors"
+              title={language === 'fr' ? 'Se déconnecter' : 'تسجيل الخروج'}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{language === 'fr' ? 'Déconnexion' : 'خروج'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={onAuthClick}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#8D174B] hover:bg-[#70113B] text-xs font-semibold text-white transition-colors"
+              title={language === 'fr' ? 'Se connecter' : 'تسجيل الدخول'}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{language === 'fr' ? 'Connexion' : 'دخول'}</span>
+            </button>
+          )}
         </div>
       </div>
     </header>
