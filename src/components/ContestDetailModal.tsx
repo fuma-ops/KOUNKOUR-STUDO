@@ -25,6 +25,14 @@ interface ContestDetailModalProps {
   onOpenSalarySimulator?: (contest: Contest) => void;
 }
 
+// Identifiant du concours SUR emploi-public.ma (pour l'arrêté et les listes
+// officielles). Il est lu dans l'URL source officielle : l'id interne (Supabase)
+// ne correspond à aucun document sur emploi-public.
+function emploiPublicId(c: { id: string; officialSourceUrl?: string }): string {
+  const m = (c.officialSourceUrl || '').match(/details\/([0-9a-f-]{36})/i);
+  return m ? m[1] : c.id.replace(/^(c-|ep-|scrape-)/, '');
+}
+
 export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
   contest,
   isOpen,
@@ -383,7 +391,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                       
                       {/* Arrêté PDF button */}
                       <a
-                        href={contest.documents?.[0]?.url || `https://www.emploi-public.ma/fr/concours/download/arrete/${contest.id.replace('c-', '').replace('ep-', '')}`}
+                        href={contest.documents?.[0]?.url || `https://www.emploi-public.ma/fr/concours/download/arrete/${emploiPublicId(contest)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#8D174B] hover:bg-[#70113B] text-white font-bold text-xs sm:text-sm shadow-md transition-colors"
@@ -400,7 +408,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                           </span>
 
                           <a
-                            href={contest.convoquesUrl || `https://www.emploi-public.ma/fr/concours/download/list_convoques/${contest.id.replace('c-', '').replace('ep-', '')}`}
+                            href={contest.convoquesUrl || `https://www.emploi-public.ma/fr/concours/download/list_convoques/${emploiPublicId(contest)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#8D174B]/20 hover:border-[#8D174B] text-xs font-bold text-[#8D174B] transition-all shadow-xs"
@@ -418,7 +426,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
 
                           {contest.status === 'results' && (
                             <a
-                              href={`https://www.emploi-public.ma/fr/concours/download/resultats/${contest.id.replace('c-', '').replace('ep-', '')}`}
+                              href={`https://www.emploi-public.ma/fr/concours/download/resultats/${emploiPublicId(contest)}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="w-full flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-all shadow-xs"
@@ -930,7 +938,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                       </div>
 
                       <a
-                        href={contest.convoquesUrl || `https://www.emploi-public.ma/fr/concours/download/list_convoques/${contest.id.replace('c-', '').replace('ep-', '')}`}
+                        href={contest.convoquesUrl || `https://www.emploi-public.ma/fr/concours/download/list_convoques/${emploiPublicId(contest)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8D174B] hover:bg-[#70113B] text-white text-xs font-bold transition-all shadow-xs"
@@ -963,7 +971,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                         </div>
 
                         <a
-                          href={`https://www.emploi-public.ma/fr/concours/download/list_convoques_oral/${contest.id.replace('c-', '').replace('ep-', '')}`}
+                          href={`https://www.emploi-public.ma/fr/concours/download/list_convoques_oral/${emploiPublicId(contest)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8D174B] hover:bg-[#70113B] text-white text-xs font-bold transition-all shadow-xs"
@@ -997,7 +1005,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                         </div>
 
                         <a
-                          href={`https://www.emploi-public.ma/fr/concours/download/resultats/${contest.id.replace('c-', '').replace('ep-', '')}`}
+                          href={`https://www.emploi-public.ma/fr/concours/download/resultats/${emploiPublicId(contest)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-xs"
