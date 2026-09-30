@@ -3,13 +3,15 @@ import { CandidateProfile, CandidateTrackingItem, ApplicationStatus, Contest, La
 export type { CandidateProfile, CandidateTrackingItem, ApplicationStatus };
 
 export const DEFAULT_PROFILE: CandidateProfile = {
-  fullName: 'Fatima-Zahra El Mansouri',
-  email: 'fz.elmansouri@etudiant.um5.ac.ma',
-  phone: '0661234567',
-  age: 24,
-  degreeLevel: 'Licence',
-  specialty: 'Droit',
-  region: 'Rabat-Salé-Kénitra',
+  // Profil vide par défaut : aucune éligibilité n'est affirmée tant que le
+  // candidat n'a pas renseigné SON diplôme, SA spécialité et SON âge.
+  fullName: '',
+  email: '',
+  phone: '',
+  age: 0,
+  degreeLevel: '',
+  specialty: '',
+  region: '',
   currentSituation: 'student',
   notificationsEnabled: true,
   alertDaysBefore: 7,
@@ -114,180 +116,207 @@ export function updateContestTracking(
 }
 
 // Eligibility and Smart Matching Engine
+// Verdict d'éligibilité. SEUL « eligible » est compté comme éligible : on ne
+// l'affirme que si diplôme, spécialité, âge ET statut ouvert sont confirmés.
+// « verify » = une information manque (profil incomplet ou annonce qui ne précise
+// pas la spécialité / le diplôme) → affiché « à vérifier », jamais « éligible ».
+// « not_eligible » = disqualification certaine (clôturé, diplôme insuffisant,
+// spécialité précise différente).
+export type EligibilityVerdict = 'eligible' | 'verify' | 'not_eligible';
+
 export interface EligibilityResult {
-  isEligible: boolean;
+  verdict: EligibilityVerdict;
+  isEligible: boolean; // === (verdict === 'eligible')
   isHighMatch: boolean;
   score: number; // 0 to 100%
   degreeMatch: boolean;
   ageMatch: boolean;
   specialtyMatch: boolean;
+  specialtyStatus: 'match' | 'unknown' | 'different';
   regionMatch: boolean;
   reasons: { fr: string; ar: string }[];
 }
 
+const stripAccents = (s: string) =>
+  (s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+
+// Rang d'un niveau de diplôme (exigé ou détenu). null = indéterminable.
+// « Master / Doctorat » = minimum Master (4).
+export function degreeRankOf(text: string | undefined | null): number | null {
+  const t = stripAccents(text || '').replace(/\s+/g, '');
+  if (!t) return null;
+  if (t.includes('master') || t.includes('bac+5') || t.includes('ingenieur')) return 4;
+  if (t.includes('doctorat') || t.includes('docteur')) return 5;
+  if (t.includes('licence') || t.includes('bac+3')) return 3;
+  if (t.includes('bac+2') || t.includes('dts') || t.includes('dut') || t.includes('bts') || t.includes('technicienspecialise')) return 2;
+  if (t.includes('bac') || t.includes('cqp')) return 1;
+  return null;
+}
+
+// Mots trop génériques pour distinguer une spécialité.
+const SPEC_STOP = new Set([
+  'genie', 'sciences', 'science', 'technique', 'techniques', 'technicien', 'techniciens',
+  'technico', 'specialite', 'specialites', 'specialise', 'specialisee', 'option', 'options',
+  'etat', 'grade', 'echelle', 'niveau', 'poste', 'postes', 'concours', 'recrutement',
+  'generale', 'general', 'mentionnee', 'mentionnees', 'arrete', 'annonce', 'officiel',
+  'officielle', 'officielles', 'dans', 'pour', 'avec', 'aux', 'sur', 'par', 'des', 'les',
+  'une', 'ingenieur', 'ingenieurs', 'ingenierie', 'administrateur', 'systemes', 'systeme',
+  'appliquee', 'appliquees', 'applique', 'appliques', 'autre', 'autres', 'filiere', 'filieres',
+]);
+
+// Familles de mots équivalents (agricole ≈ agriculture ≈ agronomie, etc.).
+function stemToken(t: string): string {
+  if (/^(agric|agro)/.test(t)) return 'agri';
+  if (/^(medec|medic)/.test(t)) return 'medic';
+  if (/^(juridi|droit)/.test(t)) return 'droit';
+  if (/^(informati|numeri)/.test(t)) return 'inform';
+  if (/^electr/.test(t)) return 'electr';
+  if (/^infirm/.test(t)) return 'infirm';
+  return t.length >= 7 ? t.slice(0, 6) : t;
+}
+
+export function specialtyTokens(s: string | undefined | null): string[] {
+  return stripAccents(s || '')
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 4 && !SPEC_STOP.has(t))
+    .map(stemToken);
+}
+
+function isGenericSpecialty(s: string | undefined | null): boolean {
+  const t = stripAccents(s || '');
+  return (
+    !t.trim() ||
+    t.includes('mentionn') ||
+    t.includes('arrete') ||
+    t.includes('annonce') ||
+    t.includes('non specifi') ||
+    t.includes('non precis')
+  );
+}
+
 export function checkEligibility(contest: Contest, profile: CandidateProfile): EligibilityResult {
   const reasons: { fr: string; ar: string }[] = [];
-  let degreeMatch = true;
-  let ageMatch = true;
-  let specialtyMatch = false;
-  let regionMatch = true;
-  let score = 0;
+  const add = (fr: string, ar: string) => reasons.push({ fr, ar });
+  let hardNo = false;
+  let needVerify = false;
 
-  // 1. Age condition
-  // Most civil service in Morocco is max 45 years, education/AREF is 30 years
-  let maxAge = 45;
-  if (contest.id.includes('education') || contest.administration.id === 'adm-education') {
-    maxAge = 30;
-  } else if (contest.id.includes('oncf') || contest.id.includes('tech')) {
-    maxAge = 40;
+  // 0. Statut : on ne peut plus postuler à un concours clôturé / en épreuves.
+  const closed =
+    contest.status === 'closed' || contest.status === 'results' || contest.status === 'in_progress';
+  if (closed) {
+    hardNo = true;
+    add('Candidatures closes : la date limite de dépôt est dépassée.', 'انتهى أجل إيداع الترشيحات لهذه المباراة.');
   }
 
-  if (profile.age > maxAge) {
-    ageMatch = false;
-    reasons.push({
-      fr: `Âge supérieur à la limite légale pour ce concours (max ${maxAge} ans).`,
-      ar: `السن يتجاوز الحد الأقصى المسموح به قانوناً لهذه المباراة (أقصى حد ${maxAge} سنة).`,
-    });
-  } else {
-    score += 15;
-  }
-
-  // 2. Degree condition
-  // Degree hierarchy: Bac (1) < Bac+2 (2) < Licence (3) < Master / Ingénieur (4) < Doctorat (5)
-  const degreeRank: Record<string, number> = {
-    'Bac': 1,
-    'Bac+2': 2,
-    'Technicien': 2,
-    'Technicien Spécialisé': 2,
-    'DUT': 2,
-    'BTS': 2,
-    'Licence': 3,
-    'Licence Professionnelle': 3,
-    'Master': 4,
-    'Master / Doctorat': 4,
-    'Ingénieur': 4,
-    'Ingénieur d’État': 4,
-    'Doctorat': 5,
-    'Médecin': 5,
-  };
-
-  // 0 = niveau inconnu → on n'exclut JAMAIS sur un diplôme non déterminé (ne jamais rater).
-  const contestDegreeRank = degreeRank[contest.degreeLevel] ||
-    (contest.title.fr.toLowerCase().includes('ingénieur') || contest.degreeLevel.toLowerCase().includes('master') ? 4 : 0);
-  const profileDegreeRank = degreeRank[profile.degreeLevel] || 3;
-
-  if (contestDegreeRank > 0 && profileDegreeRank < contestDegreeRank) {
-    degreeMatch = false;
-    reasons.push({
-      fr: `Diplôme minimum requis : ${contest.degreeLevel} (Votre profil : ${profile.degreeLevel}).`,
-      ar: `المستوى الدراسي الأدنى المطلوب: ${contest.degreeLevel} (ملفك: ${profile.degreeLevel}).`,
-    });
-  } else {
-    score += 40;
-  }
-
-  // 3. Specialty matching — par mots-clés DISTINCTIFS (généralisable à toute
-  //    spécialité, pas seulement une liste codée en dur).
-  //    3 états : 'match' (correspond) / 'unknown' (concours "toutes spécialités"
-  //    ou profil vide → à vérifier, on ne rate pas) / 'different' (spécialité
-  //    précise clairement différente → on n'affiche pas comme adapté).
-  const strip = (s: string) =>
-    (s || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '');
-  // Mots trop génériques pour distinguer une spécialité.
-  const STOP = new Set([
-    'genie', 'sciences', 'science', 'technique', 'techniques', 'specialite',
-    'specialites', 'option', 'etat', 'grade', 'echelle', 'niveau', 'poste',
-    'concours', 'recrutement', 'appliquee', 'appliquees', 'generale', 'mentionnee',
-    'mentionnees', 'arrete', 'annonce', 'officiel', 'officielle', 'officielles',
-    'dans', 'pour', 'avec', 'des', 'les', 'une', 'aux', 'sur', 'par',
-  ]);
-  const toks = (s: string) =>
-    strip(s)
-      .split(/[^a-z0-9]+/)
-      .filter((t) => t.length >= 4 && !STOP.has(t));
-
-  const profileSpecRaw = profile.specialty || '';
-  const contestSpecRaw = contest.specialty?.fr || '';
-  const contestSpecStrip = strip(contestSpecRaw);
-
-  // Concours "toutes spécialités" / non précisées → inconnu (à vérifier).
-  const genericSpecialty =
-    !contestSpecStrip ||
-    contestSpecStrip.includes('mentionn') ||
-    contestSpecStrip.includes('arrete') ||
-    contestSpecStrip.includes('annonce') ||
-    contestSpecStrip.includes('non specifie');
-
-  let specialtyStatus: 'match' | 'unknown' | 'different';
-  if (!profileSpecRaw.trim() || genericSpecialty) {
-    specialtyStatus = 'unknown';
-  } else {
-    const pt = toks(profileSpecRaw);
-    const haystack = toks(
-      `${contestSpecRaw} ${(contest.specialtiesList || []).join(' ')} ${contest.title?.fr || ''}`
+  // 1. Diplôme
+  const required = degreeRankOf(contest.degreeLevel);
+  const mine = degreeRankOf(profile.degreeLevel);
+  let degreeMatch = false;
+  if (mine === null) {
+    needVerify = true;
+    add('Renseignez votre niveau de diplôme dans votre profil.', 'يرجى تحديد مستواك الدراسي في ملفك.');
+  } else if (required === null) {
+    needVerify = true;
+    add(
+      `Niveau de diplôme exigé non précisé par l'annonce : à vérifier sur l'arrêté officiel.`,
+      'المستوى الدراسي المطلوب غير محدد في الإعلان: يرجى التحقق من القرار الرسمي.'
     );
-    const shared = pt.some((t) => haystack.includes(t));
-    specialtyStatus = shared ? 'match' : 'different';
+  } else if (mine < required) {
+    hardNo = true;
+    add(
+      `Diplôme insuffisant : ${contest.degreeLevel} requis (votre niveau : ${profile.degreeLevel}).`,
+      `المستوى الدراسي غير كافٍ: المطلوب ${contest.degreeLevel} (مستواك: ${profile.degreeLevel}).`
+    );
+  } else {
+    degreeMatch = true;
   }
 
-  if (specialtyStatus === 'match') {
+  // 2. Spécialité — comparée UNIQUEMENT au champ spécialité de l'annonce (pas au
+  //    titre, qui contient « Ingénieur », « Administrateur »… et créait des faux positifs).
+  let specialtyMatch = false;
+  let specialtyStatus: 'match' | 'unknown' | 'different' = 'unknown';
+  const profileSpec = (profile.specialty || '').trim();
+  const contestSpec = contest.specialty?.fr || '';
+  const profileTokens = specialtyTokens(profileSpec);
+  const contestTokens = specialtyTokens([contestSpec, ...(contest.specialtiesList || [])].join(' '));
+  if (!profileSpec) {
+    needVerify = true;
+    add('Renseignez votre spécialité dans votre profil.', 'يرجى تحديد تخصصك في ملفك.');
+  } else if (profileTokens.length === 0) {
+    needVerify = true;
+    add(
+      'Saisissez votre spécialité en français pour permettre la comparaison avec les annonces.',
+      'يرجى كتابة تخصصك بالفرنسية لتمكين المقارنة مع الإعلانات.'
+    );
+  } else if (isGenericSpecialty(contestSpec) || contestTokens.length === 0) {
+    needVerify = true;
+    add(
+      `L'annonce ne précise pas la spécialité exigée (« Spécialités mentionnées dans l'arrêté ») : impossible de confirmer. Consultez l'arrêté officiel.`,
+      'الإعلان لا يحدد التخصص المطلوب: لا يمكن التأكيد. يرجى الاطلاع على القرار الرسمي.'
+    );
+  } else if (profileTokens.some((t) => contestTokens.includes(t))) {
     specialtyMatch = true;
-    score += 40;
-  } else if (specialtyStatus === 'unknown') {
-    specialtyMatch = true; // à vérifier : on ne rate pas
-    score += 15;
-    reasons.push({
-      fr: `Spécialité à vérifier sur l'arrêté officiel (le concours ne précise pas de filière unique).`,
-      ar: `يُنصح بالتحقق من التخصص في القرار الرسمي (المباراة لا تحدد شعبة وحيدة).`,
-    });
+    specialtyStatus = 'match';
   } else {
-    specialtyMatch = false;
-    reasons.push({
-      fr: `Spécialité officielle requise : ${contest.specialty.fr} (Votre spécialité : ${profile.specialty}).`,
-      ar: `التخصص الرسمي المطلوب: ${contest.specialty.ar} (تخصصك: ${profile.specialty}).`,
-    });
+    specialtyStatus = 'different';
+    hardNo = true;
+    add(
+      `Spécialité exigée : ${contestSpec}. Votre spécialité (${profileSpec}) ne correspond pas.`,
+      `التخصص المطلوب: ${contest.specialty?.ar || contestSpec}. تخصصك (${profileSpec}) غير مطابق.`
+    );
   }
 
-  // 4. Regional matching
-  const profileRegion = (profile.region || '').toLowerCase();
-  const contestRegion = (contest.region?.fr || '').toLowerCase();
-  if (contestRegion.includes('national') || contestRegion.includes('toutes') || contestRegion.includes(profileRegion) || profileRegion.includes(contestRegion)) {
-    regionMatch = true;
-    score += 5;
+  // 3. Âge — limite générale de la fonction publique : 18 à 45 ans.
+  let ageMatch = false;
+  const age = Number(profile.age) || 0;
+  if (age <= 0) {
+    needVerify = true;
+    add('Renseignez votre âge dans votre profil.', 'يرجى تحديد سنك في ملفك.');
+  } else if (age < 18) {
+    hardNo = true;
+    add('Âge minimum requis : 18 ans.', 'السن الأدنى المطلوب: 18 سنة.');
+  } else if (age > 45) {
+    needVerify = true;
+    add(
+      `Âge supérieur à la limite générale de 45 ans : vérifiez l'arrêté (dérogations possibles).`,
+      'السن يتجاوز الحد العام (45 سنة): يرجى التحقق من القرار (استثناءات ممكنة).'
+    );
   } else {
-    regionMatch = false;
+    ageMatch = true;
   }
 
-  // Rigueur (cahier §14) : on exclut uniquement les cas CERTAINS de non-éligibilité
-  //  - diplôme connu et clairement insuffisant ;
-  //  - spécialité précise clairement DIFFÉRENTE de celle du candidat.
-  // On ne rate jamais un concours "toutes spécialités" ou incertain (→ à vérifier).
-  // L'âge n'est jamais éliminatoire ici (seulement signalé).
-  const isEligible = degreeMatch && specialtyStatus !== 'different';
-  const isHighMatch = isEligible && ageMatch && specialtyStatus === 'match' && score >= 80;
+  // 4. Région (information, non éliminatoire)
+  const profileRegion = stripAccents(profile.region || '');
+  const contestRegion = stripAccents(contest.region?.fr || '');
+  const regionMatch =
+    !contestRegion ||
+    contestRegion.includes('national') ||
+    contestRegion.includes('royaume') ||
+    (!!profileRegion && (contestRegion.includes(profileRegion) || profileRegion.includes(contestRegion)));
 
-  if (isEligible) {
-    reasons.push({
-      fr: `Votre profil correspond aux critères : diplôme (${contest.degreeLevel}), spécialité (${contest.specialty.fr}) et âge.`,
-      ar: `ملفك يستوفي الشروط الرسمية: الدبلوم (${contest.degreeLevel})، التخصص (${contest.specialty.ar}) والسن.`,
-    });
-  } else if (!specialtyMatch && degreeMatch && ageMatch) {
-    reasons.push({
-      fr: `Diplôme et âge valides, mais la spécialité officielle exigée est "${contest.specialty.fr}".`,
-      ar: `المستوى والسن مستوفيان، لكن التخصص الرسمي المطلوب للمباراة هو "${contest.specialty.ar}".`,
-    });
+  const verdict: EligibilityVerdict = hardNo ? 'not_eligible' : needVerify ? 'verify' : 'eligible';
+  if (verdict === 'eligible') {
+    add(
+      `Éligible : diplôme (${contest.degreeLevel}), spécialité (${contestSpec}) et âge conformes.`,
+      `مؤهل: الدبلوم (${contest.degreeLevel}) والتخصص والسن مطابقة للشروط.`
+    );
   }
+
+  const score =
+    (degreeMatch ? 35 : 0) + (specialtyMatch ? 45 : 0) + (ageMatch ? 10 : 0) + (!closed ? 10 : 0);
 
   return {
-    isEligible,
-    isHighMatch,
-    score: Math.min(score, 100),
+    verdict,
+    isEligible: verdict === 'eligible',
+    isHighMatch: verdict === 'eligible' && regionMatch,
+    score,
     degreeMatch,
     ageMatch,
     specialtyMatch,
+    specialtyStatus,
     regionMatch,
     reasons,
   };

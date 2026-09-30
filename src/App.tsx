@@ -328,9 +328,13 @@ export default function App() {
                       </span>
                     </div>
                     <h3 className="text-sm sm:text-base font-extrabold text-[#242126]">
-                      {language === 'fr'
-                        ? `Votre profil : ${candidateProfile.degreeLevel} en ${candidateProfile.specialty || 'Toutes filières'} (${candidateProfile.age} ans)`
-                        : `ملفك الشخصي : ${candidateProfile.degreeLevel} في ${candidateProfile.specialty || 'جميع التخصصات'} (${candidateProfile.age} سنة)`}
+                      {!candidateProfile.degreeLevel || !candidateProfile.specialty || !candidateProfile.age
+                        ? language === 'fr'
+                          ? 'Complétez votre profil (diplôme, spécialité, âge) pour voir les concours auxquels vous êtes éligible.'
+                          : 'أكمل ملفك (الدبلوم، التخصص، السن) لمعرفة المباريات التي تستوفي شروطها.'
+                        : language === 'fr'
+                        ? `Votre profil : ${candidateProfile.degreeLevel} en ${candidateProfile.specialty} (${candidateProfile.age} ans)`
+                        : `ملفك الشخصي : ${candidateProfile.degreeLevel} في ${candidateProfile.specialty} (${candidateProfile.age} سنة)`}
                     </h3>
                     <p className="text-xs text-[#6E6773] mt-0.5">
                       {language === 'fr'

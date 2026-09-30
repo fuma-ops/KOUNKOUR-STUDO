@@ -577,8 +577,14 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {allContests.map((c) => {
-              const elig = checkEligibility(c, profile);
+            {allContests
+              .map((c) => ({ c, elig: checkEligibility(c, profile) }))
+              .sort(
+                (a, b) =>
+                  ({ eligible: 0, verify: 1, not_eligible: 2 })[a.elig.verdict] -
+                  ({ eligible: 0, verify: 1, not_eligible: 2 })[b.elig.verdict]
+              )
+              .map(({ c, elig }) => {
               return (
                 <div
                   key={c.id}
@@ -605,6 +611,10 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                       ) : elig.isEligible ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
                           {language === 'fr' ? 'Éligible' : 'مؤهل'}
+                        </span>
+                      ) : elig.verdict === 'verify' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full">
+                          {language === 'fr' ? 'À vérifier' : 'يُتحقق منه'}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full">
@@ -700,8 +710,8 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                   min="18"
                   max="65"
                   required
-                  value={profile.age}
-                  onChange={(e) => setProfile({ ...profile, age: parseInt(e.target.value, 10) || 18 })}
+                  value={profile.age || ''}
+                  onChange={(e) => setProfile({ ...profile, age: parseInt(e.target.value, 10) || 0 })}
                   className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white"
                 />
               </div>
@@ -715,6 +725,7 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                   onChange={(e) => setProfile({ ...profile, degreeLevel: e.target.value })}
                   className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white cursor-pointer"
                 >
+                  <option value="">— Choisissez votre diplôme / اختر الدبلوم —</option>
                   <option value="Doctorat">Doctorat (الدكتوراه)</option>
                   <option value="Master">Master / Ingénieur d’État (ماستر / مهندس دولة)</option>
                   <option value="Licence">Licence Fondamentale ou Professionnelle (الإجازة)</option>
@@ -802,6 +813,7 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                   onChange={(e) => setProfile({ ...profile, region: e.target.value })}
                   className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white cursor-pointer"
                 >
+                  <option value="">— Choisissez votre région / اختر الجهة —</option>
                   <option value="Rabat-Salé-Kénitra">Rabat-Salé-Kénitra (الرباط - سلا - القنيطرة)</option>
                   <option value="Casablanca-Settat">Casablanca-Settat (الدار البيضاء - سطات)</option>
                   <option value="Fès-Meknès">Fès-Meknès (فاس - مكناس)</option>

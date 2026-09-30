@@ -46,7 +46,7 @@ function mapRow(row: any): Contest {
   const nameAr = admin.name_ar || nameFr;
   const criteria = Array.isArray(row.contest_criteria) ? row.contest_criteria : [];
   const specCrit = criteria.find((c: any) => c.criterion_type === 'specialite');
-  const specFr = specCrit?.value_fr || row.diploma_fr || 'Spécialités mentionnées dans l’arrêté';
+  const specFr = specCrit?.value_fr || 'Spécialités mentionnées dans l’arrêté';
   const specAr = specCrit?.value_ar || specFr;
   const regionFr = row.region_fr || 'National (Royaume du Maroc)';
   const regionAr = row.region_ar || regionFr;

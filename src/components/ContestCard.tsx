@@ -158,9 +158,13 @@ export const ContestCard: React.FC<ContestCardProps> = ({
                 <Check className="w-3 h-3 text-emerald-600" />
                 <span>{language === 'fr' ? `✅ ${eligibility.score}% Éligible` : `✅ ${eligibility.score}% مؤهل قانوناً`}</span>
               </span>
+            ) : eligibility.verdict === 'verify' ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                <span>{language === 'fr' ? '🔎 À vérifier' : '🔎 يُتحقق منه'}</span>
+              </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">
-                <span>{language === 'fr' ? '⚠️ Profil différent' : '⚠️ ملف غير مطابق'}</span>
+                <span>{language === 'fr' ? '⚠️ Non éligible' : '⚠️ غير مؤهل'}</span>
               </span>
             )}
 

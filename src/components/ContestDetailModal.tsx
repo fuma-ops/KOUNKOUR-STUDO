@@ -625,6 +625,8 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                       ? 'bg-emerald-50/70 border-emerald-300' 
                       : eligibility.isEligible 
                       ? 'bg-blue-50/70 border-blue-200' 
+                      : eligibility.verdict === 'verify'
+                      ? 'bg-amber-50/70 border-amber-300'
                       : 'bg-rose-50/70 border-rose-300'
                   }`}>
                     <div className="flex items-center justify-between gap-2 mb-2">
@@ -641,12 +643,16 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                           ? 'bg-emerald-200 text-emerald-900'
                           : eligibility.isEligible
                           ? 'bg-blue-200 text-blue-900'
+                          : eligibility.verdict === 'verify'
+                          ? 'bg-amber-200 text-amber-900'
                           : 'bg-rose-200 text-rose-900'
                       }`}>
                         {eligibility.isHighMatch 
                           ? (language === 'fr' ? 'Profil Idéal 100%' : 'مطابقة تامة') 
                           : eligibility.isEligible 
                           ? (language === 'fr' ? 'Éligible' : 'مؤهل') 
+                          : eligibility.verdict === 'verify'
+                          ? (language === 'fr' ? 'À vérifier' : 'يُتحقق منه')
                           : (language === 'fr' ? 'Non éligible' : 'غير مؤهل')}
                       </span>
                     </div>
@@ -662,7 +668,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                         </span>
                         <span>•</span>
                         <span>
-                          <strong>{language === 'fr' ? 'Spécialité :' : 'التخصص :'}</strong> {profile.specialty || (language === 'fr' ? 'Non renseignée' : 'غير محدد')} ({eligibility.specialtyMatch ? '✅ Conforme' : '⚠️ Non conforme'})
+                          <strong>{language === 'fr' ? 'Spécialité :' : 'التخصص :'}</strong> {profile.specialty || (language === 'fr' ? 'Non renseignée' : 'غير محدد')} ({eligibility.specialtyStatus === 'match' ? '✅ Conforme' : eligibility.specialtyStatus === 'different' ? '❌ Non conforme' : '❔ Non confirmée'})
                         </span>
                       </div>
                       {eligibility.reasons.map((r, i) => (
