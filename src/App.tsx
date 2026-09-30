@@ -25,6 +25,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
 import { OfficialDisclaimer } from './components/OfficialDisclaimer';
 import { getAllActiveContests } from './utils/radarStorage';
+import { fetchPublishedContests } from './data/supabaseContests';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
@@ -118,8 +119,20 @@ export default function App() {
     setCompletedQcmScores((prev) => [newEntry, ...prev]);
   };
 
-  const allActiveContests = useMemo(() => {
-    return getAllActiveContests();
+  // Concours chargés depuis Supabase (source unique partagée). Repli sur les
+  // données locales si la base est injoignable, pour ne jamais afficher un
+  // écran vide.
+  const [allActiveContests, setAllActiveContests] = useState<Contest[]>(() => getAllActiveContests());
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublishedContests()
+      .then((rows) => {
+        if (!cancelled && rows && rows.length > 0) setAllActiveContests(rows);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [contestsVersion]);
 
   const candidateProfile = useMemo(() => {
