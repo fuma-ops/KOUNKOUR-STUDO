@@ -12,6 +12,7 @@ interface HeaderProps {
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
   isAuthed?: boolean;
+  isStaff?: boolean;
   onAuthClick?: () => void;
   onSignOut?: () => void;
 }
@@ -22,11 +23,22 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   savedCount,
-  isAuthed,
+  isAuthed = false,
+  isStaff = false,
   onAuthClick,
   onSignOut,
 }) => {
   const t = translations[language];
+
+  // Dynamic navigation items based on authentication status and staff permissions
+  const navItems = [
+    { id: 'home', label: t.nav.home },
+    { id: 'contests', label: t.nav.contests },
+    { id: 'preparation', label: t.nav.preparation },
+    { id: 'community', label: t.nav.community },
+    ...(isAuthed ? [{ id: 'profile', label: t.nav.profile }] : []),
+    ...(isAuthed && isStaff ? [{ id: 'admin', label: language === 'fr' ? '👑 Admin' : '👑 الإدارة' }] : []),
+  ];
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#F1E5EC] transition-all">
@@ -56,15 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-1">
-          {[
-            { id: 'home', label: t.nav.home },
-            { id: 'contests', label: t.nav.contests },
-            { id: 'radar', label: (t.nav as any).radar || 'Radar', isRadar: true },
-            { id: 'preparation', label: t.nav.preparation },
-            { id: 'community', label: t.nav.community },
-            { id: 'profile', label: t.nav.profile },
-            { id: 'admin', label: language === 'fr' ? '👑 Admin' : '👑 الإدارة' },
-          ].map((item) => {
+          {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
@@ -76,9 +80,6 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-[#6E6773] hover:text-[#242126] hover:bg-gray-50'
                 }`}
               >
-                {item.isRadar && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                )}
                 <span>{item.label}</span>
               </button>
             );
@@ -98,28 +99,32 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Quick Bookmarks badge */}
-          <button
-            onClick={() => setActiveTab('profile')}
-            className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors"
-            title={t.profile.savedContests}
-          >
-            <Bookmark className="w-4 h-4" />
-            {savedCount > 0 && (
-              <span className="absolute top-1 end-1 w-4 h-4 bg-[#8D174B] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                {savedCount}
-              </span>
-            )}
-          </button>
+          {isAuthed && (
+            <button
+              onClick={() => setActiveTab('profile')}
+              className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors"
+              title={t.profile.savedContests}
+            >
+              <Bookmark className="w-4 h-4" />
+              {savedCount > 0 && (
+                <span className="absolute top-1 end-1 w-4 h-4 bg-[#8D174B] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {savedCount}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Notifications bell */}
-          <button
-            onClick={() => setActiveTab('profile')}
-            className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors"
-            title="Notifications"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-[#C73578] rounded-full"></span>
-          </button>
+          {isAuthed && (
+            <button
+              onClick={() => setActiveTab('profile')}
+              className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-[#C73578] rounded-full"></span>
+            </button>
+          )}
 
           {/* Connexion / Déconnexion (Supabase Auth) */}
           {isAuthed ? (

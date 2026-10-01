@@ -1,28 +1,33 @@
 import React from 'react';
 import { Language } from '../types';
 import { translations } from '../i18n/translations';
-import { Home, Briefcase, GraduationCap, Users, User, Radio } from 'lucide-react';
+import { Home, Briefcase, GraduationCap, Users, User, LogIn } from 'lucide-react';
 
 interface BottomNavProps {
   language: Language;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  isAuthed?: boolean;
+  onAuthClick?: () => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   language,
   activeTab,
   setActiveTab,
+  isAuthed = false,
+  onAuthClick,
 }) => {
   const t = translations[language];
 
   const navItems = [
     { id: 'home', label: t.nav.home, icon: Home },
     { id: 'contests', label: t.nav.contests, icon: Briefcase },
-    { id: 'radar', label: (t.nav as any).radar || 'Radar', icon: Radio },
     { id: 'preparation', label: t.nav.preparation, icon: GraduationCap },
     { id: 'community', label: t.nav.community, icon: Users },
-    { id: 'profile', label: t.nav.profile, icon: User },
+    isAuthed
+      ? { id: 'profile', label: t.nav.profile, icon: User }
+      : { id: 'auth', label: language === 'fr' ? 'Connexion' : 'دخول', icon: LogIn, onClick: onAuthClick },
   ];
 
   return (
@@ -37,8 +42,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all ${
+              onClick={() => {
+                if (item.onClick) {
+                  item.onClick();
+                } else {
+                  setActiveTab(item.id);
+                }
+              }}
+              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${
                 isActive ? 'text-[#8D174B]' : 'text-[#6E6773] hover:text-[#242126]'
               }`}
             >

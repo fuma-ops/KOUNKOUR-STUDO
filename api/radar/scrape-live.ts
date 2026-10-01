@@ -21,6 +21,7 @@
  */
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
+import { parseEmploiPublicDetail } from './enrich.ts';
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
@@ -249,6 +250,12 @@ function parseEmploiPublicPage(html: string, pageNo: number, seen: Set<string>, 
     const scrapedStatus = isConvocation ? 'in_progress' : statusFromDeadline(deadlineISO);
     const category = detectCategory(admin, isDouanes);
 
+    const imgEl = $(el).find('img').first();
+    let imgUrl = imgEl.attr('src') || imgEl.attr('data-src') || '';
+    if (imgUrl && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+      imgUrl = `https://www.emploi-public.ma${imgUrl.startsWith('/') ? '' : '/'}${imgUrl}`;
+    }
+
     const sourceUrl = `https://www.emploi-public.ma/fr/concours/details/${uuid}`;
     items.push({
       external_id: uuid,
@@ -258,12 +265,17 @@ function parseEmploiPublicPage(html: string, pageNo: number, seen: Set<string>, 
       sourceName: 'emploi-public.ma',
       officialSourceUrl: sourceUrl,
       sourceUrl,
+      image: imgUrl || undefined,
       title: { fr: title, ar: `مباراة توظيف ${title}` },
-      administration: { name: { fr: admin || 'Administration publique', ar: admin || '' }, category },
+      administration: { 
+        name: { fr: admin || 'Administration publique', ar: admin || '' }, 
+        category,
+        logo: imgUrl || undefined,
+      },
       postsCount: postsCount ?? 1,
       degreeLevel: degreeLevel || '',
-      specialty: { fr: specialty || 'Spécialité mentionnée dans l’annonce officielle', ar: '' },
-      region: { fr: 'National (Royaume du Maroc)', ar: 'المملكة المغربية' },
+      specialty: specialty ? { fr: specialty, ar: '' } : null,
+      region: null,
       publicationDate: '',
       deadlineDate: deadlineText,
       status: 'pending_review',
@@ -276,13 +288,18 @@ function parseEmploiPublicPage(html: string, pageNo: number, seen: Set<string>, 
         administration_name: admin || null,
         administration_category: category,
         degree_level: degreeLevel,
-        specialty,
+        specialty: specialty || null,
         region: null,
         positions: postsCount,
         deadline_text: deadlineText || null,
         deadline_date: deadlineISO,
         publication_text: null,
-        raw: { scraped_status: scrapedStatus, is_verified_source: true, source: 'vercel-serverless' },
+        raw: { 
+          scraped_status: scrapedStatus, 
+          is_verified_source: true, 
+          source: 'vercel-serverless',
+          image: imgUrl || null,
+        },
         status: 'pending_review',
       },
     });
@@ -296,6 +313,9 @@ export const DREAMJOB_LIST_URLS = [
   'https://www.dreamjob.ma/emploi-public/',
   'https://www.dreamjob.ma/emploi-public/page/2/',
   'https://www.dreamjob.ma/emploi-public/page/3/',
+  'https://www.dreamjob.ma/emploi-public/feed/',
+  'https://www.dreamjob.ma/emploi-public/feed/?paged=2',
+  'https://www.dreamjob.ma/emploi-public/feed/?paged=3',
 ];
 
 export interface DreamjobEntry {
@@ -303,6 +323,7 @@ export interface DreamjobEntry {
   url: string;
   slug: string;
   excerpt: string;
+  imageUrl?: string;
 }
 
 // Chemins qui ne sont PAS des annonces (navigation WordPress, pages fixes…).
@@ -330,12 +351,13 @@ function dreamjobPostUrl(href: string, base: string): { url: string; slug: strin
 
 // Pure et testable : extrait les annonces d'une page liste dreamjob.
 // Stratégie 1 : blocs <article> WordPress (titre dans h1/h2/h3/.entry-title).
-// Stratégie 2 (repli) : tout lien d'article dont le texte parle de concours/recrutement.
+// Stratégie 2 : éléments <item> de flux RSS/XML (insensible aux challenges Cloudflare).
+// Stratégie 3 (repli) : tout lien d'article dont le texte parle de concours/recrutement.
 export function parseDreamjobList(html: string, baseUrl = 'https://www.dreamjob.ma/emploi-public/'): {
   entries: DreamjobEntry[];
   strategy: 'article' | 'links' | 'none';
 } {
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(html, { xmlMode: html.includes('<?xml') || html.includes('<rss') });
   const seen = new Set<string>();
   const entries: DreamjobEntry[] = [];
 
@@ -349,7 +371,35 @@ export function parseDreamjobList(html: string, baseUrl = 'https://www.dreamjob.
     if (title.length < 10) return;
     seen.add(post.slug);
     const excerpt = $(art).find('.entry-summary, .entry-content, .excerpt, p').text().replace(/\s+/g, ' ').trim();
-    entries.push({ title, url: post.url, slug: post.slug, excerpt: excerpt.slice(0, 600) });
+    
+    // Extraction exacte de l'image de l'article WordPress
+    const imgEl = $(art).find('.post-thumbnail img, .entry-thumbnail img, img.wp-post-image, .featured-image img, a img, img').first();
+    const rawImg = imgEl.attr('src') || imgEl.attr('data-src') || imgEl.attr('data-lazy-src') || imgEl.attr('data-orig-file') || '';
+    const imageUrl = rawImg && (rawImg.startsWith('http') || rawImg.startsWith('//')) ? (rawImg.startsWith('//') ? `https:${rawImg}` : rawImg) : '';
+
+    entries.push({ title, url: post.url, slug: post.slug, excerpt: excerpt.slice(0, 600), imageUrl: imageUrl || undefined });
+  });
+  if (entries.length > 0) return { entries, strategy: 'article' };
+
+  // Support direct des flux RSS/XML (<item>)
+  $('item').each((_i, it) => {
+    const title = $(it).find('title').first().text().replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/\s+/g, ' ').trim();
+    const link = $(it).find('link').first().text().trim();
+    if (!link) return;
+    const post = dreamjobPostUrl(link, baseUrl);
+    if (!post || seen.has(post.slug)) return;
+    if (title.length < 10) return;
+    seen.add(post.slug);
+    const excerpt = $(it).find('description, content\\:encoded').first().text().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    let imageUrl = $(it).find('enclosure[type^="image"]').attr('url') || $(it).find('media\\:content[url]').attr('url') || $(it).find('media\\:thumbnail').attr('url') || '';
+    if (!imageUrl) {
+      const desc = $(it).find('description, content\\:encoded').text();
+      const m = desc.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp|svg))["']/i) || desc.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (m) imageUrl = m[1];
+    }
+
+    entries.push({ title, url: post.url, slug: post.slug, excerpt: excerpt.slice(0, 600), imageUrl: imageUrl || undefined });
   });
   if (entries.length > 0) return { entries, strategy: 'article' };
 
@@ -359,7 +409,12 @@ export function parseDreamjobList(html: string, baseUrl = 'https://www.dreamjob.
     const title = $(el).text().replace(/\s+/g, ' ').trim();
     if (title.length < 15 || !/concours|recrut|poste/i.test(title)) return;
     seen.add(post.slug);
-    entries.push({ title, url: post.url, slug: post.slug, excerpt: '' });
+    
+    const imgEl = $(el).find('img').first();
+    const rawImg = imgEl.attr('src') || imgEl.attr('data-src') || '';
+    const imageUrl = rawImg && (rawImg.startsWith('http') || rawImg.startsWith('//')) ? (rawImg.startsWith('//') ? `https:${rawImg}` : rawImg) : '';
+
+    entries.push({ title, url: post.url, slug: post.slug, excerpt: '', imageUrl: imageUrl || undefined });
   });
   return { entries, strategy: entries.length > 0 ? 'links' : 'none' };
 }
@@ -459,8 +514,13 @@ function buildDreamjobItem(e: DreamjobEntry, dup: DuplicateRef | null): any {
     sourceId: 'src-dreamjob',
     sourceName: 'dreamjob.ma',
     sourceUrl: e.url,
+    image: e.imageUrl || undefined,
     title: { fr: e.title, ar: e.title },
-    administration: { name: { fr: admin || 'Administration publique', ar: admin || '' }, category },
+    administration: { 
+      name: { fr: admin || 'Administration publique', ar: admin || '' }, 
+      category,
+      logo: e.imageUrl || undefined,
+    },
     postsCount: postsCount ?? 1,
     degreeLevel: degreeLevel || '',
     specialty: { fr: specialty || 'Spécialité mentionnée dans l’annonce officielle', ar: '' },
@@ -496,6 +556,7 @@ function buildDreamjobItem(e: DreamjobEntry, dup: DuplicateRef | null): any {
         official_source_required: true,
         possible_duplicate_of: dup,
         source: 'vercel-serverless',
+        image: e.imageUrl || null,
       },
       status: 'pending_review',
     },
@@ -569,6 +630,115 @@ export default async function handler(req: any, res: any) {
           continue;
         }
         items.push(...parseEmploiPublicPage(pr.html, pr.page, seen, addLog));
+      }
+
+      // Lecture des fiches détail officielles (4 en parallèle maximum, délai 7s, même User-Agent)
+      if (items.length > 0) {
+        addLog('info', `Enrichissement des ${items.length} annonces depuis leur fiche détail officielle (4 en parallèle)...`);
+        const BATCH_SIZE = 4;
+        for (let i = 0; i < items.length; i += BATCH_SIZE) {
+          const batch = items.slice(i, i + BATCH_SIZE);
+          // eslint-disable-next-line no-await-in-loop
+          await Promise.all(
+            batch.map(async (item) => {
+              try {
+                const targetUrl = item.officialSourceUrl || item.sourceUrl;
+                const resp = await fetch(targetUrl, {
+                  headers: BROWSER_HEADERS,
+                  signal: AbortSignal.timeout(7000),
+                });
+                if (!resp.ok) return;
+                const detailHtml = await resp.text();
+                const d = parseEmploiPublicDetail(detailHtml);
+
+                if (d.reference) {
+                  item.referenceCode = d.reference;
+                  item._db.reference = d.reference;
+                }
+                if (d.grade) {
+                  item.grade = d.grade;
+                  item._db.grade_fr = d.grade;
+                  const gLower = d.grade.toLowerCase();
+                  let inferred = '';
+                  if (gLower.includes('médecin') || gLower.includes('medecin')) inferred = 'Doctorat en Médecine (Bac+7)';
+                  else if (gLower.includes('pharmacien')) inferred = 'Doctorat en Pharmacie (Bac+6)';
+                  else if (gLower.includes('dentiste')) inferred = 'Doctorat en Médecine Dentaire (Bac+6)';
+                  else if (gLower.includes('ingénieur') || gLower.includes('ingenieur')) inferred = "Diplôme d'Ingénieur d'État (Bac+5)";
+                  else if (gLower.includes('architecte')) inferred = "Diplôme d'Architecte (Bac+5)";
+                  else if (gLower.includes('professeur') || gLower.includes('enseignant')) inferred = 'Doctorat (Bac+8)';
+                  else if (gLower.includes('administrateur 2') || gLower.includes('2ème grade') || gLower.includes('2eme grade')) inferred = 'Master / Diplôme d’Études Supérieures (Bac+5)';
+                  else if (gLower.includes('administrateur 3') || (gLower.includes('3ème grade') && gLower.includes('admin'))) inferred = 'Licence / Bac+3';
+                  else if (gLower.includes('technicien 3') || gLower.includes('3ème grade') || gLower.includes('spécialisé') || gLower.includes('echelle 9') || gLower.includes('échelle 9')) inferred = 'Bac+2 (Technicien Spécialisé / DUT / BTS / DTS)';
+                  else if (gLower.includes('technicien 4') || gLower.includes('4ème grade') || gLower.includes('rédacteur') || gLower.includes('echelle 8') || gLower.includes('échelle 8')) inferred = 'Baccalauréat / Diplôme de Technicien';
+                  else if (gLower.includes('adjoint technique') || gLower.includes('echelle 6') || gLower.includes('échelle 6')) inferred = 'Certificat de Qualification Professionnelle (CQP)';
+                  else if (gLower.includes('adjoint administratif')) inferred = 'Baccalauréat';
+                  else if (gLower.includes('infirmier') || gLower.includes('sage-femme') || gLower.includes('santé')) inferred = 'Licence Professionnelle (Bac+3)';
+
+                  if (inferred && (!item.degreeLevel || item.degreeLevel.length < 3)) {
+                    item.degreeLevel = inferred;
+                    item._db.degree_level = inferred;
+                  }
+                }
+                if (d.specialty && d.specialty.length > 0) {
+                  item.specialtiesList = d.specialty;
+                  item.specialty = { fr: d.specialty.join(', '), ar: '' };
+                  item._db.specialty = d.specialty.join(', ');
+                } else {
+                  item.specialtiesList = [];
+                  item.specialty = null;
+                  item._db.specialty = null;
+                }
+                if (d.postsCount !== null) {
+                  item.postsCount = d.postsCount;
+                  item._db.positions = d.postsCount;
+                }
+                if (d.recruitmentType) {
+                  item.recruitmentType = d.recruitmentType;
+                  item._db.recruitment_type = d.recruitmentType;
+                }
+                if (d.region) {
+                  item.region = { fr: d.region, ar: d.region };
+                  item._db.region = d.region;
+                  item._db.region_fr = d.region;
+                }
+                if (d.depositType) {
+                  item.depositType = d.depositType;
+                  item._db.deposit_type = d.depositType;
+                }
+                if (d.depositSite) {
+                  item.depositSite = d.depositSite;
+                  item.applyUrl = d.depositSite;
+                  item._db.apply_url = d.depositSite;
+                }
+                if (d.deadlineDate) {
+                  item.deadlineDate = d.deadlineDate;
+                  item._db.deadline_text = d.deadlineDate;
+                  const iso = parseFrDateISO(d.deadlineDate);
+                  if (iso) item._db.deadline_date = iso;
+                }
+                if (d.examDate) {
+                  item.contestDate = d.examDate;
+                  item._db.exam_date = d.examDate;
+                }
+                if (d.publicationDate) {
+                  item.publicationDate = d.publicationDate;
+                  item._db.publication_text = d.publicationDate;
+                }
+                if (d.administration) {
+                  item.administration.name = { fr: d.administration, ar: d.administration };
+                  item._db.administration_name = d.administration;
+                }
+                if (d.arreteUrl) {
+                  item.arreteUrl = d.arreteUrl;
+                  if (item._db.raw) item._db.raw.arrete_url = d.arreteUrl;
+                }
+              } catch {
+                /* Fiche injoignable ou timeout : conserve les données de base de la liste */
+              }
+            })
+          );
+        }
+        addLog('info', `Enrichissement des fiches détail terminé.`);
       }
     } else {
       const pages = await fetchPages(DREAMJOB_LIST_URLS);

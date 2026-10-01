@@ -44,7 +44,7 @@ const cases: Case[] = [
   { label: 'Génie électrique (Doctorat)', profile: { specialty: 'Génie électrique', degreeLevel: 'Doctorat' }, expectEligible: ['MC ENTA Génie Électrique - Systèmes Embarqués'] },
   { label: 'Droit privé (Licence) — Master requis à l’Éducation', profile: { specialty: 'Droit privé', degreeLevel: 'Licence' }, expectEligible: [] },
   { label: 'Droit privé (Master)', profile: { specialty: 'Droit privé' }, expectEligible: ['Administrateur 2e grade (Éducation)'] },
-  { label: 'Agronomie (Master)', profile: { specialty: 'Agronomie' }, expectEligible: ["Ingénieur d'État (Protection civile) agronome", 'Technicien 3e grade (Protection civile) agricole'] },
+  { label: 'Agronomie (Master) — Technicien Bac+2 refusé (surqualification)', profile: { specialty: 'Agronomie' }, expectEligible: ["Ingénieur d'État (Protection civile) agronome"] },
   { label: 'Pharmacie (Doctorat)', profile: { specialty: 'Pharmacie', degreeLevel: 'Doctorat' }, expectEligible: ['Pharmacien 1er grade'] },
   { label: 'Profil vide (aucune spécialité)', profile: { specialty: '' }, expectEligible: [] },
   { label: 'Spécialité en arabe', profile: { specialty: 'الهندسة المدنية' }, expectEligible: [] },

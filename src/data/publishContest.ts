@@ -139,10 +139,24 @@ export async function publishScrapedToSupabase(
     }
   }
 
-  const specialtyFr =
-    item.specialty?.fr && !item.specialty.fr.toLowerCase().includes('mentionnée')
-      ? item.specialty.fr
-      : null;
+  const rawSpecs: string[] = [];
+  if (Array.isArray(enriched?.specialty)) {
+    rawSpecs.push(...enriched.specialty);
+  } else if (Array.isArray(enriched?.specialties)) {
+    rawSpecs.push(...enriched.specialties);
+  }
+  if (rawSpecs.length === 0 && Array.isArray((item as any).specialtiesList)) {
+    rawSpecs.push(...(item as any).specialtiesList);
+  }
+  if (rawSpecs.length === 0 && item.specialty?.fr) {
+    rawSpecs.push(item.specialty.fr);
+  }
+
+  const validSpecialties = rawSpecs
+    .map((s) => s?.trim())
+    .filter((s): s is string => Boolean(s && !s.toLowerCase().includes('mentionnée') && !s.toLowerCase().includes('mentionnee')));
+
+  const rawRegion = enriched?.region || (item.region?.fr && !item.region.fr.includes('National') ? item.region.fr : null) || null;
 
   const { data: contest, error: insertError } = await supabase
     .from('contests')
@@ -152,15 +166,18 @@ export async function publishScrapedToSupabase(
       title_original: item.title?.fr || 'Concours',
       title_fr: item.title?.fr || null,
       title_ar: item.title?.ar || null,
-      reference: enriched.reference || item.referenceCode || null, // vrai code de la page détail, jamais inventé
+      reference: enriched?.reference || item.referenceCode || null, // vrai code de la page détail, jamais inventé
       status: 'publie',
+      grade_fr: enriched?.grade || (item as any).grade || null,
+      recruitment_type: enriched?.recruitmentType || (item as any).recruitmentType || null,
+      deposit_type: enriched?.depositType || (item as any).depositType || null,
       diploma_fr: item.degreeLevel || null,
-      positions: typeof item.postsCount === 'number' ? item.postsCount : null,
-      region_fr: item.region?.fr || null,
-      deadline_date: toISODate(enriched.deadlineDate || item.deadlineDate),
-      exam_date: toISODate(enriched.examDate || (item as any).contestDate),
-      publication_date: toISODate(enriched.publicationDate || item.publicationDate),
-      apply_url: enriched.applyUrl || null,
+      positions: enriched?.postsCount ?? (typeof item.postsCount === 'number' ? item.postsCount : null),
+      region_fr: rawRegion,
+      deadline_date: toISODate(enriched?.deadlineDate || item.deadlineDate),
+      exam_date: toISODate(enriched?.examDate || (item as any).contestDate),
+      publication_date: toISODate(enriched?.publicationDate || item.publicationDate),
+      apply_url: enriched?.depositSite || enriched?.applyUrl || (item as any).depositSite || (item as any).applyUrl || null,
       source_url: sourceUrl,
       source_org: adminName,
       published_at: new Date().toISOString(),
@@ -169,15 +186,16 @@ export async function publishScrapedToSupabase(
     .single();
   if (insertError || !contest) return { ok: false, reason: insertError?.message || 'insertion refusée' };
 
-  if (specialtyFr) {
-    await supabase.from('contest_criteria').insert({
+  if (validSpecialties.length > 0) {
+    const criteriaRows = validSpecialties.map((spec, idx) => ({
       contest_id: contest.id,
       criterion_type: 'specialite',
-      value_fr: specialtyFr,
+      value_fr: spec,
       source_page: sourceUrl,
       verification_state: 'a_verifier',
-      position: 0,
-    });
+      position: idx,
+    }));
+    await supabase.from('contest_criteria').insert(criteriaRows);
   }
 
   // Marque le candidat comme importé (s'il existe en base).

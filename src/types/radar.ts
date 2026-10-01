@@ -82,6 +82,7 @@ export interface ScrapedContestItem {
   recruitmentType?: string;
   depositType?: string;
   depositSite?: string;
+  applyUrl?: string;
   contestDate?: string;
   /** Concours proche déjà connu (signalé, jamais fusionné automatiquement). */
   possibleDuplicate?: {

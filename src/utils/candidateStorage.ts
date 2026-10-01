@@ -230,6 +230,12 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
       `Diplôme insuffisant : ${contest.degreeLevel} requis (votre niveau : ${profile.degreeLevel}).`,
       `المستوى الدراسي غير كافٍ: المطلوب ${contest.degreeLevel} (مستواك: ${profile.degreeLevel}).`
     );
+  } else if (required <= 2 && mine > required) {
+    hardNo = true;
+    add(
+      `Surqualification statutaire : ce concours est réservé au grade de Technicien / Bac (${contest.degreeLevel}). Un diplôme de ${profile.degreeLevel} n'est pas recevable pour ce grade selon la réglementation de la fonction publique.`,
+      `عدم تطابق نظامي: هذه المباراة مخصصة لدرجة تقني / بكالوريا (${contest.degreeLevel}). شهادة ${profile.degreeLevel} غير مقبولة للترشح لهذه الدرجة وفقاً للنظام الأساسي للوظيفة العمومية.`
+    );
   } else {
     degreeMatch = true;
   }

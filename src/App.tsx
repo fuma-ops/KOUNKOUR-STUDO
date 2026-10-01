@@ -13,18 +13,16 @@ import { HeroBanner } from './components/HeroBanner';
 import { ContestCard } from './components/ContestCard';
 import { FilterDrawer } from './components/FilterDrawer';
 import { ContestDetailModal } from './components/ContestDetailModal';
-import { TalabKhattiModal } from './components/TalabKhattiModal';
 import { SalarySimulatorModal } from './components/SalarySimulatorModal';
 import { AdminCvModal } from './components/AdminCvModal';
 import { QcmModule } from './components/QcmModule';
 import { CommunityModule } from './components/CommunityModule';
 import { ProfileModule } from './components/ProfileModule';
-import { RadarModule } from './components/RadarModule';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
 import { OfficialDisclaimer } from './components/OfficialDisclaimer';
-import { getAllActiveContests } from './utils/radarStorage';
+import { getAllActiveContests, loadImportedContests, getDeletedContestIds, deleteContestFromSystem, sanitizeContestFields } from './utils/radarStorage';
 import { fetchPublishedContests } from './data/supabaseContests';
 import { useSession } from './lib/useSession';
 import { AuthModal } from './components/AuthModal';
@@ -45,7 +43,6 @@ export default function App() {
   const [onlyMatchingProfile, setOnlyMatchingProfile] = useState<boolean>(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
-  const [talabKhattiContest, setTalabKhattiContest] = useState<Contest | null>(null);
   const [salaryContestTarget, setSalaryContestTarget] = useState<Contest | null>(null);
   const [activeCommunityContestId, setActiveCommunityContestId] = useState<string | null>(null);
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState<boolean>(false);
@@ -123,21 +120,78 @@ export default function App() {
     setCompletedQcmScores((prev) => [newEntry, ...prev]);
   };
 
-  // Concours chargés depuis Supabase (source unique partagée). Repli sur les
-  // données locales si la base est injoignable, pour ne jamais afficher un
-  // écran vide.
+  // Concours chargés depuis Supabase + fusion transparente avec les imports Radar
   const [allActiveContests, setAllActiveContests] = useState<Contest[]>(() => getAllActiveContests());
   useEffect(() => {
     let cancelled = false;
     fetchPublishedContests()
       .then((rows) => {
-        if (!cancelled && rows && rows.length > 0) setAllActiveContests(rows);
+        if (!cancelled) {
+          const deletedIds = new Set(getDeletedContestIds());
+          const imported = loadImportedContests().filter((c) => !deletedIds.has(c.id));
+          const supabaseRows = (rows || []).filter((r) => !deletedIds.has(r.id));
+          
+          // Dédoublonnage strict par référence officielle, slug ou id
+          const seenKeys = new Set<string>();
+          const deduplicated: Contest[] = [];
+
+          // 1. Priorité absolue aux concours officiels Supabase
+          for (const s of supabaseRows) {
+            const refKey = s.referenceCode ? `ref:${s.referenceCode.trim().toLowerCase()}` : '';
+            const slugKey = s.slug ? `slug:${s.slug.trim().toLowerCase()}` : '';
+            const idKey = `id:${s.id}`;
+            if (refKey) seenKeys.add(refKey);
+            if (slugKey) seenKeys.add(slugKey);
+            seenKeys.add(idKey);
+            deduplicated.push(s);
+          }
+
+          // 2. Ajout des imports locaux uniquement s'ils ne sont pas déjà en base
+          for (const imp of imported) {
+            const refKey = imp.referenceCode ? `ref:${imp.referenceCode.trim().toLowerCase()}` : '';
+            const slugKey = imp.slug ? `slug:${imp.slug.trim().toLowerCase()}` : '';
+            const normId = imp.id.replace(/^(?:c-|scrape-)/, '');
+            const idKey = `id:${normId}`;
+
+            const isDuplicate =
+              (refKey && seenKeys.has(refKey)) ||
+              (slugKey && seenKeys.has(slugKey)) ||
+              seenKeys.has(idKey) ||
+              seenKeys.has(`id:${imp.id}`);
+
+            if (!isDuplicate) {
+              if (refKey) seenKeys.add(refKey);
+              if (slugKey) seenKeys.add(slugKey);
+              seenKeys.add(idKey);
+              deduplicated.push(imp);
+            }
+          }
+
+          const combined = deduplicated.map(sanitizeContestFields).filter((c) => !deletedIds.has(c.id));
+          if (combined.length > 0) {
+            setAllActiveContests(combined);
+          }
+        }
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [contestsVersion]);
+
+  const handleDeleteContest = async (contestId: string) => {
+    await deleteContestFromSystem(contestId);
+    setAllActiveContests((prev) => prev.filter((c) => c.id !== contestId && c.id !== `c-${contestId}`));
+    setContestsVersion((v) => v + 1);
+    if (selectedContest?.id === contestId) {
+      setSelectedContest(null);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await session.signOut();
+    setActiveTab('home');
+  };
 
   const candidateProfile = useMemo(() => {
     return loadCandidateProfile();
@@ -265,6 +319,12 @@ export default function App() {
         language={language}
         onNavigateToUserApp={() => setActiveTab('home')}
         onNavigateTab={(tab) => setActiveTab(tab)}
+        onSelectContest={setSelectedContest}
+        onContestImported={() => {
+          setAllActiveContests(getAllActiveContests());
+          setContestsVersion((v) => v + 1);
+        }}
+        onDeleteContest={handleDeleteContest}
       />
     );
   }
@@ -291,8 +351,9 @@ export default function App() {
         setActiveTab={setActiveTab}
         savedCount={bookmarkedIds.length}
         isAuthed={!!session.user}
+        isStaff={session.isStaff}
         onAuthClick={() => setAuthOpen(true)}
-        onSignOut={session.signOut}
+        onSignOut={handleSignOut}
       />
 
       {/* Content Body Based on Tab */}
@@ -672,19 +733,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Radar Scraper Tab */}
-        {activeTab === 'radar' && (
-          <ErrorBoundary fallbackTitle="Module Radar en cours de synchronisation">
-            <RadarModule
-              language={language}
-              onSelectContest={setSelectedContest}
-              onContestImported={() => {
-                setContestsVersion((v) => v + 1);
-              }}
-            />
-          </ErrorBoundary>
-        )}
-
         {/* Preparation / QCM Tab */}
         {activeTab === 'preparation' && (
           <QcmModule
@@ -698,28 +746,53 @@ export default function App() {
           <CommunityModule 
             language={language} 
             initialContestId={activeCommunityContestId}
+            isAuthed={!!session.user}
+            onAuthClick={() => setAuthOpen(true)}
+            allContests={allActiveContests}
           />
         )}
 
         {/* Profile Tab */}
         {activeTab === 'profile' && (
-          <ProfileModule
-            key={profileVersion}
-            language={language}
-            onLanguageChange={setLanguage}
-            bookmarkedContests={bookmarkedContests}
-            allContests={allActiveContests}
-            completedQcmScores={completedQcmScores}
-            onSelectContest={setSelectedContest}
-            onRemoveBookmark={(id) => setBookmarkedIds((prev) => prev.filter((i) => i !== id))}
-            onProfileUpdated={() => setProfileVersion((v) => v + 1)}
-            onOpenTalabKhatti={(contest) => setTalabKhattiContest(contest)}
-            onOpenSalarySimulator={(contest) => {
-              setSalaryContestTarget(contest || null);
-              setIsSalaryModalOpen(true);
-            }}
-            onOpenAdminCv={() => setIsAdminCvModalOpen(true)}
-          />
+          session.user ? (
+            <ProfileModule
+              key={profileVersion}
+              language={language}
+              onLanguageChange={setLanguage}
+              bookmarkedContests={bookmarkedContests}
+              allContests={allActiveContests}
+              completedQcmScores={completedQcmScores}
+              onSelectContest={setSelectedContest}
+              onRemoveBookmark={(id) => setBookmarkedIds((prev) => prev.filter((i) => i !== id))}
+              onProfileUpdated={() => setProfileVersion((v) => v + 1)}
+              onOpenSalarySimulator={(contest) => {
+                setSalaryContestTarget(contest || null);
+                setIsSalaryModalOpen(true);
+              }}
+              onOpenAdminCv={() => setIsAdminCvModalOpen(true)}
+            />
+          ) : (
+            <div className="max-w-md mx-auto my-12 p-8 bg-white rounded-3xl border border-[#F1E5EC] text-center shadow-lg animate-fade-in">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center mx-auto mb-4 shadow-md">
+                <Bookmark className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-[#242126] mb-2">
+                {language === 'fr' ? 'Connexion requise pour votre espace' : 'تسجيل الدخول مطلوب'}
+              </h2>
+              <p className="text-xs text-[#6E6773] mb-6 leading-relaxed">
+                {language === 'fr' 
+                  ? 'Connectez-vous pour consulter vos concours favoris, votre profil de candidature et vos scores de préparation.' 
+                  : 'يرجى تسجيل الدخول للاطلاع على مبارياتك المفضلة، ملفك الشخصي ونتائج الاختبارات.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setAuthOpen(true)}
+                className="w-full py-3 rounded-xl bg-[#8D174B] hover:bg-[#70113B] text-white font-bold text-sm shadow-md transition-all cursor-pointer"
+              >
+                {language === 'fr' ? 'Se connecter / Créer un compte' : 'تسجيل الدخول / إنشاء حساب'}
+              </button>
+            </div>
+          )
         )}
       </main>
 
@@ -751,19 +824,10 @@ export default function App() {
           setActiveTab('community');
           setSelectedContest(null);
         }}
-        onOpenTalabKhatti={(contest) => setTalabKhattiContest(contest)}
         onOpenSalarySimulator={(contest) => {
           setSalaryContestTarget(contest);
           setIsSalaryModalOpen(true);
         }}
-      />
-
-      {/* Official Talab Khatti (Demande Manuscrite) Modal */}
-      <TalabKhattiModal
-        contest={talabKhattiContest}
-        isOpen={!!talabKhattiContest}
-        onClose={() => setTalabKhattiContest(null)}
-        language={language}
       />
 
       {/* Official Salary Simulator Modal */}
@@ -789,6 +853,8 @@ export default function App() {
         language={language}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        isAuthed={!!session.user}
+        onAuthClick={() => setAuthOpen(true)}
       />
 
       {/* Footer */}

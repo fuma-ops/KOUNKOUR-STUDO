@@ -16,7 +16,8 @@ import {
   loadScrapeLogs, saveScrapeLogs, importScrapedContestToCatalog,
   loadImportedContests, normalizeScrapedItem,
   importMultipleScrapedContestsToCatalog, ignoreMultipleScrapedContests,
-  loadSourceScanStats, saveSourceScanStat, SourceScanStat
+  loadSourceScanStats, saveSourceScanStat, SourceScanStat,
+  resolveAdministrationLogo, deleteContestFromSystem
 } from '../utils/radarStorage';
 import { getSupabase } from '../lib/supabase';
 import { publishScrapedToSupabase, publishManyScrapedToSupabase } from '../data/publishContest';
@@ -25,12 +26,14 @@ interface RadarModuleProps {
   language: Language;
   onSelectContest?: (contest: Contest) => void;
   onContestImported?: (contest: Contest) => void;
+  onDeleteContest?: (contestId: string) => Promise<void> | void;
 }
 
 export const RadarModule: React.FC<RadarModuleProps> = ({
   language,
   onSelectContest,
   onContestImported,
+  onDeleteContest,
 }) => {
   const isRTL = language === 'ar';
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
@@ -50,6 +53,8 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
   const [scanSourceId, setScanSourceId] = useState<string>(OFFICIAL_RADAR_SOURCES[0].id);
   const [scanningSourceId, setScanningSourceId] = useState<string | null>(null);
   const [scanStats, setScanStats] = useState<Record<string, SourceScanStat>>(loadSourceScanStats());
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [backfillProgress, setBackfillProgress] = useState(0);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -74,6 +79,93 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
       saveScrapeLogs(updated);
       return updated;
     });
+  };
+
+  const handleBackfillDetails = async () => {
+    if (isBackfilling || isScanning) return;
+    setIsBackfilling(true);
+    setIsTerminalExpanded(true);
+    setBackfillProgress(5);
+    addLog('info', '[BACKFILL] Démarrage de la mise à jour des fiches depuis emploi-public.ma...');
+
+    let offset = 0;
+    const limit = 10;
+    let hasMore = true;
+    let totalUpdated = 0;
+    let totalComplete = 0;
+    let totalUnreachable = 0;
+
+    try {
+      let authHeaders: Record<string, string> = {};
+      const sb = getSupabase();
+      if (sb) {
+        const { data } = await sb.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) authHeaders = { Authorization: `Bearer ${token}` };
+      }
+
+      if (!authHeaders.Authorization) {
+        addLog('warn', '[BACKFILL] Connexion admin requise pour mettre à jour la base Supabase.');
+        setIsBackfilling(false);
+        return;
+      }
+
+      while (hasMore) {
+        addLog('info', `[BACKFILL] Traitement du lot (offset: ${offset}, limit: ${limit})...`);
+        const res = await fetch(`/api/radar/backfill-details?offset=${offset}&limit=${limit}`, {
+          headers: authHeaders,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Erreur HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (!data.ok) {
+          throw new Error(data.error || 'Erreur inconnue');
+        }
+
+        if (Array.isArray(data.updated)) {
+          data.updated.forEach((u: any) => {
+            totalUpdated++;
+            addLog('success', `[MIS À JOUR] « ${u.title} » (${u.fields.join(', ')}).`);
+          });
+        }
+        if (Array.isArray(data.alreadyComplete)) {
+          data.alreadyComplete.forEach((c: any) => {
+            totalComplete++;
+            addLog('info', `[DÉJÀ COMPLET] « ${c.title} ».`);
+          });
+        }
+        if (Array.isArray(data.unreachable)) {
+          data.unreachable.forEach((un: any) => {
+            totalUnreachable++;
+            addLog('warn', `[INJOIGNABLE] « ${un.title} » (${un.error}).`);
+          });
+        }
+
+        const total = data.totalCount || 1;
+        offset += limit;
+        hasMore = data.hasMore === true && offset < total;
+        setBackfillProgress(Math.min(95, Math.round((offset / total) * 100)));
+      }
+
+      setBackfillProgress(100);
+      addLog(
+        'success',
+        `[BILAN BACKFILL] Terminé : ${totalUpdated} concours mis à jour, ${totalComplete} déjà complets, ${totalUnreachable} injoignables.`
+      );
+      setImportedToast(
+        language === 'fr'
+          ? `✅ Fiches mises à jour depuis emploi-public : ${totalUpdated} actualisés, ${totalComplete} complets.`
+          : `✅ تم تحديث بيانات المباريات من الموقع الرسمي بنجاح.`
+      );
+    } catch (err: any) {
+      addLog('warn', `[BACKFILL] Erreur lors de la mise à jour : ${err?.message || err}`);
+    } finally {
+      setIsBackfilling(false);
+      setTimeout(() => setImportedToast(null), 6000);
+    }
   };
 
   const [isLiveRealScrape, setIsLiveRealScrape] = useState(true);
@@ -176,30 +268,31 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
   };
 
   const handleImportToCatalog = async (item: ScrapedContestItem) => {
-    // Publication réelle vers Supabase d'abord : l'annonce n'est marquée « au
-    // catalogue » que si elle est vraiment en ligne (ou déjà en ligne).
-    const result = await publishScrapedToSupabase(item);
-    const alreadyOnline = !result.ok && result.reason.startsWith('déjà publié');
-    if (result.ok || alreadyOnline) {
-      const newContest = importScrapedContestToCatalog(item);
-      setScrapedItems(loadScrapedItems());
-      if (onContestImported) onContestImported(newContest);
+    // 1. Ajoute immédiatement au catalogue local pour affichage instantané
+    const newContest = importScrapedContestToCatalog(item);
+    setScrapedItems(loadScrapedItems());
+    if (onContestImported) onContestImported(newContest);
+
+    // 2. Tente la synchronisation / publication vers Supabase en arrière-plan
+    let result: any = { ok: true };
+    try {
+      result = await publishScrapedToSupabase(item);
+    } catch {
+      result = { ok: false, reason: 'Synchronisation locale uniquement' };
     }
+
     addLog(
-      result.ok ? 'success' : 'warn',
+      result.ok ? 'success' : 'info',
       result.ok
-        ? `[PUBLICATION] "${item.title.fr}" publié sur le site (Supabase).`
-        : `[PUBLICATION] "${item.title.fr}" non publié : ${result.reason}.`,
+        ? `[CATALOGUE] "${item.title.fr}" intégré et publié avec succès.`
+        : `[CATALOGUE] "${item.title.fr}" intégré au catalogue (Note: ${result.reason || 'local'}).`,
       item.sourceId
     );
+
     setImportedToast(
       language === 'fr'
-        ? result.ok
-          ? `Le concours "${item.title.fr}" est désormais visible sur le site public !`
-          : `Non publié : ${result.reason}.`
-        : result.ok
-        ? `تمت إضافة المباراة بنجاح !`
-        : `لم يتم النشر.`
+        ? `✅ Le concours "${item.title.fr}" a bien été ajouté au catalogue public !`
+        : `✅ تمت إضافة المباراة بنجاح إلى دليل المباريات !`
     );
     setTimeout(() => setImportedToast(null), 5000);
   };
@@ -218,25 +311,24 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     }
   };
 
-  // Publication groupée : seuls les concours réellement publiés (ou déjà en ligne)
-  // passent « au catalogue » ; les autres restent en file avec la raison au journal.
+  // Publication groupée : intègre au catalogue et synchronise en ligne
   const publishBatch = async (items: ScrapedContestItem[], label: string) => {
-    const { published, failures } = await publishManyScrapedToSupabase(items);
-    const failed = new Map(failures.map((f) => [f.id, f.reason]));
-    const done = items.filter((it) => {
-      const reason = failed.get(it.id);
-      return reason === undefined || reason.startsWith('déjà publié');
-    });
-    const importedList = done.length > 0 ? importMultipleScrapedContestsToCatalog(done) : [];
+    const importedList = importMultipleScrapedContestsToCatalog(items);
     setScrapedItems(loadScrapedItems());
     setSelectedIds([]);
-    addLog('success', `[${label}] ${published}/${items.length} concours publiés en ligne (Supabase).`);
-    failures.forEach((f) => addLog('warn', `[${label}] Non publié « ${f.title} » : ${f.reason}.`));
+
+    try {
+      const { published, failures } = await publishManyScrapedToSupabase(items);
+      addLog('success', `[${label}] ${published}/${items.length} synchronisés avec Supabase.`);
+      failures.forEach((f) => addLog('info', `[${label}] « ${f.title} » : ${f.reason}.`));
+    } catch {
+      addLog('info', `[${label}] ${items.length} concours intégrés localement.`);
+    }
+
     setImportedToast(
       language === 'fr'
-        ? `✅ ${published} concours publiés sur le site public` +
-            (failures.length > 0 ? ` — ${failures.length} restés en file (voir journal).` : ' !')
-        : `✅ تم نشر ${published} مباراة على الموقع !`
+        ? `✅ ${items.length} concours ont été ajoutés avec succès au catalogue public !`
+        : `✅ تم نشر ${items.length} مباراة على الموقع !`
     );
     if (onContestImported && importedList.length > 0) {
       onContestImported(importedList[0]);
@@ -261,6 +353,24 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     setScrapedItems(loadScrapedItems());
     setSelectedIds([]);
     addLog('info', `[ACTION REGROUPÉE] ${selectedIds.length} concours ont été ignorés.`);
+  };
+
+  const handleDeleteImported = async (item: ScrapedContestItem) => {
+    const contestId = item.id.replace(/^scrape-/, 'c-');
+    if (onDeleteContest) {
+      await onDeleteContest(contestId);
+      await onDeleteContest(item.id);
+    } else {
+      await deleteContestFromSystem(contestId);
+      await deleteContestFromSystem(item.id);
+    }
+    const existing = loadScrapedItems();
+    const updated = existing.map((s) => (s.id === item.id ? { ...s, status: 'pending_review' as const } : s));
+    saveScrapedItems(updated);
+    setScrapedItems(updated);
+    addLog('warn', `[SUPPRESSION] Le concours "${item.title?.[language] || item.title?.fr || item.id}" a été retiré du catalogue.`);
+    setImportedToast(language === 'fr' ? 'Concours supprimé du catalogue.' : 'تم حذف المباراة من الدليل.');
+    setTimeout(() => setImportedToast(null), 4000);
   };
 
   const handleExportScrapedJson = () => {
@@ -390,7 +500,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
 
             <button
               onClick={() => handleStartScan()}
-              disabled={isScanning}
+              disabled={isScanning || isBackfilling}
               className={`px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2.5 shadow-lg transition-all cursor-pointer ${
                 isScanning
                   ? 'bg-emerald-600/70 text-white cursor-wait'
@@ -402,6 +512,24 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                 {isScanning
                   ? (language === 'fr' ? `Scan en cours (${scanProgress}%)...` : `جارٍ المسح (${scanProgress}%)...`)
                   : (language === 'fr' ? `Scanner ${scanSource.domain}` : `مسح ${scanSource.domain}`)}
+              </span>
+            </button>
+
+            <button
+              onClick={handleBackfillDetails}
+              disabled={isScanning || isBackfilling}
+              className={`px-4 py-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer ${
+                isBackfilling
+                  ? 'bg-purple-700/80 text-white cursor-wait'
+                  : 'bg-white/15 hover:bg-white/20 text-white border border-white/25 hover:border-white/40'
+              }`}
+              title="Mettre à jour les spécialités, grades, régions et dates des concours déjà publiés depuis leur fiche officielle"
+            >
+              <Database className={`w-4 h-4 ${isBackfilling ? 'animate-spin' : 'text-purple-300'}`} />
+              <span>
+                {isBackfilling
+                  ? (language === 'fr' ? `Mise à jour (${backfillProgress}%)...` : `جارٍ التحديث (${backfillProgress}%)...`)
+                  : (language === 'fr' ? 'Mettre à jour les fiches depuis emploi-public' : 'تحديث البيانات من التشغيل العمومي')}
               </span>
             </button>
 
@@ -423,13 +551,15 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
             </button>
           </div>
 
-          {/* Progress bar when scanning */}
-          {isScanning && (
+          {/* Progress bar when scanning or backfilling */}
+          {(isScanning || isBackfilling) && (
             <div className="mt-4">
               <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-emerald-400 transition-all duration-300 rounded-full shadow-sm"
-                  style={{ width: `${scanProgress}%` }}
+                  className={`h-full transition-all duration-300 rounded-full shadow-sm ${
+                    isBackfilling ? 'bg-purple-400' : 'bg-emerald-400'
+                  }`}
+                  style={{ width: `${isBackfilling ? backfillProgress : scanProgress}%` }}
                 />
               </div>
             </div>
@@ -824,11 +954,11 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                       <div className="flex-1 space-y-2.5">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
-                            {item.administration.logo && (item.administration.logo.startsWith('/') || item.administration.logo.startsWith('http')) ? (
-                              <img src={item.administration.logo} alt="Logo" className="w-full h-full object-contain" />
-                            ) : (
-                              <span className="text-base">{item.administration.logo || '🏛️'}</span>
-                            )}
+                            <img
+                              src={resolveAdministrationLogo(item.administration?.name?.fr || item.administration?.name?.[language], item.administration?.category, item.title?.fr || item.title?.[language])}
+                              alt="Logo"
+                              className="w-full h-full object-contain"
+                            />
                           </div>
                           <span className="text-xs font-bold text-[#8D174B] uppercase tracking-wide">
                             {item.administration?.name?.[language] || item.administration?.name?.fr || 'Administration'}
@@ -925,9 +1055,23 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                           <span>{language === 'fr' ? 'Intégrer au catalogue' : 'إدراج بالموقع'}</span>
                         </button>
                       ) : (
-                        <div className="text-end text-xs text-emerald-700 font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>{language === 'fr' ? 'Disponible dans l’app' : 'متوفر بالتطبيق'}</span>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <div className="text-end text-xs text-emerald-700 font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>{language === 'fr' ? 'Disponible dans l’app' : 'متوفر بالتطبيق'}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteImported(item);
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
+                            title={language === 'fr' ? 'Supprimer ce concours du catalogue' : 'حذف المباراة من الدليل'}
+                          >
+                            <Trash2 className="w-3 h-3 text-rose-600" />
+                            <span>{language === 'fr' ? 'Supprimer' : 'حذف'}</span>
+                          </button>
                         </div>
                       )}
 

@@ -14,6 +14,7 @@ import {
   loadCandidateTracking, updateContestTracking,
   checkEligibility, exportAllBrowserData, importBrowserData, clearAllBrowserData
 } from '../utils/candidateStorage';
+import { inferSalaryScaleFromProfile, calculateMoroccanPublicSalary } from '../data/salaryScales';
 
 interface ProfileModuleProps {
   language: Language;
@@ -24,7 +25,6 @@ interface ProfileModuleProps {
   onSelectContest: (contest: Contest) => void;
   onRemoveBookmark: (contestId: string) => void;
   onProfileUpdated?: () => void;
-  onOpenTalabKhatti?: (contest: Contest) => void;
   onOpenSalarySimulator?: (contest?: Contest) => void;
   onOpenAdminCv?: () => void;
 }
@@ -38,7 +38,6 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
   onSelectContest,
   onRemoveBookmark,
   onProfileUpdated,
-  onOpenTalabKhatti,
   onOpenSalarySimulator,
   onOpenAdminCv,
 }) => {
@@ -526,16 +525,6 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                             <span>{language === 'fr' ? 'Consulter l’annonce complète' : 'الاطلاع على تفاصيل المباراة'}</span>
                             <ArrowIcon className="w-3.5 h-3.5" />
                           </button>
-
-                          <button
-                            onClick={() => {
-                              if (onOpenTalabKhatti) onOpenTalabKhatti(c);
-                            }}
-                            className="px-3 py-1.5 rounded-lg bg-[#FDF2F7] hover:bg-[#F9E6F0] text-[#8D174B] font-bold text-xs flex items-center gap-1 border border-[#8D174B]/20 transition-all cursor-pointer"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            <span>{language === 'fr' ? '📄 Demande (طلب خطي)' : '📄 طلب خطي'}</span>
-                          </button>
                         </div>
 
                         <a
@@ -826,6 +815,54 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                 </select>
               </div>
             </div>
+
+            {/* Smart Salary Estimate Card based on Diploma */}
+            {(() => {
+              const deducedScale = inferSalaryScaleFromProfile(profile);
+              const salaryDetails = calculateMoroccanPublicSalary({
+                scaleId: deducedScale.id,
+                echelonNumber: 1,
+                zone: 'A',
+              });
+              return (
+                <div className="bg-gradient-to-br from-[#8D174B] to-[#5C0E31] text-white p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-extrabold uppercase bg-amber-400 text-[#242126] px-2 py-0.5 rounded shadow-2xs inline-block">
+                      {language === 'fr' ? 'Estimation Salaire Fonction Publique' : 'تقدير الأجر بالوظيفة العمومية'}
+                    </span>
+                    <h4 className="text-sm font-bold text-white">
+                      {language === 'fr' 
+                        ? `Avec votre diplôme (${profile.degreeLevel || 'Bac+X'}), vous intégrez le grade :`
+                        : `بموجب شهادتك، تترشح للدرجة الإدارية :`}
+                    </h4>
+                    <p className="text-xs text-rose-150 font-medium">
+                      {deducedScale.grade[language] || deducedScale.grade.fr} • {deducedScale.echelle}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 self-start sm:self-auto shrink-0">
+                    <div className="bg-white/15 px-3.5 py-2 rounded-xl text-center backdrop-blur-xs border border-white/20">
+                      <span className="text-[10px] text-rose-200 block uppercase font-bold">
+                        {language === 'fr' ? 'Net mensuel débutant' : 'الصافي الشهري عند التوظيف'}
+                      </span>
+                      <span className="text-lg sm:text-xl font-extrabold text-amber-300 font-mono">
+                        ~{salaryDetails.salaireNet.toLocaleString('fr-FR')} DH
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenSalarySimulator) onOpenSalarySimulator();
+                      }}
+                      className="px-3 py-2.5 rounded-xl bg-white text-[#8D174B] font-bold text-xs hover:bg-rose-50 transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                    >
+                      <span>{language === 'fr' ? 'Simuler en détail' : 'تفاصيل الأجر'}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="pt-4 border-t border-[#F1E5EC] flex justify-end">
               <button

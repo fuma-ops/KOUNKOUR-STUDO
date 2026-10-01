@@ -3,6 +3,7 @@ import { Contest, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { Calendar, Users, GraduationCap, MapPin, Bookmark, CheckCircle2, AlertTriangle, Clock, Sparkles, Check } from 'lucide-react';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
+import { resolveAdministrationLogo } from '../utils/radarStorage';
 
 interface ContestCardProps {
   contest: Contest;
@@ -125,12 +126,12 @@ export const ContestCard: React.FC<ContestCardProps> = ({
           <div className="relative z-10 flex-1 flex items-center justify-center px-4 -mt-2">
             <div className="transition-transform duration-300 group-hover:scale-105 flex items-center justify-center">
               <img
-                src={contest.administration.logo || contest.image || '/images/administrations/logo-013.png'}
-                alt={contest.administration.name[language]}
+                src={contest.image || contest.administration?.logo || resolveAdministrationLogo(contest.administration?.name?.fr || contest.administration?.name?.[language], contest.administration?.category, contest.title?.fr || contest.title?.[language])}
+                alt={contest.administration?.name?.[language] || 'Administration'}
                 referrerPolicy="no-referrer"
                 className="max-h-24 sm:max-h-28 max-w-[210px] w-auto h-auto object-contain drop-shadow-sm"
                 onError={(e) => {
-                  (e.target as any).src = '/images/administrations/logo-013.png';
+                  (e.target as any).src = resolveAdministrationLogo(contest.administration?.name?.fr, contest.administration?.category, contest.title?.fr);
                 }}
               />
             </div>
@@ -168,9 +169,22 @@ export const ContestCard: React.FC<ContestCardProps> = ({
               </span>
             )}
 
-            {contest.referenceCode && (
-              <span className="text-[10px] font-mono text-gray-400">
-                {contest.referenceCode}
+            {/* Clear Status Tag: Ouvert / Clôturé */}
+            {contest.status === 'open' || contest.status === 'closing_soon' ? (
+              <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/80">
+                {language === 'fr' ? '● Ouvert' : '● مفتوح'}
+              </span>
+            ) : contest.status === 'closed' ? (
+              <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2.5 py-0.5 rounded-full border border-gray-200">
+                {language === 'fr' ? '● Clôturé' : '● مغلق'}
+              </span>
+            ) : contest.status === 'in_progress' ? (
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                {language === 'fr' ? '● En cours' : '● جاري'}
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
+                {language === 'fr' ? '● Résultats' : '● النتائج'}
               </span>
             )}
           </div>
@@ -181,7 +195,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({
           </h4>
 
           {/* Official Specialty badge */}
-          {contest.specialty && contest.specialty[language] && (
+          {contest.specialty && contest.specialty[language] && !contest.specialty[language].toLowerCase().includes('mentionn') && (
             <div className="mb-3">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#8D174B]/8 text-[#8D174B] border border-[#8D174B]/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#8D174B]"></span>

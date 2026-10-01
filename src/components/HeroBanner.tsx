@@ -61,12 +61,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
 
           {/* Hero Content on top of real photograph */}
           <div className="relative z-10 p-6 sm:p-10 md:p-12 max-w-2xl text-white">
-            {/* Moroccan Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-white text-xs font-semibold mb-4 border border-white/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>{language === 'fr' ? 'Portail Officiel • Concours Publics Maroc 2026' : 'البوابة الرسمية لمباريات التوظيف العمومي بالمغرب 2026'}</span>
-            </div>
-
             {/* Main Headline */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3 drop-shadow-sm">
               {language === 'fr' ? (

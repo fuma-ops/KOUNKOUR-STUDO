@@ -11,7 +11,7 @@ export interface ContestDocument {
     ar: string;
   };
   fileType: string;
-  fileSize: string;
+  fileSize?: string;
   date: string;
   url: string;
   docType?: 'arrete' | 'convoques_ecrit' | 'convoques_oral' | 'admis_definitifs' | 'liste_attente';
@@ -90,10 +90,13 @@ export interface Contest {
   convoquesUrl?: string;
   isDemo: boolean;
   grade?: string;
+  grade_fr?: string;
   specialtiesList?: string[];
   recruitmentType?: string;
   depositType?: string;
   depositSite?: string;
+  applyUrl?: string;
+  arreteUrl?: string;
 }
 
 export interface QcmOption {

@@ -53,34 +53,168 @@ async function getHtml(url: string): Promise<{ ok: boolean; status: number; html
   return { ok: r.ok, status: r.status, html: r.ok ? await r.text() : '' };
 }
 
-// Pure : champs d'une fiche détail emploi-public.
-export function parseEmploiPublicDetail(html: string) {
+export interface EmploiPublicDetailResult {
+  administration: string | null;
+  deadlineDate: string | null;
+  examDate: string | null;
+  publicationDate: string | null;
+  specialty: string[] | null;
+  specialties: string[] | null;
+  grade: string | null;
+  postsCount: number | null;
+  positions: number | null;
+  recruitmentType: string | null;
+  region: string | null;
+  depositType: string | null;
+  depositSite: string | null;
+  applyUrl: string | null;
+  reference: string | null;
+  code: string | null;
+  arreteUrl: string | null;
+  pdfUrl: string | null;
+}
+
+// Pure : champs d'une fiche détail emploi-public extraits STRICTEMENT par la structure HTML.
+export function parseEmploiPublicDetail(html: string): EmploiPublicDetailResult {
   const $ = cheerio.load(html);
-  const text = $('body').text().replace(/\s+/g, ' ').trim();
 
-  // Code du concours : ex "C43571/26" (jamais inventé — null si absent).
-  let reference: string | null = null;
-  const refM = text.match(/Code du concours\s*:?\s*([A-Z]?\d{3,6}\s*\/\s*\d{2,4})/i);
-  if (refM) reference = refM[1].replace(/\s+/g, '');
+  function cleanText(t: string | undefined | null): string | null {
+    if (!t) return null;
+    const v = t.replace(/\s+/g, ' ').trim();
+    return v || null;
+  }
 
-  // Site de dépôt : lien officiel (hors emploi-public).
-  let applyUrl: string | null = null;
-  $('a[href]').each((_i, el) => {
-    if (applyUrl) return;
-    const href = $(el).attr('href') || '';
-    if (/^https?:\/\//.test(href) && /gov\.ma/i.test(href) && !/emploi-public\.ma/i.test(href)) {
-      applyUrl = href;
+  // 1. En-tête : Détail de l'annonce (s-content-box avec h3.h4)
+  // Contient : Administration qui recrute, Délai de dépôt des candidatures, Date du concours, Date de publication
+  let administration: string | null = null;
+  let deadlineDate: string | null = null;
+  let examDate: string | null = null;
+  let publicationDate: string | null = null;
+
+  $('h3.h4').each((_i, el) => {
+    const span = $(el).find('span').first();
+    const label = cleanText(span.text());
+    const clone = $(el).clone();
+    clone.find('span').remove();
+    const val = cleanText(clone.text());
+
+    if (label && val) {
+      if (/Administration qui recrute/i.test(label)) {
+        administration = val;
+      } else if (/D[ée]lai de d[ée]p[ôo]t/i.test(label) || /Limite de d[ée]p[ôo]t/i.test(label)) {
+        // "23 Juillet 2026 - 16:30" → "23 Juillet 2026"
+        const m = val.match(/^(\d{1,2}(?:er)?\s+[A-Za-zÀ-ÿ]+\s+\d{4})/i);
+        deadlineDate = m ? m[1].trim() : val;
+      } else if (/Date du concours/i.test(label)) {
+        const m = val.match(/^(\d{1,2}(?:er)?\s+[A-Za-zÀ-ÿ]+\s+\d{4})/i);
+        examDate = m ? m[1].trim() : val;
+      } else if (/Date de publication/i.test(label)) {
+        const m = val.match(/^(\d{1,2}(?:er)?\s+[A-Za-zÀ-ÿ]+\s+\d{4})/i);
+        publicationDate = m ? m[1].trim() : val;
+      }
     }
   });
 
+  // Repli pour l'administration organisatrice si non trouvée en haut
+  if (!administration) {
+    const org = $('.details-contact .form-title strong').first().text();
+    if (org) administration = cleanText(org);
+  }
+
+  // 2. Liste détaillée Description (ul li)
+  // Spécialité, Grade, Nombre de postes, Type de recrutement, Région, Type de dépôt, Site de dépôt, Code du concours
+  let specialty: string[] | null = null;
+  let grade: string | null = null;
+  let postsCount: number | null = null;
+  let recruitmentType: string | null = null;
+  let region: string | null = null;
+  let depositType: string | null = null;
+  let depositSite: string | null = null;
+  let reference: string | null = null;
+
+  $('ul li').each((_i, el) => {
+    const span = $(el).find('span').first();
+    const label = cleanText(span.text());
+    const strong = $(el).find('strong').first();
+    if (!label || !strong.length) return;
+
+    if (/Sp[ée]cialit[ée]/i.test(label)) {
+      // Tableau : une entrée par ligne commençant par « - », en retirant le « - » initial.
+      // Recopier le texte EXACT, même avec une faute (« genreraliste »).
+      const rawText = strong.text();
+      const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const specs: string[] = [];
+      for (const line of lines) {
+        if (line.startsWith('-')) {
+          specs.push(line.replace(/^-\s*/, '').trim());
+        }
+      }
+      if (specs.length > 0) {
+        specialty = specs;
+      } else if (rawText.trim()) {
+        specialty = [rawText.replace(/^-\s*/, '').trim()];
+      }
+    } else if (/Grade/i.test(label)) {
+      grade = cleanText(strong.text());
+    } else if (/Nombre de postes/i.test(label)) {
+      const n = parseInt(cleanText(strong.text()) || '', 10);
+      postsCount = Number.isNaN(n) ? null : n;
+    } else if (/Type de recrutement/i.test(label)) {
+      recruitmentType = cleanText(strong.text());
+    } else if (/R[ée]gion/i.test(label)) {
+      // Séparer le nom de région du « (10 postes) »
+      const clone = strong.clone();
+      clone.find('span').remove();
+      let r = cleanText(clone.text()) || '';
+      r = r.replace(/\s*\(\d+\s*postes?\)/i, '').trim();
+      region = r || null;
+    } else if (/Type de d[ée]p[ôo]t/i.test(label)) {
+      depositType = cleanText(strong.text());
+    } else if (/Site de d[ée]p[ôo]t/i.test(label)) {
+      const a = strong.find('a');
+      depositSite = cleanText(a.length ? a.attr('href') || a.text() : strong.text());
+    } else if (/Code du concours/i.test(label)) {
+      reference = cleanText(strong.text());
+    }
+  });
+
+  // 3. Lien « Arrêté d'ouverture du concours » (PDF)
+  let arreteUrl: string | null = null;
+  $('a[href*="/download/arrete/"], a[href*="/arrete/"], a:contains("Arrêté d\'ouverture")').each((_i, el) => {
+    if (arreteUrl) return;
+    const href = $(el).attr('href');
+    if (href) {
+      arreteUrl = href.startsWith('http')
+        ? href
+        : `https://www.emploi-public.ma${href.startsWith('/') ? '' : '/'}${href}`;
+    }
+  });
+
+  // Replis textuels sécurisés si une structure non-standard est rencontrée
+  if (!reference) {
+    const refM = $('body').text().match(/Code du concours\s*:?\s*([A-Z]?\d{3,6}\s*\/\s*\d{2,4})/i);
+    if (refM) reference = refM[1].replace(/\s+/g, '');
+  }
+
   return {
+    administration,
+    deadlineDate,
+    examDate,
+    publicationDate,
+    specialty,
+    specialties: specialty,
+    grade,
+    postsCount,
+    positions: postsCount,
+    recruitmentType,
+    region,
+    depositType,
+    depositSite,
+    applyUrl: depositSite,
     reference,
-    examDate: firstDate(text, ['Date du concours']),
-    publicationDate: firstDate(text, ['Date de publication']),
-    deadlineDate: firstDate(text, ['D[ée]lai de d[ée]p[ôo]t', 'Limite de d[ée]p[ôo]t']),
-    applyUrl,
-    recruitmentType: afterLabel(text, ['Type de recrutement']),
-    depositType: afterLabel(text, ['Type de d[ée]p[ôo]t']),
+    code: reference,
+    arreteUrl,
+    pdfUrl: arreteUrl,
   };
 }
 
