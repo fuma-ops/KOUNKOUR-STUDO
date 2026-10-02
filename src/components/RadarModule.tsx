@@ -86,10 +86,10 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
     setIsBackfilling(true);
     setIsTerminalExpanded(true);
     setBackfillProgress(5);
-    addLog('info', '[BACKFILL] Démarrage de la mise à jour des fiches depuis emploi-public.ma...');
+    addLog('info', '[BACKFILL] Mise à jour des fiches : emploi-public.ma (officiel), puis dreamjob.ma pour compléter les champs manquants...');
 
     let offset = 0;
-    const limit = 10;
+    const limit = 6;
     let hasMore = true;
     let totalUpdated = 0;
     let totalComplete = 0;
@@ -137,6 +137,14 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
             addLog('info', `[DÉJÀ COMPLET] « ${c.title} ».`);
           });
         }
+        if (Array.isArray(data.possibleDreamjob)) {
+          data.possibleDreamjob.forEach((p: any) => {
+            addLog('info', `[DREAMJOB À VÉRIFIER] « ${p.title} » ressemble à ${p.url}, mais l’annonce ne cite pas sa fiche officielle : rien n’a été écrit.`);
+          });
+        }
+        if (offset === 0 && data.summary && data.summary.dreamjobCandidates === 0) {
+          addLog('info', '[BACKFILL] Aucune annonce dreamjob en base : lancez d’abord un scan dreamjob.ma pour qu’il puisse compléter les fiches.');
+        }
         if (Array.isArray(data.unreachable)) {
           data.unreachable.forEach((un: any) => {
             totalUnreachable++;
@@ -157,7 +165,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
       );
       setImportedToast(
         language === 'fr'
-          ? `✅ Fiches mises à jour depuis emploi-public : ${totalUpdated} actualisés, ${totalComplete} complets.`
+          ? `✅ Fiches mises à jour (emploi-public + dreamjob) : ${totalUpdated} actualisées, ${totalComplete} déjà complètes.`
           : `✅ تم تحديث بيانات المباريات من الموقع الرسمي بنجاح.`
       );
     } catch (err: any) {
@@ -523,13 +531,13 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                   ? 'bg-purple-700/80 text-white cursor-wait'
                   : 'bg-white/15 hover:bg-white/20 text-white border border-white/25 hover:border-white/40'
               }`}
-              title="Mettre à jour les spécialités, grades, régions et dates des concours déjà publiés depuis leur fiche officielle"
+              title="Complète les concours déjà publiés depuis leur fiche officielle emploi-public, puis depuis dreamjob uniquement si l’annonce cite cette fiche. Aucune valeur existante n’est remplacée."
             >
               <Database className={`w-4 h-4 ${isBackfilling ? 'animate-spin' : 'text-purple-300'}`} />
               <span>
                 {isBackfilling
                   ? (language === 'fr' ? `Mise à jour (${backfillProgress}%)...` : `جارٍ التحديث (${backfillProgress}%)...`)
-                  : (language === 'fr' ? 'Mettre à jour les fiches depuis emploi-public' : 'تحديث البيانات من التشغيل العمومي')}
+                  : (language === 'fr' ? 'Mettre à jour les fiches (emploi-public + dreamjob)' : 'تحديث البيانات (emploi-public + dreamjob)')}
               </span>
             </button>
 

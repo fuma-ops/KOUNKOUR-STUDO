@@ -8,12 +8,12 @@ export const mockQcmSets: QcmSet[] = [
     id: 'qcm-dgsn-gardiens-paix-annales',
     slug: 'annales-qcm-gardiens-de-la-paix-dgsn',
     title: {
-      fr: 'Annales QCM Gardiens de la Paix (DGSN)',
+      fr: 'Entraînement QCM — Gardiens de la Paix (DGSN)',
       ar: 'استبيان مباراة حراس الأمن - المديرية العامة للأمن الوطني',
     },
     description: {
-      fr: 'Sujet officiel des épreuves écrites QCM de la DGSN pour le recrutement des Gardiens de la Paix (Culture Générale, Histoire & Géographie du Maroc, DGSN).',
-      ar: 'الاختبار الكتابي الرسمي متعدد الاختيارات لمباراة حراس الأمن الوطني (الثقافة العامة، تاريخ وجغرافية المغرب، مؤسسة الأمن الوطني).',
+      fr: 'QCM d’entraînement préparé par KounKour sur les thèmes du concours des Gardiens de la Paix (Culture Générale, Histoire & Géographie du Maroc, DGSN). Ce n’est pas un sujet officiel.',
+      ar: 'أسئلة تدريبية أعدّتها KounKour حول مواضيع مباراة حراس الأمن (الثقافة العامة، تاريخ وجغرافية المغرب، الأمن الوطني). ليست اختباراً رسمياً.',
     },
     category: 'culture_generale',
     durationMinutes: 30,
@@ -40,7 +40,7 @@ export const mockQcmSets: QcmSet[] = [
           fr: 'Le mont Tidghine (2 456 m) est le point culminant de la chaîne du Rif au Maroc. Le mont Toubkal culmine quant à lui dans le Haut Atlas.',
           ar: 'جبل تدغين (2456 م) هو أعلى قمة جبلية في سلسلة جبال الريف المغربية. أما جبل توبقال فيقع في الأطلس الكبير.',
         },
-        source: 'Géographie du Maroc & Annales DGSN',
+        source: 'Géographie du Maroc',
       },
       {
         id: 'gp-q2',
@@ -455,8 +455,8 @@ export const mockQcmSets: QcmSet[] = [
       ar: 'مباراة مفتشي الشرطة - اختبار اللغة الفرنسية والثقافة العامة',
     },
     description: {
-      fr: 'Questionnaire officiel à choix multiples en langue française du concours des Inspecteurs de Police (Institutions marocaines, Droit, Culture Générale, Orthographe).',
-      ar: 'النموذج الرسمي للاختبار الكتابي باللغة الفرنسية لمفتشي الشرطة (المؤسسات الدستورية، القواعد اللغوية، الثقافة العامة).',
+      fr: 'QCM d’entraînement en langue française sur les thèmes du concours des Inspecteurs de Police (Institutions marocaines, Droit, Culture Générale, Orthographe). Ce n’est pas un sujet officiel.',
+      ar: 'أسئلة تدريبية باللغة الفرنسية حول مواضيع مباراة مفتشي الشرطة (المؤسسات الدستورية، القواعد اللغوية، الثقافة العامة). ليست اختباراً رسمياً.',
     },
     category: 'francais',
     durationMinutes: 25,
@@ -793,8 +793,8 @@ export const mockQcmSets: QcmSet[] = [
       ar: 'مباراة ضباط الشرطة وضباط الأمن - التنظيم القضائي والقانون',
     },
     description: {
-      fr: 'Questions réelles de droit pénal, procédure pénale, organisation judiciaire marocaine et institutions constitutionnelles issues des épreuves d’Officiers de Police.',
-      ar: 'أسئلة أصلية مستخرجة من امتحانات ضباط الشرطة في قانون المسطرة الجنائية، التنظيم القضائي والمؤسسات الدستورية بالمغرب.',
+      fr: 'QCM d’entraînement en droit pénal, procédure pénale, organisation judiciaire marocaine et institutions constitutionnelles, sur les thèmes du concours des Officiers de Police. Ce n’est pas un sujet officiel.',
+      ar: 'أسئلة تدريبية في المسطرة الجنائية والتنظيم القضائي والمؤسسات الدستورية حول مواضيع مباراة ضباط الشرطة. ليست اختباراً رسمياً.',
     },
     category: 'droit_public',
     durationMinutes: 30,
@@ -1131,8 +1131,8 @@ export const mockQcmSets: QcmSet[] = [
       ar: 'مباراة مفتشي الشرطة - الثقافة العامة واللغة العربية وقوانين الأمن',
     },
     description: {
-      fr: 'Questions officielles en langue arabe du concours des inspecteurs de police (Droit administratif, Histoire du Maroc, Institutions policières et règles juridiques).',
-      ar: 'الأسئلة الرسمية لاختبار مفتشي الشرطة باللغة العربية (القانون الإداري، تاريخ المغرب، مؤسسات الشرطة، وحقوق الإنسان).',
+      fr: 'QCM d’entraînement en langue arabe sur les thèmes du concours des Inspecteurs de Police (Droit administratif, Histoire du Maroc, Institutions policières). Ce n’est pas un sujet officiel.',
+      ar: 'أسئلة تدريبية باللغة العربية حول مواضيع مباراة مفتشي الشرطة (القانون الإداري، تاريخ المغرب، مؤسسات الشرطة). ليست اختباراً رسمياً.',
     },
     category: 'arabe',
     durationMinutes: 30,
@@ -1469,7 +1469,7 @@ export const mockQcmSets: QcmSet[] = [
       ar: 'مباراة عمداء الشرطة - القانون العام والعلوم الجنائية والأمنية',
     },
     description: {
-      fr: 'Sujets de haut niveau du concours des Commissaires de Police (Droit pénal spécial, Procédure pénale, Droit constitutionnel et Géopolitique sécuritaire).',
+      fr: 'QCM d’entraînement de haut niveau sur les thèmes du concours des Commissaires de Police (Droit pénal spécial, Procédure pénale, Droit constitutionnel). Ce n’est pas un sujet officiel.',
       ar: 'أسئلة المستوى العالي لمباراة عمداء الشرطة (القانون الجنائي الخاص، المسطرة الجنائية، الحريات العامة والتنظيم الأمني الدولي).',
     },
     category: 'droit_public',

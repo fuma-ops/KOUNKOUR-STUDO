@@ -130,32 +130,6 @@ function computeConfidence(item: any): number {
   return Math.round(score * 100);
 }
 
-// Déduction intelligente du diplôme statutaire exigé par les statuts officiels de la fonction publique marocaine
-export function inferStatutoryDiploma(grade?: string | null): string {
-  if (!grade) return '';
-  const g = grade.toLowerCase();
-  if (g.includes('médecin') || g.includes('medecin')) return 'Doctorat en Médecine (Bac+7)';
-  if (g.includes('pharmacien')) return 'Doctorat en Pharmacie (Bac+6)';
-  if (g.includes('dentiste')) return 'Doctorat en Médecine Dentaire (Bac+6)';
-  if (g.includes('ingénieur') || g.includes('ingenieur')) return "Diplôme d'Ingénieur d'État (Bac+5)";
-  if (g.includes('architecte')) return "Diplôme d'Architecte (Bac+5)";
-  if (g.includes('professeur') || g.includes('enseignant')) return 'Doctorat (Bac+8)';
-  if (g.includes('administrateur 2') || g.includes('2ème grade') || g.includes('2eme grade')) return 'Master / Diplôme d’Études Supérieures (Bac+5)';
-  if (g.includes('administrateur 3') || (g.includes('3ème grade') && g.includes('admin'))) return 'Licence / Bac+3';
-  if (g.includes('technicien 3') || g.includes('3ème grade') || g.includes('spécialisé') || g.includes('echelle 9') || g.includes('échelle 9')) {
-    return 'Bac+2 (Technicien Spécialisé / DUT / BTS / DTS)';
-  }
-  if (g.includes('technicien 4') || g.includes('4ème grade') || g.includes('rédacteur') || g.includes('echelle 8') || g.includes('échelle 8')) {
-    return 'Baccalauréat / Diplôme de Technicien';
-  }
-  if (g.includes('adjoint technique') || g.includes('echelle 6') || g.includes('échelle 6')) {
-    return 'Certificat de Qualification Professionnelle (CQP)';
-  }
-  if (g.includes('adjoint administratif')) return 'Baccalauréat';
-  if (g.includes('infirmier') || g.includes('sage-femme') || g.includes('santé')) return 'Licence Professionnelle (Bac+3)';
-  return '';
-}
-
 export function normalizeScrapedItem(item: any): ScrapedContestItem {
   if (!item) return {} as any;
   // ID déterministe (jamais aléatoire) : dérivé de l'URL source si pas d'id.
@@ -184,8 +158,8 @@ export function normalizeScrapedItem(item: any): ScrapedContestItem {
   const regAr = item.region?.ar || regFr;
 
   const grade = item.grade || item.grade_fr || undefined;
-  const inferredDegree = inferStatutoryDiploma(grade);
-  const degreeLevel = item.degreeLevel || inferredDegree || '';
+  // Diplôme : uniquement celui lu dans l'annonce (jamais déduit du grade).
+  const degreeLevel = item.degreeLevel || '';
 
   let snippetFr = '';
   let snippetAr = '';
@@ -585,12 +559,9 @@ export function importScrapedContestToCatalog(item: ScrapedContestItem): Contest
 export function getAllActiveContests(): Contest[] {
   const deletedIds = new Set(getDeletedContestIds());
   const imported = loadImportedContests().filter((c) => !deletedIds.has(c.id)).map(sanitizeContestFields);
-  // Filter out any mocks that might share IDs
-  const importedIds = new Set(imported.map((c) => c.id));
-  const base = mockContests
-    .filter((c) => !importedIds.has(c.id) && !deletedIds.has(c.id))
-    .map(sanitizeContestFields);
-  let all = [...imported, ...base];
+  // Aucun concours d'exemple (mockContests) : seuls les concours réels importés
+  // localement, en attendant ceux publiés dans Supabase.
+  let all = [...imported];
 
   // Apply overrides from admin modifications
   try {
@@ -613,248 +584,6 @@ export function getAllActiveContests(): Contest[] {
   });
 }
 
-// Déduction statutaire des épreuves écrites et orales selon les arrêtés officiels marocains
-export function inferOfficialExams(contest: Partial<Contest>): { written: ContestExamItem[]; oral: ContestExamItem[] } {
-  const titleFr = (contest.title?.fr || '').toLowerCase();
-  const gradeFr = (contest.grade_fr || contest.grade || '').toLowerCase();
-  const degree = (contest.degreeLevel || '').toLowerCase();
-  const spec = (contest.specialty?.fr || (contest.specialtiesList || []).join(' ')).toLowerCase();
-  const combined = `${titleFr} ${gradeFr} ${degree} ${spec}`;
-
-  // 1. Ingénieurs d'État (Échelle 11) & Architectes
-  if (combined.includes('ingenieur') || combined.includes('architecte')) {
-    const isArchitect = combined.includes('architecte');
-    return {
-      written: [
-        {
-          title: {
-            fr: isArchitect 
-              ? 'Épreuve écrite : Conception architecturale et aménagement urbain (Projet technique & Réglementation)'
-              : 'Épreuve écrite de spécialité : Étude de cas technique et résolution de problèmes d’ingénierie',
-            ar: isArchitect
-              ? 'اختبار كتابي: التصميم المعماري والتهيئة الحضرية (مشروع تقني وضوابط التعمير)'
-              : 'اختبار كتابي في التخصص: دراسة حالة تقنية وحل الإشكاليات الهندسية',
-          },
-          coefficient: 3,
-          duration: isArchitect ? '4 heures' : '3 heures',
-        },
-        {
-          title: {
-            fr: 'Épreuve d’ordre général : Note de synthèse sur les politiques publiques sectorielles et le développement',
-            ar: 'اختبار في موضوع عام: مذكرة تركيبية حول السياسات العمومية والتنمية',
-          },
-          coefficient: 2,
-          duration: '2 heures',
-        },
-      ],
-      oral: [
-        {
-          title: {
-            fr: 'Épreuve orale : Entretien individuel avec le jury (Parcours, soutenance technique, culture générale et motivation)',
-            ar: 'اختبار شفوي: مقابلة فردية مع لجنة المباراة (المسار، مناقشة الجوانب التقنية، الثقافة العامة والدافعية)',
-          },
-          coefficient: 3,
-          duration: '30 minutes',
-        },
-      ],
-    };
-  }
-
-  // 2. Administrateurs 2ème & 3ème grade (Échelle 11 & 10) / Conseillers / Inspecteurs
-  if (combined.includes('administrateur') || combined.includes('conseiller') || combined.includes('secretaire des affaires') || combined.includes('commissaire judiciaire')) {
-    return {
-      written: [
-        {
-          title: {
-            fr: 'Épreuve d’ordre général : Dissertation ou questions de synthèse sur les réformes institutionnelles, économiques ou sociales du Maroc',
-            ar: 'اختبار عام: إنشاء أو أسئلة تركيبية حول الإصلاحات المؤسساتية، الاقتصادية أو الاجتماعية بالمملكة',
-          },
-          coefficient: 2,
-          duration: '3 heures',
-        },
-        {
-          title: {
-            fr: 'Épreuve écrite de spécialité : Sujet portant sur les sciences juridiques, économiques, de gestion ou politiques selon la filière',
-            ar: 'اختبار كتابي في التخصص: موضوع يتعلق بالعلوم القانونية، الاقتصادية، التدبيرية أو السياسية حسب المسلك',
-          },
-          coefficient: 3,
-          duration: '3 heures',
-        },
-      ],
-      oral: [
-        {
-          title: {
-            fr: 'Épreuve orale : Entretien avec la commission (Aptitudes managériales, culture administrative et réformes publiques)',
-            ar: 'اختبار شفوي: مقابلة مع لجنة المباراة (الكفاءات التدبيرية، الثقافة الإدارية والسياسات العمومية)',
-          },
-          coefficient: 3,
-          duration: '25 minutes',
-        },
-      ],
-    };
-  }
-
-  // 3. Techniciens 3ème et 4ème grade (Échelle 9 & 8) / Adjoints techniques
-  if (combined.includes('technicien') || combined.includes('adjoint') || combined.includes('bac+2') || combined.includes('dts') || combined.includes('dut') || combined.includes('bts')) {
-    return {
-      written: [
-        {
-          title: {
-            fr: 'Épreuve écrite de spécialité : QCM et questions courtes professionnelles portant sur la spécialité du diplôme',
-            ar: 'اختبار كتابي في التخصص: أسئلة متعددة الاختيارات (QCM) وأسئلة مهنية دقيقة في مجال التخصص',
-          },
-          coefficient: 3,
-          duration: '2 heures',
-        },
-        {
-          title: {
-            fr: 'Épreuve écrite d’ordre général : QCM de culture générale, institutions marocaines et pratique administrative',
-            ar: 'اختبار عام: أسئلة متعددة الاختيارات (QCM) حول الثقافة العامة، المؤسسات الوطنية والتنظيم الإداري',
-          },
-          coefficient: 1,
-          duration: '1 heure 30',
-        },
-      ],
-      oral: [
-        {
-          title: {
-            fr: 'Épreuve orale : Entretien d’aptitude professionnelle et mise en situation pratique',
-            ar: 'اختبار شفوي: مقابلة لتقييم الكفاءة المهنية والقدرات التطبيقية',
-          },
-          coefficient: 2,
-          duration: '20 minutes',
-        },
-      ],
-    };
-  }
-
-  // 4. Sûreté Nationale (DGSN - Gardiens de la paix, Inspecteurs, Officiers, Commissaires)
-  if (combined.includes('dgsn') || combined.includes('police') || combined.includes('paix') || combined.includes('surete nationale') || combined.includes('commissaire')) {
-    return {
-      written: [
-        {
-          title: {
-            fr: 'Épreuve écrite 1 : QCM de culture générale, institutions du Royaume, histoire et actualité nationale et internationale',
-            ar: 'اختبار كتابي 1: أسئلة متعددة الاختيارات (QCM) في الثقافة العامة، مؤسسات المملكة والمستجدات الوطنية والدولية',
-          },
-          coefficient: 2,
-          duration: '1 heure 30',
-        },
-        {
-          title: {
-            fr: 'Épreuve écrite 2 : Épreuve portant sur la spécialité juridique, administrative ou dissertation générale',
-            ar: 'اختبار كتابي 2: اختبار في العلوم القانونية، التنظيم الإداري أو موضوع إنشائي',
-          },
-          coefficient: 3,
-          duration: '2 heures',
-        },
-      ],
-      oral: [
-        {
-          title: {
-            fr: 'Épreuve orale et psychotechnique : Entretien avec le jury, test d’aptitude psychologique et visite médicale',
-            ar: 'اختبار شفوي وفحص نفسي: مقابلة مع اللجنة، اختبار الكفاءة النفسية والفحص الطبي النظامي',
-          },
-          coefficient: 3,
-          duration: '20 minutes',
-        },
-      ],
-    };
-  }
-
-  // 5. Corps médical et pharmaceutique (Médecins, Pharmaciens, Chirurgiens-Dentistes)
-  if (combined.includes('medecin') || combined.includes('pharmacien') || combined.includes('chu') || combined.includes('infirmier') || combined.includes('sante')) {
-    return {
-      written: [
-        {
-          title: {
-            fr: 'Épreuve écrite : QCM et cas cliniques portant sur la médecine générale, la thérapeutique et les urgences',
-            ar: 'اختبار كتابي: أسئلة متعددة الاختيارات (QCM) وحالات سريرية في الطب العام والعلاجات والتدبير الصحي',
-          },
-          coefficient: 3,
-          duration: '2 heures',
-        },
-        {
-          title: {
-            fr: 'Épreuve d’ordre général : QCM portant sur l’organisation du système national de santé et la législation sanitaire',
-            ar: 'اختبار عام: أسئلة متعددة الاختيارات في المنظومة الصحية الوطنية والتشريع الصحي',
-          },
-          coefficient: 1,
-          duration: '1 heure 30',
-        },
-      ],
-      oral: [
-        {
-          title: {
-            fr: 'Épreuve orale : Entretien clinique et déontologique devant le jury médical',
-            ar: 'اختبار شفوي: مقابلة سريرية وأخلاقيات المهنة أمام لجنة الأطباء',
-          },
-          coefficient: 2,
-          duration: '20 minutes',
-        },
-      ],
-    };
-  }
-
-  // 6. Enseignement Supérieur (Maîtres de Conférences / Professeurs Assistants)
-  if (combined.includes('maitre de conference') || combined.includes('universite') || combined.includes('professeur')) {
-    return {
-      written: [
-        {
-          title: {
-            fr: 'Épreuve 1 (Titres et Travaux) : Évaluation du dossier scientifique, des publications et des travaux de recherche par la commission',
-            ar: 'المرحلة 1 (الملف العلمي): تقييم الأبحاث والمؤلفات والأعمال البيداغوجية من طرف لجنة الخبراء',
-          },
-          coefficient: 3,
-          duration: 'Sur dossier',
-        },
-      ],
-      oral: [
-        {
-          title: {
-            fr: 'Épreuve 2 (Exposé-Entretien) : Présentation des travaux scientifiques et leçon pédagogique devant le jury',
-            ar: 'المرحلة 2 (العرض والمناقشة): تقديم الأعمال العلمية ومناقشة مشروع البحث والتدريس أمام اللجنة',
-          },
-          coefficient: 3,
-          duration: '45 minutes',
-        },
-      ],
-    };
-  }
-
-  // 7. Structure statutaire standard par défaut
-  return {
-    written: [
-      {
-        title: {
-          fr: 'Épreuve écrite de spécialité : Sujet technique ou QCM portant sur les missions du poste et le diplôme exigé',
-          ar: 'اختبار كتابي في التخصص: موضوع تقني أو أسئلة متعددة الاختيارات تتعلق بمهام المنصب',
-        },
-        coefficient: 3,
-        duration: '2 heures 30',
-      },
-      {
-        title: {
-          fr: 'Épreuve d’ordre général : Sujet ou QCM portant sur les institutions nationales et la culture administrative',
-          ar: 'اختبار في موضوع عام: موضوع أو QCM في الثقافة العامة والمؤسسات الوطنية',
-        },
-        coefficient: 2,
-        duration: '1 heure 30',
-      },
-    ],
-    oral: [
-      {
-        title: {
-          fr: 'Épreuve orale : Entretien individuel avec la commission de recrutement portant sur les compétences et la motivation',
-          ar: 'اختبار شفوي: مقابلة فردية مع لجنة التوظيف حول المؤهلات والدافعية المهنية',
-        },
-        coefficient: 2,
-        duration: '20 minutes',
-      },
-    ],
-  };
-}
-
 export function sanitizeContestFields(c: Contest): Contest {
   const updated = { ...c };
 
@@ -872,116 +601,20 @@ export function sanitizeContestFields(c: Contest): Contest {
 
   const titleFr = updated.title?.fr || '';
 
-  // Déduire le grade statutaire officiel depuis le titre s'il est manquant
+  // Grade manquant : recopié tel quel du titre s'il y figure (« … grade », « échelle N »)
   if (!updated.grade_fr || updated.grade_fr.length < 3) {
     const gm = titleFr.match(/(?:recrutement\s+(?:de\s+|d['’])?)?([A-ZÀ-ÿ][a-zà-ÿA-Z0-9\s'’\-]+(?:grade|echelle\s*\d+|échelle\s*\d+)[a-zà-ÿA-Z0-9\s'’\-]*)/i);
     if (gm && gm[1]) {
       updated.grade_fr = gm[1].trim();
       updated.grade = updated.grade_fr;
-    } else if (/officier|gardien de la paix|inspecteur/i.test(titleFr)) {
-      const cleanG = titleFr.replace(/^Avis\s+de\s+concours\s+(?:de\s+recrutement\s+)?(?:de\s+)?/i, '').trim();
-      updated.grade_fr = cleanG;
-      updated.grade = cleanG;
     }
-  }
 
-  // Rectification des erreurs de diplôme manifestes (ex: Officier de police échelle 8 avec faux Bac+5)
-  const gLower = `${updated.grade_fr || ''} ${titleFr}`.toLowerCase();
-  if (gLower.includes('officier de paix') || gLower.includes('officier de police')) {
-    if ((updated.degreeLevel || '').includes('Bac+5')) {
-      updated.degreeLevel = 'Baccalauréat / Bac+2 (Statut DGSN)';
-      if (updated.criteria) {
-        updated.criteria.diplomas = [{ fr: 'Baccalauréat / Bac+2 (Statut DGSN)', ar: 'شهادة البكالوريا أو دبلوم باك+2 (الأمن الوطني)' }];
-      }
-    }
   }
 
   // Nettoyage des régions par défaut génériques
   if (updated.region?.fr && (/National/i.test(updated.region.fr) || /Régions du Royaume/i.test(updated.region.fr))) {
     updated.region = { fr: '', ar: '' };
     updated.location = { fr: '', ar: '' };
-  }
-
-  // Dictionnaire officiel des spécialités statutaires vérifiées depuis les fiches emploi-public.ma et arrêtés
-  const titleLower = titleFr.toLowerCase();
-  const refCode = (updated.referenceCode || '').toUpperCase();
-  const sourceUrl = updated.officialSourceUrl || '';
-
-  // 1. Spécialités exactes extraites des fiches officielles
-  if (refCode.includes('C43567') || sourceUrl.includes('163393e4') || (titleLower.includes('technicien') && titleLower.includes('education') && titleLower.includes('echelle 9'))) {
-    updated.specialtiesList = ['Gestion des entreprises', 'Commerce'];
-    updated.specialty = { fr: 'Gestion des entreprises, Commerce', ar: 'تدبير المقاولات، التجارة' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43567/26';
-  } else if (refCode.includes('C43566') || sourceUrl.includes('610a541b') || (titleLower.includes('administrateur 3') && titleLower.includes('education'))) {
-    updated.specialtiesList = ['Économie de gestion'];
-    updated.specialty = { fr: 'Économie de gestion', ar: 'اقتصاد التسيير' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43566/26';
-  } else if (refCode.includes('C43076') || sourceUrl.includes('72ed0218') || (titleLower.includes('ingenieur') && titleLower.includes('civil') && !titleLower.includes('education'))) {
-    updated.specialtiesList = ['Génie civil'];
-    updated.specialty = { fr: 'Génie civil', ar: 'الهندسة المدنية' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43076/26';
-  } else if (refCode.includes('C43049') || sourceUrl.includes('1d56279d') || titleLower.includes('architecte')) {
-    updated.specialtiesList = ['Architecture'];
-    updated.specialty = { fr: 'Architecture', ar: 'الهندسة المعمارية' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43049/26';
-  } else if (refCode.includes('C43042') || sourceUrl.includes('72d7f4f3')) {
-    updated.specialtiesList = ['Comptabilité', 'Finance'];
-    updated.specialty = { fr: 'Comptabilité, Finance', ar: 'المحاسبة، المالية' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43042/26';
-  } else if (refCode.includes('C43035') || sourceUrl.includes('74fa6128')) {
-    updated.specialtiesList = ['Mécanique Automobile', 'Électricité Automobile', 'Mécanique d’Entretien'];
-    updated.specialty = { fr: 'Mécanique Automobile, Électricité Automobile', ar: 'ميكانيك السيارات، كهرباء السيارات' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43035/26';
-  } else if (refCode.includes('C43005') || sourceUrl.includes('e9c0bb85')) {
-    updated.specialtiesList = ['Statistiques', 'Informatique et Systèmes Décisionnels', 'Finance Quantitative'];
-    updated.specialty = { fr: 'Statistiques, Informatique, Finance', ar: 'الإحصائيات، الإعلاميات، المالية' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43005/26';
-  } else if (refCode.includes('C43034') || sourceUrl.includes('3d99718c')) {
-    updated.specialtiesList = ['Gestion', 'Secrétariat et Bureautique'];
-    updated.specialty = { fr: 'Gestion, Secrétariat et Bureautique', ar: 'التسيير، كتابة الإدارة والمكتبية' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43034/26';
-  } else if (refCode.includes('C43033') || sourceUrl.includes('4e64e78f')) {
-    updated.specialtiesList = ['Techniques des Réseaux Informatiques', 'Développement Informatique', 'Gestion des Entreprises'];
-    updated.specialty = { fr: 'Réseaux Informatiques, Développement, Gestion', ar: 'شبكات الإعلاميات، التطوير المعلوماتي، تدبير المقاولات' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43033/26';
-  } else if (refCode.includes('C43032') || sourceUrl.includes('bacf792b')) {
-    updated.specialtiesList = ['Réseaux et Télécommunications', 'Développement Informatique', 'Génie Logiciel'];
-    updated.specialty = { fr: 'Réseaux et Télécommunications, Développement Informatique', ar: 'الشبكات والمواصلات، التطوير المعلوماتي' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43032/26';
-  } else if (refCode.includes('C43031') || sourceUrl.includes('3d6e4275')) {
-    updated.specialtiesList = ['Sciences Politiques', 'Relations Internationales', 'Droit Public'];
-    updated.specialty = { fr: 'Sciences Politiques, Relations Internationales', ar: 'العلوم السياسية، العلاقات الدولية' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43031/26';
-  } else if (refCode.includes('C43030') || sourceUrl.includes('f8fd2d0d')) {
-    updated.specialtiesList = ['Sciences Politiques', 'Diplomatie', 'Droit International'];
-    updated.specialty = { fr: 'Sciences Politiques, Diplomatie, Droit International', ar: 'العلوم السياسية، الدبلوماسية، القانون الدولي' };
-    if (!updated.referenceCode) updated.referenceCode = 'C43030/26';
-  } else if (refCode.includes('C42997') || sourceUrl.includes('d91438ac')) {
-    updated.specialtiesList = ['Génie Civil', 'Comptabilité et Gestion'];
-    updated.specialty = { fr: 'Génie Civil, Comptabilité et Gestion', ar: 'الهندسة المدنية، المحاسبة والتسيير' };
-    if (!updated.referenceCode) updated.referenceCode = 'C42997/26';
-  } else if (refCode.includes('C42996') || sourceUrl.includes('6aa579ad')) {
-    updated.specialtiesList = ['Comptabilité, Contrôle et Audit', 'Finance'];
-    updated.specialty = { fr: 'Comptabilité, Contrôle et Audit, Finance', ar: 'المحاسبة والمراقبة والتدقيق، المالية' };
-    if (!updated.referenceCode) updated.referenceCode = 'C42996/26';
-  } else if (refCode.includes('C42821') || sourceUrl.includes('78699344') || titleLower.includes('médecins')) {
-    updated.specialtiesList = ['Médecine Générale'];
-    updated.specialty = { fr: 'Médecine Générale', ar: 'الطب العام' };
-    if (!updated.referenceCode) updated.referenceCode = 'C42821/26';
-  } else if (titleLower.includes('commissaire judiciaire') || sourceUrl.includes('78b27d05')) {
-    updated.specialtiesList = ['Sciences Juridiques', 'Droit Privé', 'Droit des Affaires'];
-    updated.specialty = { fr: 'Sciences Juridiques, Droit Privé', ar: 'العلوم القانونية، القانون الخاص' };
-  } else if (titleLower.includes('gardien de la paix') || titleLower.includes('inspecteur de police') || titleLower.includes('officier de police') || titleLower.includes('officier de paix') || titleLower.includes('commissaire de police')) {
-    if (titleLower.includes('gardien de la paix')) {
-      updated.specialtiesList = ['Baccalauréat (Toutes séries)'];
-      updated.specialty = { fr: 'Toutes séries (Statut DGSN)', ar: 'جميع الشعب (النظام الأساسي للأمن الوطني)' };
-    } else if (titleLower.includes('inspecteur de police') || titleLower.includes('officier')) {
-      updated.specialtiesList = ['DEUG / Bac+2 (Toutes filières universitaires)'];
-      updated.specialty = { fr: 'Toutes filières Bac+2 (Statut DGSN)', ar: 'جميع التخصصات باك+2 (الأمن الوطني)' };
-    } else {
-      updated.specialtiesList = ['Licence en Droit', 'Sciences Économiques et Gestion'];
-      updated.specialty = { fr: 'Droit, Sciences Économiques', ar: 'القانون، العلوم الاقتصادية' };
-    }
   }
 
   // Purge définitive de toute chaîne placeholder "Spécialités mentionnées dans l’arrêté"
@@ -1014,30 +647,10 @@ export function sanitizeContestFields(c: Contest): Contest {
           },
           fileType: 'PDF Officiel',
           fileSize: 'Document officiel',
-          date: updated.publicationDate || '2026',
+          date: updated.publicationDate || '',
           url: officialArreteUrl,
         },
       ];
-    }
-  }
-
-  // Conditions d'âge statutaires de la fonction publique marocaine
-  if (updated.criteria && (!updated.criteria.ageLimit?.fr || updated.criteria.ageLimit.fr.length < 3)) {
-    if (gLower.includes('echelle 11') || gLower.includes('échelle 11') || gLower.includes('echelle 10') || gLower.includes('échelle 10') || gLower.includes('ingénieur') || gLower.includes('administrateur') || gLower.includes('médecin')) {
-      updated.criteria.ageLimit = {
-        fr: '18 à 45 ans (Statut de la fonction publique)',
-        ar: 'من 18 إلى 45 سنة (النظام الأساسي العام للوظيفة العمومية)',
-      };
-    } else if (gLower.includes('echelle 9') || gLower.includes('échelle 9') || gLower.includes('echelle 8') || gLower.includes('échelle 8') || gLower.includes('technicien')) {
-      updated.criteria.ageLimit = {
-        fr: '18 à 40 ans (Statut des techniciens)',
-        ar: 'من 18 إلى 40 سنة (النظام الأساسي لهيئة التقنيين)',
-      };
-    } else if (gLower.includes('police') || gLower.includes('paix')) {
-      updated.criteria.ageLimit = {
-        fr: '21 à 30 ans (Statut spécial DGSN)',
-        ar: 'من 21 إلى 30 سنة (النظام الأساسي للأمن الوطني)',
-      };
     }
   }
 
@@ -1056,11 +669,6 @@ export function sanitizeContestFields(c: Contest): Contest {
       ...updated.administration,
       logo: resolved,
     };
-  }
-
-  // Épreuves et examens statutaires officiels (QCM vs Sujet général vs Épreuve technique)
-  if (!updated.exams || !updated.exams.written || updated.exams.written.length === 0) {
-    updated.exams = inferOfficialExams(updated);
   }
 
   return updated;

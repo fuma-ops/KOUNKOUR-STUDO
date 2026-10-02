@@ -21,7 +21,12 @@
  */
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
-import { parseEmploiPublicDetail } from './enrich.ts';
+import { findPossibleDuplicate, parseEmploiPublicDetail, parseFrDateISO, toCandidateRow } from '../_lib/parsers.ts';
+import type { DuplicateRef } from '../_lib/parsers.ts';
+
+// Ré-export pour les tests (scripts/).
+export { findPossibleDuplicate, parseFrDateISO };
+export type { DuplicateRef };
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
@@ -44,34 +49,6 @@ const BROWSER_HEADERS = {
 };
 
 type AddLog = (level: string, message: string) => void;
-
-const FR_MONTHS: Record<string, number> = {
-  janvier: 0, février: 1, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5,
-  juillet: 6, août: 7, aout: 7, septembre: 8, octobre: 9, novembre: 10,
-  décembre: 11, decembre: 11,
-};
-
-// "15 octobre 2026", "1er octobre 2026" ou "15/10/2026" → "2026-10-15".
-export function parseFrDateISO(text: string): string | null {
-  if (!text) return null;
-  const m = text.match(/(\d{1,2})(?:er)?\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})/);
-  if (m) {
-    const month = FR_MONTHS[m[2].toLowerCase()];
-    const d = parseInt(m[1], 10);
-    if (month !== undefined && d >= 1 && d <= 31) {
-      return `${m[3]}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    }
-  }
-  const n = text.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/);
-  if (n) {
-    const d = parseInt(n[1], 10);
-    const mo = parseInt(n[2], 10);
-    if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) {
-      return `${n[3]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    }
-  }
-  return null;
-}
 
 // Spécialité extraite STRICTEMENT du texte scrapé — jamais devinée.
 function extractSpecialty(text: string): string | null {
@@ -450,53 +427,6 @@ export function extractDreamjobDeadline(text: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-function normTokens(s: string): Set<string> {
-  return new Set(
-    s
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((w) => w.length >= 4 && !/^(concours|recrutement|poste|postes|2025|2026|2027|pour|dans|des|avec|grade|echelle)$/.test(w))
-  );
-}
-
-function overlap(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let inter = 0;
-  a.forEach((w) => {
-    if (b.has(w)) inter++;
-  });
-  return inter / Math.min(a.size, b.size);
-}
-
-export interface DuplicateRef {
-  kind: 'publie' | 'emploi-public';
-  title: string;
-  admin: string | null;
-  deadline: string | null;
-  url: string | null;
-}
-
-// Doublon POSSIBLE (signalé à l'admin, jamais supprimé automatiquement — cahier l.239).
-export function findPossibleDuplicate(
-  title: string,
-  admin: string | null,
-  deadlineISO: string | null,
-  refs: DuplicateRef[]
-): DuplicateRef | null {
-  const mine = normTokens(`${title} ${admin || ''}`);
-  let best: { ref: DuplicateRef; score: number } | null = null;
-  for (const ref of refs) {
-    const score = overlap(mine, normTokens(`${ref.title} ${ref.admin || ''}`));
-    const sameDeadline = !!deadlineISO && deadlineISO === ref.deadline;
-    if ((sameDeadline && score >= 0.3) || score >= 0.6) {
-      if (!best || score > best.score) best = { ref, score };
-    }
-  }
-  return best ? best.ref : null;
-}
-
 function buildDreamjobItem(e: DreamjobEntry, dup: DuplicateRef | null): any {
   const text = `${e.title} ${e.excerpt}`;
   const admin = extractDreamjobAdmin(e.title);
@@ -523,8 +453,9 @@ function buildDreamjobItem(e: DreamjobEntry, dup: DuplicateRef | null): any {
     },
     postsCount: postsCount ?? 1,
     degreeLevel: degreeLevel || '',
-    specialty: { fr: specialty || 'Spécialité mentionnée dans l’annonce officielle', ar: '' },
-    region: { fr: 'National (Royaume du Maroc)', ar: 'المملكة المغربية' },
+    // Absent de l'annonce → vide (jamais de texte générique).
+    specialty: { fr: specialty || '', ar: '' },
+    region: { fr: '', ar: '' },
     publicationDate: '',
     deadlineDate: deadlineText,
     status: 'pending_review',
@@ -658,26 +589,7 @@ export default async function handler(req: any, res: any) {
                 if (d.grade) {
                   item.grade = d.grade;
                   item._db.grade_fr = d.grade;
-                  const gLower = d.grade.toLowerCase();
-                  let inferred = '';
-                  if (gLower.includes('médecin') || gLower.includes('medecin')) inferred = 'Doctorat en Médecine (Bac+7)';
-                  else if (gLower.includes('pharmacien')) inferred = 'Doctorat en Pharmacie (Bac+6)';
-                  else if (gLower.includes('dentiste')) inferred = 'Doctorat en Médecine Dentaire (Bac+6)';
-                  else if (gLower.includes('ingénieur') || gLower.includes('ingenieur')) inferred = "Diplôme d'Ingénieur d'État (Bac+5)";
-                  else if (gLower.includes('architecte')) inferred = "Diplôme d'Architecte (Bac+5)";
-                  else if (gLower.includes('professeur') || gLower.includes('enseignant')) inferred = 'Doctorat (Bac+8)';
-                  else if (gLower.includes('administrateur 2') || gLower.includes('2ème grade') || gLower.includes('2eme grade')) inferred = 'Master / Diplôme d’Études Supérieures (Bac+5)';
-                  else if (gLower.includes('administrateur 3') || (gLower.includes('3ème grade') && gLower.includes('admin'))) inferred = 'Licence / Bac+3';
-                  else if (gLower.includes('technicien 3') || gLower.includes('3ème grade') || gLower.includes('spécialisé') || gLower.includes('echelle 9') || gLower.includes('échelle 9')) inferred = 'Bac+2 (Technicien Spécialisé / DUT / BTS / DTS)';
-                  else if (gLower.includes('technicien 4') || gLower.includes('4ème grade') || gLower.includes('rédacteur') || gLower.includes('echelle 8') || gLower.includes('échelle 8')) inferred = 'Baccalauréat / Diplôme de Technicien';
-                  else if (gLower.includes('adjoint technique') || gLower.includes('echelle 6') || gLower.includes('échelle 6')) inferred = 'Certificat de Qualification Professionnelle (CQP)';
-                  else if (gLower.includes('adjoint administratif')) inferred = 'Baccalauréat';
-                  else if (gLower.includes('infirmier') || gLower.includes('sage-femme') || gLower.includes('santé')) inferred = 'Licence Professionnelle (Bac+3)';
-
-                  if (inferred && (!item.degreeLevel || item.degreeLevel.length < 3)) {
-                    item.degreeLevel = inferred;
-                    item._db.degree_level = inferred;
-                  }
+                  // Diplôme : jamais déduit du grade (il doit venir de l'annonce).
                 }
                 if (d.specialty && d.specialty.length > 0) {
                   item.specialtiesList = d.specialty;
@@ -803,7 +715,7 @@ export default async function handler(req: any, res: any) {
       // réinsérés — seuls les NOUVEAUX entrent dans la file de validation.
       const { data, error } = await supabase
         .from('radar_candidates')
-        .upsert(items.map((it) => it._db), { onConflict: 'source_id,external_id', ignoreDuplicates: true })
+        .upsert(items.map((it) => toCandidateRow(it._db)), { onConflict: 'source_id,external_id', ignoreDuplicates: true })
         .select('id');
       if (error) {
         addLog('warn', `Écriture base refusée (${error.message}). Résultats affichés sans sauvegarde.`);

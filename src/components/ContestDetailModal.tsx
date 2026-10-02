@@ -453,7 +453,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                     )}
 
                     {/* Limite d'âge */}
-                    {contest.criteria?.ageLimit && (
+                    {contest.criteria?.ageLimit?.fr?.trim() && (
                       <div className="p-3 bg-[#FAF7F9] rounded-2xl border border-[#F1E5EC]">
                         <span className="text-[10px] font-extrabold uppercase text-gray-400 block mb-0.5">
                           {language === 'fr' ? 'Limite d’âge légale' : 'السن القانوني'}
@@ -465,7 +465,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                     )}
 
                     {/* Nationalité */}
-                    {contest.criteria?.nationality && (
+                    {contest.criteria?.nationality?.fr?.trim() && (
                       <div className="p-3 bg-[#FAF7F9] rounded-2xl border border-[#F1E5EC]">
                         <span className="text-[10px] font-extrabold uppercase text-gray-400 block mb-0.5">
                           {language === 'fr' ? 'Nationalité' : 'الجنسية'}

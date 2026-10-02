@@ -1,6 +1,6 @@
 import { getSupabase } from '../lib/supabase';
 import { Contest, ContestCategory, ContestStatus } from '../types';
-import { resolveAdministrationLogo, removeImportedContest, inferOfficialExams } from '../utils/radarStorage';
+import { resolveAdministrationLogo, removeImportedContest } from '../utils/radarStorage';
 
 // Lecture des concours PUBLIÉS depuis Supabase + mapping vers le type Contest de
 // studo. Source unique de vérité partagée (fini le localStorage/mockContests).
@@ -113,13 +113,8 @@ function mapRow(row: any): Contest {
       experience: { fr: '', ar: '' },
       specialties: specialtiesList.map((s) => ({ fr: s, ar: s })),
     },
-    exams: inferOfficialExams({
-      title: { fr: titleFr, ar: titleAr },
-      grade_fr: row.grade_fr,
-      degreeLevel: row.diploma_fr,
-      specialty: { fr: specFr, ar: specAr },
-      specialtiesList,
-    }),
+    // Épreuves : jamais déduites. Vides tant qu'elles ne sont pas lues dans l'arrêté.
+    exams: { written: [], oral: [] },
     documents: [],
     isDemo: false,
   } as Contest;
@@ -135,6 +130,9 @@ export async function fetchPublishedContests(): Promise<Contest[] | null> {
       .select(
         '*, administrations ( name_fr, name_ar, category, official_site ), contest_criteria ( criterion_type, value_fr, value_ar )'
       )
+      // Statuts publics uniquement : un admin connecté ne doit pas voir sur le site
+      // les brouillons ou concours archivés (lisibles par lui via les RLS staff).
+      .in('status', ['publie', 'mis_a_jour', 'cloture', 'annule', 'resultats_publies'])
       .order('published_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (error || !data) return null;

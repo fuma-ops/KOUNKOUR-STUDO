@@ -17,6 +17,9 @@ import {
   parseFrDateISO,
 } from '../api/radar/scrape-live.ts';
 import { findOfficialLink } from '../api/radar/enrich.ts';
+import { parseDreamjobPost, toCandidateRow, canonicalEmploiPublicUrl } from '../api/_lib/parsers.ts';
+import { fillIfMissing } from '../api/radar/backfill-details.ts';
+import { sanitizeContestFields } from '../src/utils/radarStorage.ts';
 import { parseFrenchDate } from '../src/utils/radarStorage.ts';
 
 let failures = 0;
@@ -195,6 +198,67 @@ check(
   findOfficialLink('<div class="entry-content"><a href="https://www.dreamjob.ma/a/">x</a></div>', 'https://www.dreamjob.ma/emploi-public/z/').officialUrl,
   null
 );
+
+
+// ─── Annonce dreamjob : lecture du corps ──────────────────────────────────────
+const djPost = `<article><div class="entry-content">
+  <p>Le Ministère de la Santé organise un concours pour le recrutement de 10 postes.</p>
+  <p><strong>Spécialités :</strong></p>
+  <ul><li>- Médecine générale</li><li>Pédiatrie</li></ul>
+  <p>Date du concours : 26 Juillet 2026</p>
+  <p>Dernier délai : 23 juillet 2026</p>
+  <p><a href="https://www.emploi-public.ma/fr/concours/details/78699344-C4D1-4204-ad40-9749cc0563aa">Annonce officielle</a></p>
+</div></article>`;
+const dj = parseDreamjobPost(djPost, 'https://www.dreamjob.ma/emploi-public/medecins/');
+check('Post dreamjob : spécialités en liste', dj.specialties, ['Médecine générale', 'Pédiatrie']);
+check('Post dreamjob : postes', dj.postsCount, 10);
+check('Post dreamjob : date du concours', dj.examDate, '26 Juillet 2026');
+check('Post dreamjob : délai', dj.deadlineDate, '23 juillet 2026');
+check(
+  'Post dreamjob : lien officiel canonique',
+  canonicalEmploiPublicUrl(dj.officialUrl),
+  'https://www.emploi-public.ma/fr/concours/details/78699344-c4d1-4204-ad40-9749cc0563aa'
+);
+check(
+  'Post dreamjob : spécialité en ligne',
+  parseDreamjobPost('<div class="entry-content"><p>Spécialité : Génie civil - Topographie</p></div>', 'https://www.dreamjob.ma/x/').specialties,
+  ['Génie civil', 'Topographie']
+);
+check(
+  'Post dreamjob : sans libellé « Spécialité » → null (jamais deviné)',
+  parseDreamjobPost('<div class="entry-content"><p>Concours d’ingénieurs en informatique</p></div>', 'https://www.dreamjob.ma/x/').specialties,
+  null
+);
+
+// ─── Écriture radar_candidates : colonnes réelles uniquement ─────────────────
+const row = toCandidateRow({ source_id: 's', external_id: 'e', specialty: 'x', reference: 'C1/26', grade_fr: 'G', region_fr: null, raw: { a: 1 } });
+check('Candidat : colonnes inconnues retirées', Object.keys(row).sort(), ['external_id', 'raw', 'source_id', 'specialty']);
+check('Candidat : champs de la fiche rangés dans raw.detail', row.raw, { a: 1, detail: { reference: 'C1/26', grade_fr: 'G' } });
+
+// ─── Backfill : ne jamais écraser une valeur existante ───────────────────────
+const fill = { updates: {} as Record<string, any>, fields: [] as string[] };
+const cur = { reference: 'C42821/26', exam_date: null, region_fr: 'National (Royaume du Maroc)', positions: 0, grade_fr: 'Existant' };
+fillIfMissing(fill, cur, 'reference', 'AUTRE', 'code');
+fillIfMissing(fill, cur, 'exam_date', '2026-07-26', 'date du concours');
+fillIfMissing(fill, cur, 'region_fr', 'MARRAKECH-SAFI', 'région');
+fillIfMissing(fill, cur, 'positions', 10, 'postes');
+fillIfMissing(fill, cur, 'grade_fr', 'Nouveau', 'grade');
+fillIfMissing(fill, cur, 'exam_date', '2099-01-01', 'date (2e source)');
+check('Backfill : seules les valeurs manquantes', fill.updates, { exam_date: '2026-07-26', region_fr: 'MARRAKECH-SAFI', positions: 10 });
+
+// ─── Affichage : aucune donnée inventée par le site ──────────────────────────
+const shown: any = sanitizeContestFields({
+  id: 'x', title: { fr: 'Médecins premier grade - Echelle 11', ar: '' }, referenceCode: '',
+  specialty: { fr: 'genreraliste', ar: '' }, specialtiesList: ['genreraliste'],
+  officialSourceUrl: 'https://www.emploi-public.ma/fr/concours/details/4bce4152-8b28-45d0-b869-c883f18864db',
+  criteria: { ageLimit: { fr: '', ar: '' }, nationality: { fr: '', ar: '' }, diplomas: [], specialties: [] },
+  exams: { written: [], oral: [] }, documents: [], postsCount: 10, status: 'open',
+  administration: { name: { fr: 'Ministère de la Santé', ar: '' } }, region: { fr: '', ar: '' },
+} as any);
+check('Affichage : spécialité réelle conservée', shown.specialtiesList, ['genreraliste']);
+check('Affichage : aucun code attribué', shown.referenceCode, '');
+check('Affichage : aucun âge inventé', shown.criteria.ageLimit.fr, '');
+check('Affichage : aucune épreuve inventée', shown.exams.written.length, 0);
 
 console.log(failures === 0 ? '\nTous les tests passent.' : `\n${failures} test(s) en échec.`);
 process.exit(failures === 0 ? 0 : 1);

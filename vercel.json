@@ -2,5 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "buildCommand": "vite build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "functions": {
+    "api/radar/backfill-details.ts": {
+      "maxDuration": 60
+    },
+    "api/radar/scrape-live.ts": {
+      "maxDuration": 60
+    }
+  }
 }
