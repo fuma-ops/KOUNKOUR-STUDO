@@ -15,6 +15,7 @@ import {
   extractDreamjobDeadline,
   findPossibleDuplicate,
   parseFrDateISO,
+  degreeFromTitle,
 } from '../api/radar/scrape-live.ts';
 import { findOfficialLink } from '../api/radar/enrich.ts';
 import { parseDreamjobPost, toCandidateRow, canonicalEmploiPublicUrl } from '../api/_lib/parsers.ts';
@@ -259,6 +260,15 @@ check('Affichage : spécialité réelle conservée', shown.specialtiesList, ['ge
 check('Affichage : aucun code attribué', shown.referenceCode, '');
 check('Affichage : aucun âge inventé', shown.criteria.ageLimit.fr, '');
 check('Affichage : aucune épreuve inventée', shown.exams.written.length, 0);
+
+// ─── Diplôme lu dans le grade : seulement si sans ambiguïté ──────────────────
+check('Grade : maître de conférences → Doctorat', degreeFromTitle('maitre de conférence'), 'Doctorat');
+check('Grade : Ingénieur d’État', degreeFromTitle("Ingénieur d'Etat 1er grade - Echelle 11"), 'Master / Ingénieur');
+check('Grade : Administrateur 2ème grade → Master', degreeFromTitle('Administrateur 2ème grade - echelle 11'), 'Master');
+check('Grade : Administrateur de 3ème grade → Licence', degreeFromTitle('Administrateur de 3ème grade - echelle 10'), 'Licence');
+check('Grade : Technicien de 3ème grade → Bac+2', degreeFromTitle('Technicien de 3ème grade - echelle 9'), 'Bac+2');
+check('Grade : Technicien 4ème grade → inconnu', degreeFromTitle('Technicien de 4ème grade - echelle 8'), null);
+check('Grade : Adjoint technique → inconnu', degreeFromTitle('Adjoint technique de 2ème grade'), null);
 
 console.log(failures === 0 ? '\nTous les tests passent.' : `\n${failures} test(s) en échec.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -549,7 +549,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </h1>
                 <p className="text-xs sm:text-sm text-[#6E6773] mt-1">
                   {language === 'fr'
-                    ? 'Testez instantanément les règles statutaires marocaines (non-surqualification Bac+5 vs Bac+2, conditions d’âge, concordance de spécialité) sur tous les concours actifs.'
+                    ? 'Testez instantanément les règles statutaires marocaines (même spécialité ET même nombre d’années après le bac, conditions d’âge ; en cas de doute : « à vérifier ») sur tous les concours actifs.'
                     : 'اختبر قواعد المطابقة القانونية المغربية الفورية على كافة مباريات الدليل.'}
                 </p>
               </div>

@@ -72,12 +72,16 @@ function detectCategory(admin: string, isDouanes: boolean): string {
 }
 
 // Niveau déduit du GRADE cité dans le titre (null si rien de sûr).
-function degreeFromTitle(title: string): string | null {
-  const tl = title.toLowerCase();
-  if (tl.includes('ingénieur') || tl.includes('master') || tl.includes('conférences')) return 'Master / Ingénieur';
-  if (tl.includes('technicien') || tl.includes('3ème grade')) return 'Bac+2';
-  if (tl.includes('adjoint') || tl.includes('agent')) return 'Niveau Bac';
-  if (tl.includes('médecin') || tl.includes('pharmacien') || tl.includes('docteur')) return 'Doctorat';
+export function degreeFromTitle(title: string): string | null {
+  // Uniquement les grades dont le diplôme d'accès est sans ambiguïté ; sinon null
+  // (le matching affichera « à vérifier » au lieu de deviner).
+  const t = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/conference/.test(t)) return 'Doctorat'; // maître de conférences
+  if (/medecin|pharmacien|chirurgien.dentiste/.test(t)) return 'Doctorat';
+  if (/ingenieur/.test(t)) return 'Master / Ingénieur';
+  if (/administrateur\s+(?:de\s+)?2/.test(t)) return 'Master';
+  if (/administrateur\s+(?:de\s+)?3/.test(t)) return 'Licence';
+  if (/technicien\s+(?:de\s+)?3/.test(t)) return 'Bac+2';
   return null;
 }
 

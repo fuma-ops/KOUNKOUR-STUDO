@@ -53,7 +53,7 @@ function mapRow(row: any): Contest {
   const specCrits = criteria.filter((c: any) => c.criterion_type === 'specialite');
   const specialtiesList: string[] = specCrits
     .map((c: any) => c.value_fr)
-    .filter((v: any) => Boolean(v && !v.toLowerCase().includes('mentionnée') && !v.toLowerCase().includes('mentionnee')));
+    .filter((v: any) => Boolean(v && !/mentionn|voir l.annonce/i.test(v)));
 
   const specFr = specialtiesList.length > 0 ? specialtiesList.join(', ') : (row.specialty_fr || '');
   const specAr = specCrits[0]?.value_ar || specFr;

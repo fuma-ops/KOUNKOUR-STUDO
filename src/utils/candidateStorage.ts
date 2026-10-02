@@ -145,16 +145,29 @@ const stripAccents = (s: string) =>
 
 // Rang d'un niveau de diplôme (exigé ou détenu). null = indéterminable.
 // « Master / Doctorat » = minimum Master (4).
-export function degreeRankOf(text: string | undefined | null): number | null {
+// Niveau d'études exprimé en ANNÉES APRÈS LE BAC : Bac = 0, Bac+2, Licence = 3,
+// Master / Ingénieur d'État = 5, Doctorat = 8. CQP (sans bac) = -1.
+// Renvoie TOUS les niveaux cités : « Master / Doctorat » → [5, 8] (ambigu).
+export function degreeYearsIn(text: string | undefined | null): number[] {
   const t = stripAccents(text || '').replace(/\s+/g, '');
-  if (!t) return null;
-  if (t.includes('master') || t.includes('bac+5') || t.includes('ingenieur')) return 4;
-  if (t.includes('doctorat') || t.includes('docteur')) return 5;
-  if (t.includes('licence') || t.includes('bac+3')) return 3;
-  if (t.includes('bac+2') || t.includes('dts') || t.includes('dut') || t.includes('bts') || t.includes('technicienspecialise')) return 2;
-  if (t.includes('bac') || t.includes('cqp')) return 1;
-  return null;
+  if (!t) return [];
+  const found = new Set<number>();
+  if (/doctorat|docteur/.test(t)) found.add(8);
+  if (/master|bac\+5|ingenieur/.test(t)) found.add(5);
+  if (/licence|bac\+3/.test(t)) found.add(3);
+  if (/bac\+2|dts|dut|bts|deug|technicienspecialise/.test(t)) found.add(2);
+  if (/baccalaureat|bac(?!\+)/.test(t)) found.add(0);
+  if (/cqp/.test(t)) found.add(-1);
+  return [...found].sort((x, y) => x - y);
 }
+
+// Compatibilité : niveau unique (null si absent ou ambigu).
+export function degreeRankOf(text: string | undefined | null): number | null {
+  const y = degreeYearsIn(text);
+  return y.length === 1 ? y[0] : null;
+}
+
+const YEARS_LABEL: Record<number, string> = { [-1]: 'CQP', 0: 'Bac', 2: 'Bac+2', 3: 'Bac+3 (Licence)', 5: 'Bac+5 (Master / Ingénieur)', 8: 'Doctorat' };
 
 // Mots trop génériques pour distinguer une spécialité.
 const SPEC_STOP = new Set([
@@ -176,6 +189,14 @@ function stemToken(t: string): string {
   if (/^electr/.test(t)) return 'electr';
   if (/^infirm/.test(t)) return 'infirm';
   return t.length >= 7 ? t.slice(0, 6) : t;
+}
+
+// Découpe une liste de spécialités : « A - B, C ; D & E (F) ».
+export function splitSpecialties(text: string): string[] {
+  return (text || '')
+    .split(/\s[-–]\s|[,;|&()]|\n/)
+    .map((x) => x.replace(/^[\s\-–]+|[\s\-–]+$/g, ''))
+    .filter((x) => x.length > 1);
 }
 
 export function specialtyTokens(s: string | undefined | null): string[] {
@@ -211,30 +232,38 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
     add('Candidatures closes : la date limite de dépôt est dépassée.', 'انتهى أجل إيداع الترشيحات لهذه المباراة.');
   }
 
-  // 1. Diplôme
-  const required = degreeRankOf(contest.degreeLevel);
-  const mine = degreeRankOf(profile.degreeLevel);
+  // 1. Diplôme — règle KounKour : le profil correspond UNIQUEMENT si le diplôme
+  //    a EXACTEMENT le même nombre d'années après le bac que celui exigé.
+  //    Plus bas OU plus haut → non éligible. Annonce muette ou ambiguë → à vérifier.
+  const requiredYears = degreeYearsIn(contest.degreeLevel);
+  const mineYears = degreeYearsIn(profile.degreeLevel);
   let degreeMatch = false;
-  if (mine === null) {
+  if (mineYears.length !== 1) {
     needVerify = true;
     add('Renseignez votre niveau de diplôme dans votre profil.', 'يرجى تحديد مستواك الدراسي في ملفك.');
-  } else if (required === null) {
+  } else if (requiredYears.length === 0) {
     needVerify = true;
     add(
       `Niveau de diplôme exigé non précisé par l'annonce : à vérifier sur l'arrêté officiel.`,
       'المستوى الدراسي المطلوب غير محدد في الإعلان: يرجى التحقق من القرار الرسمي.'
     );
-  } else if (mine < required) {
+  } else if (requiredYears.length > 1 && !requiredYears.includes(mineYears[0])) {
     hardNo = true;
     add(
-      `Diplôme insuffisant : ${contest.degreeLevel} requis (votre niveau : ${profile.degreeLevel}).`,
-      `المستوى الدراسي غير كافٍ: المطلوب ${contest.degreeLevel} (مستواك: ${profile.degreeLevel}).`
+      `Diplôme différent : ce concours exige ${requiredYears.map((y) => YEARS_LABEL[y]).join(' ou ')}, votre diplôme est ${YEARS_LABEL[mineYears[0]]}.`,
+      `دبلوم غير مطابق: هذه المباراة تشترط ${requiredYears.map((y) => YEARS_LABEL[y]).join(' أو ')}، ودبلومك ${YEARS_LABEL[mineYears[0]]}.`
     );
-  } else if (required <= 2 && mine > required) {
+  } else if (requiredYears.length > 1) {
+    needVerify = true;
+    add(
+      `Niveau exigé ambigu dans l'annonce (« ${contest.degreeLevel} ») : vérifiez sur l'arrêté officiel le diplôme exact demandé.`,
+      `المستوى المطلوب غير دقيق في الإعلان (« ${contest.degreeLevel} »): يرجى التحقق من الدبلوم المطلوب في القرار الرسمي.`
+    );
+  } else if (mineYears[0] !== requiredYears[0]) {
     hardNo = true;
     add(
-      `Surqualification statutaire : ce concours est réservé au grade de Technicien / Bac (${contest.degreeLevel}). Un diplôme de ${profile.degreeLevel} n'est pas recevable pour ce grade selon la réglementation de la fonction publique.`,
-      `عدم تطابق نظامي: هذه المباراة مخصصة لدرجة تقني / بكالوريا (${contest.degreeLevel}). شهادة ${profile.degreeLevel} غير مقبولة للترشح لهذه الدرجة وفقاً للنظام الأساسي للوظيفة العمومية.`
+      `Diplôme différent : ce concours exige ${YEARS_LABEL[requiredYears[0]]}, votre diplôme est ${YEARS_LABEL[mineYears[0]]}.`,
+      `دبلوم غير مطابق: هذه المباراة تشترط ${YEARS_LABEL[requiredYears[0]]}، ودبلومك ${YEARS_LABEL[mineYears[0]]}.`
     );
   } else {
     degreeMatch = true;
@@ -257,22 +286,46 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
       'Saisissez votre spécialité en français pour permettre la comparaison avec les annonces.',
       'يرجى كتابة تخصصك بالفرنسية لتمكين المقارنة مع الإعلانات.'
     );
+  } else if (contestTokens.length === 0 && /[\u0600-\u06FF]/.test(contestSpec) && !isGenericSpecialty(contestSpec)) {
+    needVerify = true;
+    add(
+      `Spécialité indiquée en arabe (« ${contestSpec} ») : comparaison automatique impossible, vérifiez qu'elle correspond à votre diplôme.`,
+      `التخصص مكتوب بالعربية (« ${contestSpec} »): تعذّرت المقارنة الآلية، تحقق من مطابقته لدبلومك.`
+    );
   } else if (isGenericSpecialty(contestSpec) || contestTokens.length === 0) {
     needVerify = true;
     add(
       `L'annonce ne précise pas la spécialité exigée (« Spécialités mentionnées dans l'arrêté ») : impossible de confirmer. Consultez l'arrêté officiel.`,
       'الإعلان لا يحدد التخصص المطلوب: لا يمكن التأكيد. يرجى الاطلاع على القرار الرسمي.'
     );
-  } else if (profileTokens.some((t) => contestTokens.includes(t))) {
-    specialtyMatch = true;
-    specialtyStatus = 'match';
   } else {
-    specialtyStatus = 'different';
-    hardNo = true;
-    add(
-      `Spécialité exigée : ${contestSpec}. Votre spécialité (${profileSpec}) ne correspond pas.`,
-      `التخصص المطلوب: ${contest.specialty?.ar || contestSpec}. تخصصك (${profileSpec}) غير مطابق.`
-    );
+    // Comparaison spécialité PAR spécialité de l'annonce (liste « A - B, C »).
+    //  - mêmes mots-clés qu'une spécialité exigée → correspond ;
+    //  - mots-clés seulement en partie communs (« Gestion » vs « Gestion des sols »)
+    //    → à vérifier ; aucun mot commun → non éligible.
+    const items = [...(contest.specialtiesList || []), ...splitSpecialties(contestSpec)]
+      .map((it) => ({ label: it.trim(), tokens: [...new Set(specialtyTokens(it))] }))
+      .filter((it) => it.tokens.length > 0);
+    const mine = new Set(profileTokens);
+    const same = items.find((it) => it.tokens.length === mine.size && it.tokens.every((t) => mine.has(t)));
+    const close = items.find((it) => it.tokens.some((t) => mine.has(t)));
+    if (same) {
+      specialtyMatch = true;
+      specialtyStatus = 'match';
+    } else if (close) {
+      needVerify = true;
+      add(
+        `Spécialité proche mais pas identique : l'annonce demande « ${close.label} », votre spécialité est « ${profileSpec} ». Vérifiez sur l'arrêté que votre diplôme est accepté.`,
+        `تخصص قريب وليس مطابقاً: الإعلان يطلب « ${close.label} » وتخصصك « ${profileSpec} ». تحقق من القرار الرسمي.`
+      );
+    } else {
+      specialtyStatus = 'different';
+      hardNo = true;
+      add(
+        `Spécialité exigée : ${contestSpec}. Votre spécialité (${profileSpec}) ne correspond pas.`,
+        `التخصص المطلوب: ${contest.specialty?.ar || contestSpec}. تخصصك (${profileSpec}) غير مطابق.`
+      );
+    }
   }
 
   // 3. Âge — limite générale de la fonction publique : 18 à 45 ans.

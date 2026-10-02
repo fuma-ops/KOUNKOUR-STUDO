@@ -41,7 +41,7 @@ const PARALLEL = 3;
 const MAX_LIMIT = 6;
 
 const isGenericSpecialty = (v: string | null | undefined) =>
-  !v || /mentionn|non pr[ée]cis|non sp[ée]cifi/i.test(v);
+  !v || /mentionn|non pr[ée]cis|non sp[ée]cifi|voir l.annonce/i.test(v);
 
 async function getHtml(url: string): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
   try {
