@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Language, Contest } from '../types';
 import { 
   Users, FileText, Eye, Download, TrendingUp, Settings, 

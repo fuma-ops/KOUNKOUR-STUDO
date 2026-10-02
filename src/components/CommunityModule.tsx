@@ -49,6 +49,20 @@ export const CommunityModule: React.FC<CommunityModuleProps> = ({
   // Approved rooms in local storage version
   const [approvedRoomsVersion, setApprovedRoomsVersion] = useState(0);
 
+  // Sync with global storage events
+  useEffect(() => {
+    const handleStorageUpdate = () => {
+      const pending = loadCommunityRequests().filter((r) => r.status === 'pending').length;
+      setCommunityRequestsCount(pending);
+      setApprovedRoomsVersion((v) => v + 1);
+    };
+
+    window.addEventListener('kounkour_community_requests_updated', handleStorageUpdate);
+    return () => {
+      window.removeEventListener('kounkour_community_requests_updated', handleStorageUpdate);
+    };
+  }, []);
+
   // Community rooms state
   const [rooms, setRooms] = useState<ContestCommunityRoom[]>(() => {
     if (initialContestId) {
@@ -1194,16 +1208,20 @@ export const CommunityModule: React.FC<CommunityModuleProps> = ({
 
               <div>
                 <label className="font-bold text-[#242126] block mb-1">
-                  {language === 'fr' ? 'Motif ou référence de convocation au concours :' : 'سبب الترشح أو رقم الاستدعاء :'}
+                  {language === 'fr' ? 'Motif ou référence de convocation au concours (facultatif) :' : 'سبب الترشح أو رقم الاستدعاء (اختياري) :'}
                 </label>
                 <textarea
                   rows={3}
                   value={joinReason}
                   onChange={(e) => setJoinReason(e.target.value)}
-                  placeholder={language === 'fr' ? 'Ex: Convoqué pour l’épreuve orale du concours, Spécialité Génie Civil...' : 'مثال: مدعو للاختبار الشفوي، تخصص الهندسة المدنية...'}
+                  placeholder={language === 'fr' ? 'Ex: Convoqué pour l’épreuve du concours, Spécialité Gestion / Droit / Informatique...' : 'مثال: مدعو لاجتياز المباراة، تخصص التدبير / القانون / المعلوميات...'}
                   className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl p-3 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B]"
-                  required
                 />
+                <span className="text-[10px] text-gray-400 mt-1 block">
+                  {language === 'fr' 
+                    ? 'Votre demande sera transmise en temps réel au panneau d’administration.' 
+                    : 'سيتم إرسال طلبك مباشرة إلى لوحة تحكم المشرف للموافقة.'}
+                </span>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">

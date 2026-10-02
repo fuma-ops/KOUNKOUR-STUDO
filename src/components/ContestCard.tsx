@@ -198,8 +198,8 @@ export const ContestCard: React.FC<ContestCardProps> = ({
           {contest.specialty && contest.specialty[language] && !contest.specialty[language].toLowerCase().includes('mentionn') && (
             <div className="mb-3">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#8D174B]/8 text-[#8D174B] border border-[#8D174B]/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#8D174B]"></span>
-                <span className="truncate max-w-[280px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#8D174B] shrink-0"></span>
+                <span className="whitespace-normal break-words">
                   {language === 'fr' ? 'Spécialité : ' : 'التخصص : '}
                   {contest.specialty[language]}
                 </span>

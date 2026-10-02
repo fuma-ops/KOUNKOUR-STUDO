@@ -48,6 +48,12 @@ const INITIAL_REQUESTS: CommunityAccessRequest[] = [
   },
 ];
 
+function notifyStorageChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kounkour_community_requests_updated'));
+  }
+}
+
 export function loadCommunityRequests(): CommunityAccessRequest[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_REQUESTS);
@@ -64,6 +70,7 @@ export function loadCommunityRequests(): CommunityAccessRequest[] {
 export function saveCommunityRequests(requests: CommunityAccessRequest[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_REQUESTS, JSON.stringify(requests));
+    notifyStorageChange();
   } catch (e) {
     console.warn('Could not save community requests', e);
   }
@@ -85,9 +92,9 @@ export function createCommunityRequest(
     roomId,
     roomName,
     userName: userName || 'Candidat_Maroc',
-    userEmail,
+    userEmail: userEmail || 'candidat@kounkour.ma',
     userRole: userRole || 'Candidat Concours',
-    reason: reason.trim(),
+    reason: (reason || '').trim() || 'Demande d’accès pour la préparation du concours',
     status: 'pending',
     createdAt: 'À l’instant',
   };
@@ -120,6 +127,7 @@ export function approveCommunityRequest(requestId: string): CommunityAccessReque
     saveApprovedRooms(approvedRooms);
   }
 
+  notifyStorageChange();
   return req;
 }
 
@@ -136,6 +144,7 @@ export function rejectCommunityRequest(requestId: string): CommunityAccessReques
   const approvedRooms = loadApprovedRooms().filter((id) => id !== req.roomId);
   saveApprovedRooms(approvedRooms);
 
+  notifyStorageChange();
   return req;
 }
 
@@ -151,6 +160,7 @@ export function loadApprovedRooms(): string[] {
 export function saveApprovedRooms(rooms: string[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_APPROVED_ROOMS, JSON.stringify(rooms));
+    notifyStorageChange();
   } catch (e) {
     console.warn('Could not save approved rooms', e);
   }
@@ -160,3 +170,4 @@ export function isUserApprovedForRoom(roomId: string): boolean {
   const approved = loadApprovedRooms();
   return approved.includes(roomId);
 }
+

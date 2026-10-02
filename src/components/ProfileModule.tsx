@@ -554,88 +554,104 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
             <div>
               <strong className="font-bold block text-sm mb-0.5">
                 {language === 'fr' 
-                  ? `Concours correspondants à votre profil (${profile.degreeLevel} • ${profile.specialty} • ${profile.age} ans)` 
-                  : `المباريات المطابقة لمؤهلاتك (${profile.degreeLevel} • ${profile.specialty} • ${profile.age} سنة)`}
+                  ? `Concours correspondants à votre profil (${profile.degreeLevel || 'Diplôme'} • ${profile.specialty || 'Spécialité'} • ${profile.age || '-'} ans)` 
+                  : `المباريات المطابقة لمؤهلاتك (${profile.degreeLevel || 'الدبلوم'} • ${profile.specialty || 'التخصص'} • ${profile.age || '-'} سنة)`}
               </strong>
               <p className="text-[#6E6773]">
                 {language === 'fr' 
-                  ? 'Le moteur compare automatiquement votre diplôme, votre spécialité et votre âge avec les conditions officielles publiées.'
-                  : 'يقوم النظام بمقارنة مستواك الدراسي وتخصصك وسنك تلقائياً مع الشروط الرسمية لكل مباراة.'}
+                  ? 'Affichage exclusif des concours où votre diplôme, spécialité et âge remplissent 100% des conditions officielles d’accès.'
+                  : 'عرض حصري للمباريات التي تطابق فيها مؤهلاتك شروط الترشيح بنسبة 100%.'}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {allContests
+          {(() => {
+            const onlyEligibleList = allContests
               .map((c) => ({ c, elig: checkEligibility(c, profile) }))
-              .sort(
-                (a, b) =>
-                  ({ eligible: 0, verify: 1, not_eligible: 2 })[a.elig.verdict] -
-                  ({ eligible: 0, verify: 1, not_eligible: 2 })[b.elig.verdict]
-              )
-              .map(({ c, elig }) => {
+              .filter(({ elig }) => elig.isEligible)
+              .sort((a, b) => (b.elig.score || 0) - (a.elig.score || 0));
+
+            if (onlyEligibleList.length === 0) {
               return (
-                <div
-                  key={c.id}
-                  onClick={() => onSelectContest(c)}
-                  className={`bg-white border rounded-2xl p-5 shadow-xs transition-all cursor-pointer flex flex-col justify-between ${
-                    elig.isHighMatch
-                      ? 'border-emerald-300 ring-2 ring-emerald-500/10'
-                      : elig.isEligible
-                      ? 'border-[#F1E5EC] hover:border-[#8D174B]/30'
-                      : 'border-rose-200/80 opacity-75'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-[10px] font-bold text-[#8D174B] uppercase">
-                        {c.administration.name[language]}
-                      </span>
-
-                      {elig.isHighMatch ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          {language === 'fr' ? 'Match Parfait 100%' : 'مطابقة تامة 100%'}
-                        </span>
-                      ) : elig.isEligible ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                          {language === 'fr' ? 'Éligible' : 'مؤهل'}
-                        </span>
-                      ) : elig.verdict === 'verify' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full">
-                          {language === 'fr' ? 'À vérifier' : 'يُتحقق منه'}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full">
-                          <AlertCircle className="w-3 h-3 text-rose-600" />
-                          {language === 'fr' ? 'Critères non remplis' : 'شروط غير مستوفاة'}
-                        </span>
-                      )}
-                    </div>
-
-                    <h4 className="text-sm font-bold text-[#242126] mb-2 line-clamp-2">
-                      {c.title[language]}
-                    </h4>
-
-                    {/* Reasons breakdown */}
-                    <div className="space-y-1 mb-3">
-                      {elig.reasons.map((r, i) => (
-                        <p key={i} className="text-[11px] text-[#6E6773] flex items-start gap-1.5">
-                          <span className={elig.isEligible ? 'text-emerald-600 font-bold' : 'text-rose-500 font-bold'}>•</span>
-                          <span>{r[language]}</span>
-                        </p>
-                      ))}
-                    </div>
+                <div className="bg-white border border-[#F1E5EC] rounded-3xl p-8 text-center space-y-4 shadow-xs">
+                  <div className="w-14 h-14 rounded-2xl bg-[#FAF0F5] text-[#8D174B] flex items-center justify-center mx-auto">
+                    <Sparkles className="w-7 h-7" />
                   </div>
-
-                  <div className="pt-3 border-t border-[#F1E5EC] flex items-center justify-between text-xs text-[#6E6773]">
-                    <span>{c.degreeLevel} • {c.postsCount} {t.contests.posts}</span>
-                    <span className="text-[#8D174B] font-bold">{c.deadlineDate}</span>
+                  <div className="max-w-md mx-auto space-y-1">
+                    <h4 className="text-base font-extrabold text-[#242126]">
+                      {language === 'fr' 
+                        ? 'Aucun concours ouvert 100% éligible actuellement' 
+                        : 'لا توجد مباريات مفتوحة مطابقة لملفك حالياً'}
+                    </h4>
+                    <p className="text-xs text-[#6E6773] leading-relaxed">
+                      {language === 'fr'
+                        ? 'Assurez-vous que votre niveau de diplôme, spécialité exacte et âge sont bien renseignés dans votre profil, ou consultez l’ensemble des concours ouverts.'
+                        : 'تأكد من إدخال الدبلوم والتخصص والسن بدقة في ملفك الشخصي، أو تصفح جميع المباريات المفتوحة.'}
+                    </p>
+                  </div>
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      onClick={() => setActiveProfileTab('profile')}
+                      className="px-4 py-2.5 rounded-2xl bg-[#8D174B] text-white font-extrabold text-xs hover:bg-[#70113B] transition-all cursor-pointer"
+                    >
+                      {language === 'fr' ? 'Compléter / Modifier mon profil' : 'تحديث بيانات ملفي الشخصي'}
+                    </button>
                   </div>
                 </div>
               );
-            })}
-          </div>
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {onlyEligibleList.map(({ c, elig }) => (
+                  <div
+                    key={c.id}
+                    onClick={() => onSelectContest(c)}
+                    className="bg-white border border-emerald-200/80 hover:border-[#8D174B]/40 rounded-2xl p-5 shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-[10px] font-bold text-[#8D174B] uppercase">
+                          {c.administration.name[language]}
+                        </span>
+
+                        {elig.isHighMatch ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            {language === 'fr' ? `🎯 ${elig.score}% Match Parfait` : `🎯 ${elig.score}% مطابقة تامة`}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            {language === 'fr' ? `✅ ${elig.score}% Éligible` : `✅ ${elig.score}% مؤهل`}
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 className="text-sm font-bold text-[#242126] group-hover:text-[#8D174B] transition-colors mb-2 line-clamp-2">
+                        {c.title[language]}
+                      </h4>
+
+                      {/* Reasons breakdown */}
+                      <div className="space-y-1 mb-3">
+                        {elig.reasons.map((r, i) => (
+                          <p key={i} className="text-[11px] text-[#4A4250] flex items-start gap-1.5">
+                            <span className="text-emerald-600 font-bold">•</span>
+                            <span>{r[language]}</span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-[#F1E5EC] flex items-center justify-between text-xs text-[#6E6773]">
+                      <span>{c.degreeLevel} • {c.postsCount} {t.contests.posts}</span>
+                      <span className="text-[#8D174B] font-bold">{c.deadlineDate}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 

@@ -1,14 +1,12 @@
 import React from 'react';
-import { Language, ContestCategory } from '../types';
+import { Language } from '../types';
 import { translations } from '../i18n/translations';
-import { Search, ArrowRight, ArrowLeft, FileText, BookOpen, Users, Sparkles } from 'lucide-react';
+import { Search, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface HeroBannerProps {
   language: Language;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  selectedSector: string;
-  setSelectedSector: (sector: string) => void;
   onSearchSubmit: () => void;
 }
 
@@ -16,24 +14,11 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   language,
   searchQuery,
   setSearchQuery,
-  selectedSector,
-  setSelectedSector,
   onSearchSubmit,
 }) => {
   const t = translations[language];
   const isRTL = language === 'ar';
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
-
-  const sectors: { id: string; label: string }[] = [
-    { id: 'all', label: t.sectors.all },
-    { id: 'administration', label: t.sectors.administration },
-    { id: 'education', label: t.sectors.education },
-    { id: 'sante', label: t.sectors.sante },
-    { id: 'finances', label: t.sectors.finances },
-    { id: 'securite', label: t.sectors.securite },
-    { id: 'collectivites', label: t.sectors.collectivites },
-    { id: 'autres', label: t.sectors.autres },
-  ];
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -42,120 +27,85 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   };
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-[#FDF2F7] via-[#FFFDFE] to-white border-b border-[#F1E5EC] py-6 sm:py-10 px-4">
+    <div className="relative w-full px-3 sm:px-6 pt-2 pb-4 sm:pt-4 sm:pb-6">
       <div className="max-w-6xl mx-auto">
-        
-        {/* Real Moroccan Photographic Hero Card (matching Screenshot 02) */}
-        <div className="relative rounded-3xl overflow-hidden shadow-xl border border-[#8D174B]/20 mb-8 min-h-[360px] sm:min-h-[420px] flex items-center">
-          {/* Real Photo Background */}
+        {/* Moroccan Architectural Hero Card matching Reference Image 1 */}
+        <div className="relative rounded-3xl sm:rounded-[32px] overflow-hidden min-h-[380px] sm:min-h-[440px] flex flex-col justify-end p-5 sm:p-10 shadow-xl border border-[#8D174B]/15">
+          
+          {/* Real Moroccan Photo Backdrop (Palace & Minaret) */}
           <img
             src="/images/morocco_hero.jpg"
             alt="Moroccan architecture palace at sunrise"
-            referrerPolicy="no-referrer"
-            className="absolute inset-0 w-full h-full object-cover object-center"
+            className="absolute inset-0 w-full h-full object-cover object-center scale-100"
           />
 
-          {/* Warm Moroccan Sunrise Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#8D174B]/95 via-[#8D174B]/80 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#4A0E2E]/90 via-transparent to-transparent" />
+          {/* Warm Moroccan Sunrise & Deep Burgundy Vignette Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1F0714]/95 via-[#1F0714]/60 to-[#1F0714]/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#8D174B]/40 via-transparent to-transparent pointer-events-none" />
 
-          {/* Hero Content on top of real photograph */}
-          <div className="relative z-10 p-6 sm:p-10 md:p-12 max-w-2xl text-white">
-            {/* Main Headline */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3 drop-shadow-sm">
+          {/* Moroccan subtle geometric watermark */}
+          <div 
+            className="absolute inset-0 opacity-[0.08] pointer-events-none"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='48' height='48' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='0.9'%3E%3Cpath d='M24 0 L29 19 L48 24 L29 29 L24 48 L19 29 L0 24 L19 19 Z'/%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: '36px 36px',
+            }}
+          />
+
+          {/* Content Overlay */}
+          <div className="relative z-10 max-w-xl text-white space-y-3 sm:space-y-4">
+            
+            {/* Title */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.15] text-white drop-shadow-md">
               {language === 'fr' ? (
                 <>
-                  Trouvez les <span className="text-rose-300 underline decoration-rose-400/60 decoration-wavy decoration-2">concours</span> qui vous correspondent
+                  <span className="text-rose-300">Votre avenir</span> commence ici.
                 </>
               ) : (
                 <>
-                  اعثر على <span className="text-rose-300">المباريات</span> التي تناسب مؤهلاتك
+                  <span className="text-rose-300">مستقبلك المهني</span> يبدأ هنا.
                 </>
               )}
             </h1>
 
             {/* Subtitle */}
-            <p className="text-xs sm:text-base text-rose-100/90 font-medium mb-8 leading-relaxed max-w-xl drop-shadow-xs">
-              {t.heroSubtitle}
+            <p className="text-xs sm:text-sm md:text-base text-rose-100/90 font-medium leading-relaxed drop-shadow-xs max-w-lg">
+              {language === 'fr'
+                ? 'Tous les concours du Maroc au même endroit. Préparez-vous. Suivez vos opportunités.'
+                : 'كافة مباريات التوظيف العمومي بالمغرب في مكان واحد. استعد وتابع فرصك.'}
             </p>
 
-            {/* Central Search Bar */}
-            <div className="relative flex items-center bg-white rounded-2xl shadow-xl p-1.5 max-w-xl text-[#242126] border-2 border-white/40 focus-within:border-[#8D174B] transition-all">
-              <div className="ps-3 pe-2 text-[#8D174B]">
-                <Search className="w-5 h-5 text-[#8D174B]" />
+            {/* Search Card Pill */}
+            <div className="pt-2">
+              <div className="relative flex items-center bg-white/95 backdrop-blur-md rounded-2xl sm:rounded-full p-1.5 shadow-2xl border-2 border-white/80 focus-within:border-[#8D174B] focus-within:bg-white transition-all text-[#242126]">
+                <div className="ps-3.5 pe-2 text-[#8D174B]">
+                  <Search className="w-5 h-5 text-[#8D174B]" />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    language === 'fr'
+                      ? 'Rechercher un concours, une administration, un diplôme...'
+                      : 'البحث عن مباراة، إدارة، دبلوم...'
+                  }
+                  className="flex-1 bg-transparent py-2.5 px-2 text-xs sm:text-sm text-[#242126] placeholder-[#6E6773] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={onSearchSubmit}
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-full bg-[#8D174B] hover:bg-[#70113B] text-white flex items-center justify-center shadow-md shadow-[#8D174B]/30 transition-transform active:scale-95 cursor-pointer shrink-0"
+                  title={t.searchButton}
+                >
+                  <ArrowIcon className="w-5 h-5 stroke-[2.5]" />
+                </button>
               </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={t.searchPlaceholder}
-                className="flex-1 bg-transparent py-2.5 px-2 text-xs sm:text-sm text-[#242126] placeholder-[#6E6773] focus:outline-none"
-              />
-              <button
-                onClick={onSearchSubmit}
-                className="bg-[#8D174B] hover:bg-[#75123E] text-white px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
-              >
-                <span className="hidden sm:inline">{t.searchButton}</span>
-                <ArrowIcon className="w-4 h-4" />
-              </button>
             </div>
 
-            {/* 3 Core Pillars in Hero Overlay */}
-            <div className="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-white/20 text-center">
-              <div className="flex items-center gap-2 text-start">
-                <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-semibold text-white/95 leading-tight">
-                  {language === 'fr' ? 'Documents officiels' : 'الوثائق الرسمية'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 text-start">
-                <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                  <BookOpen className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-semibold text-white/95 leading-tight">
-                  {language === 'fr' ? 'Outils préparation' : 'أدوات الاستعداد'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 text-start">
-                <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                  <Users className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-semibold text-white/95 leading-tight">
-                  {language === 'fr' ? 'Communauté active' : 'مجتمع المترشحين'}
-                </span>
-              </div>
-            </div>
           </div>
         </div>
-
-        {/* Sector Shortcuts */}
-        <div className="flex items-center justify-center flex-wrap gap-2 max-w-4xl mx-auto">
-          {sectors.map((sec) => {
-            const isSelected = selectedSector === sec.id;
-            return (
-              <button
-                key={sec.id}
-                onClick={() => {
-                  setSelectedSector(sec.id);
-                  onSearchSubmit();
-                }}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#8D174B] text-white shadow-md'
-                    : 'bg-white text-[#6E6773] border border-[#F1E5EC] hover:border-[#8D174B]/40 hover:text-[#8D174B]'
-                }`}
-              >
-                {sec.label}
-              </button>
-            );
-          })}
-        </div>
-
       </div>
     </div>
   );
