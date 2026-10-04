@@ -147,6 +147,8 @@ export interface QcmSet {
   concoursLabel?: string | null;
   examYear?: number | null;
   sourceNote?: string | null;
+  /** Dossier de préparation (un par concours). */
+  folderSlug?: string | null;
 }
 
 export interface CommunityComment {

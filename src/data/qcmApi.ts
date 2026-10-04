@@ -1,6 +1,37 @@
 import { getSupabase } from '../lib/supabase';
 import { QcmSet } from '../types';
 
+export interface QcmFolder {
+  slug: string;
+  title: { fr: string; ar: string };
+  organization: string;
+  description: { fr: string; ar: string };
+  position: number;
+}
+
+// Repli si la base est injoignable (mêmes dossiers que dans Supabase).
+export const FALLBACK_FOLDERS: QcmFolder[] = [
+  { slug: 'dgsn-gardiens-de-la-paix', title: { fr: 'Gardiens de la paix', ar: 'حراس الأمن' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Gardiens de la paix.', ar: 'نماذج وتمارين لمباراة حراس الأمن.' }, position: 10 },
+  { slug: 'dgsn-inspecteurs-de-police', title: { fr: 'Inspecteurs de police', ar: 'مفتشو الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Inspecteurs de police.', ar: 'نماذج وتمارين لمباراة مفتشي الشرطة.' }, position: 20 },
+  { slug: 'dgsn-officiers-de-police', title: { fr: 'Officiers de police', ar: 'ضباط الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Officiers de police.', ar: 'نماذج وتمارين لمباراة ضباط الشرطة.' }, position: 30 },
+  { slug: 'dgsn-commissaires-de-police', title: { fr: 'Commissaires de police', ar: 'عمداء الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Commissaires de police.', ar: 'نماذج وتمارين لمباراة عمداء الشرطة.' }, position: 40 },
+  { slug: 'dgsn-concours-non-precise', title: { fr: 'DGSN — sujets à identifier', ar: 'الأمن الوطني — مواضيع غير محددة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Sujets réels de la DGSN dont le concours exact n’est pas indiqué sur la copie.', ar: 'مواضيع حقيقية للأمن الوطني لم يُحدَّد نوع مباراتها.' }, position: 90 },
+];
+
+export async function fetchQcmFolders(): Promise<QcmFolder[]> {
+  const sb = getSupabase();
+  if (!sb) return FALLBACK_FOLDERS;
+  const { data, error } = await sb.from('qcm_folders').select('*').eq('status', 'published').order('position');
+  if (error || !data || data.length === 0) return FALLBACK_FOLDERS;
+  return data.map((f: any) => ({
+    slug: f.slug,
+    title: { fr: f.title_fr, ar: f.title_ar || f.title_fr },
+    organization: f.organization || '',
+    description: { fr: f.description_fr || '', ar: f.description_ar || f.description_fr || '' },
+    position: f.position,
+  }));
+}
+
 // QCM stockés dans Supabase (annales réelles transcrites mot pour mot).
 // Les RLS ne renvoient au public que les QCM publiés et les questions validées.
 
@@ -14,7 +45,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, duration_minutes, difficulty, position, qcm_questions(id, position, source_number, question, options, correct_index, explanation, explanation_source)')
+    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, duration_minutes, difficulty, position, qcm_questions(id, position, source_number, question, options, correct_index, explanation, explanation_source)')
     .eq('status', 'published')
     .order('position', { ascending: true });
   if (error || !data) return [];
@@ -51,7 +82,153 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
         concoursLabel: s.concours_label,
         examYear: s.exam_year,
         sourceNote: s.source_note,
+        folderSlug: s.folder_slug,
       } as QcmSet;
     })
     .filter((s) => s.questions.length > 0);
+}
+
+// ─── Progression du candidat (par support) ───────────────────────────────────
+// Connecté : table qcm_progress (synchronisée entre appareils). Sinon : navigateur.
+
+export interface QcmProgress {
+  setKey: string;
+  seen: string[];
+  total: number;
+  bestScore: number | null;
+  lastScore: number | null;
+  attempts: number;
+  updatedAt: string;
+}
+
+const LOCAL_KEY = 'kounkour_qcm_progress_v1';
+
+function readLocal(): Record<string, QcmProgress> {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocal(map: Record<string, QcmProgress>) {
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(map));
+  } catch {
+    /* stockage indisponible : la progression reste en mémoire pour la session */
+  }
+}
+
+async function currentUserId(): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data } = await sb.auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
+function maxNullable(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.max(a, b);
+}
+
+export function mergeProgress(a: QcmProgress | undefined, b: QcmProgress | undefined): QcmProgress | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const newer = a.updatedAt >= b.updatedAt ? a : b;
+  return {
+    setKey: a.setKey,
+    seen: [...new Set([...a.seen, ...b.seen])],
+    total: Math.max(a.total, b.total),
+    bestScore: maxNullable(a.bestScore, b.bestScore),
+    lastScore: newer.lastScore,
+    attempts: Math.max(a.attempts, b.attempts),
+    updatedAt: newer.updatedAt,
+  };
+}
+
+function toRow(p: QcmProgress) {
+  return {
+    set_key: p.setKey,
+    seen_keys: p.seen,
+    total_questions: p.total,
+    best_score: p.bestScore,
+    last_score: p.lastScore,
+    attempts: p.attempts,
+    updated_at: p.updatedAt,
+  };
+}
+
+export async function loadQcmProgress(): Promise<Record<string, QcmProgress>> {
+  const local = readLocal();
+  const uid = await currentUserId();
+  const sb = getSupabase();
+  if (!uid || !sb) return local;
+  const { data, error } = await sb.from('qcm_progress').select('*').eq('user_id', uid);
+  if (error) return local;
+  const merged: Record<string, QcmProgress> = {};
+  const remote: Record<string, QcmProgress> = {};
+  for (const r of data || []) {
+    remote[r.set_key] = {
+      setKey: r.set_key,
+      seen: r.seen_keys || [],
+      total: r.total_questions,
+      bestScore: r.best_score,
+      lastScore: r.last_score,
+      attempts: r.attempts,
+      updatedAt: r.updated_at,
+    };
+  }
+  for (const key of new Set([...Object.keys(local), ...Object.keys(remote)])) {
+    merged[key] = mergeProgress(local[key], remote[key]) as QcmProgress;
+  }
+  // Ce qui a été fait hors connexion est rattaché au compte.
+  const toPush = Object.values(merged).filter((p) => {
+    const r = remote[p.setKey];
+    return !r || r.seen.length !== p.seen.length || r.bestScore !== p.bestScore || r.attempts !== p.attempts;
+  });
+  if (toPush.length) {
+    await sb.from('qcm_progress').upsert(toPush.map((p) => ({ ...toRow(p), user_id: uid })), { onConflict: 'user_id,set_key' });
+  }
+  writeLocal(merged);
+  return merged;
+}
+
+// Enregistre des questions vues et/ou un score ; renvoie la progression à jour.
+export async function recordQcmProgress(
+  prev: QcmProgress | undefined,
+  setKey: string,
+  total: number,
+  update: { seen?: string[]; score?: number }
+): Promise<QcmProgress> {
+  // Base = fusion de l'état connu et du dernier état enregistré (évite d'écraser
+  // une sauvegarde précédente quand le candidat enchaîne vite les questions).
+  const local = readLocal();
+  const base: QcmProgress = mergeProgress(prev, local[setKey]) || { setKey, seen: [], total, bestScore: null, lastScore: null, attempts: 0, updatedAt: new Date(0).toISOString() };
+  const next: QcmProgress = {
+    ...base,
+    total,
+    seen: update.seen ? [...new Set([...base.seen, ...update.seen])] : base.seen,
+    bestScore: update.score !== undefined ? maxNullable(base.bestScore, update.score) : base.bestScore,
+    lastScore: update.score !== undefined ? update.score : base.lastScore,
+    attempts: update.score !== undefined ? base.attempts + 1 : base.attempts,
+    updatedAt: new Date().toISOString(),
+  };
+  local[setKey] = next;
+  writeLocal(local);
+  const uid = await currentUserId();
+  const sb = getSupabase();
+  if (uid && sb) {
+    await sb.from('qcm_progress').upsert({ ...toRow(next), user_id: uid }, { onConflict: 'user_id,set_key' });
+  }
+  return next;
+}
+
+// Questions réellement vues parmi celles du support actuel (ignore les questions retirées).
+export function seenCount(p: QcmProgress | undefined, questionIds: string[]): number {
+  if (!p) return 0;
+  const seen = new Set(p.seen);
+  return questionIds.filter((id) => seen.has(id)).length;
 }
