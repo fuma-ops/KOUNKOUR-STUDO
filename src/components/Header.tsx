@@ -1,7 +1,7 @@
 import React from 'react';
 import { Language } from '../types';
 import { translations } from '../i18n/translations';
-import { Bell, Bookmark, Globe, LogIn, LogOut } from 'lucide-react';
+import { Bell, Bookmark, Crown, Globe, LogIn, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   language: Language;
@@ -58,7 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-xl font-bold tracking-tight text-[#8D174B]">Koun<span className="text-[#C73578]">Kour</span></span>
-              <span className="text-xs px-1.5 py-0.5 rounded bg-[#FDF2F7] text-[#8D174B] font-semibold border border-[#8D174B]/15">Maroc</span>
+              <span className="hidden sm:inline text-xs px-1.5 py-0.5 rounded bg-[#FDF2F7] text-[#8D174B] font-semibold border border-[#8D174B]/15">Maroc</span>
             </div>
             <p className="text-[10px] text-[#6E6773] font-medium leading-tight hidden sm:block">
               {t.tagline}
@@ -88,6 +88,21 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right actions: Language Switcher, Saved, Notification, Profile */}
         <div className="flex items-center gap-2">
+          {/* Accès au tableau de bord admin sur téléphone (sur ordinateur : lien « 👑 Admin » du menu). */}
+          {isAuthed && isStaff && (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+                activeTab === 'admin' ? 'bg-[#70113B] text-white' : 'bg-[#8D174B] hover:bg-[#70113B] text-white shadow-sm'
+              }`}
+              title={language === 'fr' ? 'Tableau de bord admin' : 'لوحة الإدارة'}
+              aria-label={language === 'fr' ? 'Tableau de bord admin' : 'لوحة الإدارة'}
+            >
+              <Crown className="w-3.5 h-3.5" />
+              <span className="hidden min-[400px]:inline">{language === 'fr' ? 'Admin' : 'الإدارة'}</span>
+            </button>
+          )}
+
           {/* Language Toggle Button */}
           <button
             onClick={() => onLanguageChange(language === 'fr' ? 'ar' : 'fr')}
@@ -102,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
           {isAuthed && (
             <button
               onClick={() => setActiveTab('profile')}
-              className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors"
+              className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors hidden sm:block"
               title={t.profile.savedContests}
             >
               <Bookmark className="w-4 h-4" />
@@ -118,11 +133,11 @@ export const Header: React.FC<HeaderProps> = ({
           {isAuthed && (
             <button
               onClick={() => setActiveTab('profile')}
-              className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors"
+              className="relative p-2 rounded-lg text-[#6E6773] hover:text-[#8D174B] hover:bg-[#FDF2F7] transition-colors hidden sm:block"
               title="Notifications"
             >
+              {/* Pas de pastille tant qu'il n'existe pas de vraies notifications (cahier §0). */}
               <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-[#C73578] rounded-full"></span>
             </button>
           )}
 
