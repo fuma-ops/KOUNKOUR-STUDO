@@ -45,7 +45,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, duration_minutes, difficulty, position, qcm_questions(id, position, source_number, question, options, correct_index, explanation, explanation_source)')
+    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, duration_minutes, difficulty, position, qcm_questions(id, position, source_number, question, options)')
     .eq('status', 'published')
     .order('position', { ascending: true });
   if (error || !data) return [];
@@ -61,9 +61,10 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
             number: q.source_number ?? idx + 1,
             text: { fr: q.question, ar: q.question },
             options,
-            correctOptionId: `${q.id}-${q.correct_index}`,
-            explanation: { fr: q.explanation || '', ar: q.explanation || '' },
-            source: q.explanation_source || '',
+            // Cahier §8 : la bonne réponse n'est pas envoyée avant soumission (voir submitQcm).
+            correctOptionId: '',
+            explanation: { fr: '', ar: '' },
+            source: '',
           };
         });
       return {
@@ -83,9 +84,38 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
         examYear: s.exam_year,
         sourceNote: s.source_note,
         folderSlug: s.folder_slug,
+        serverGraded: true,
       } as QcmSet;
     })
     .filter((s) => s.questions.length > 0);
+}
+
+export interface QcmCorrection {
+  correctOptionId: string;
+  explanation: string;
+  source: string;
+}
+
+// Soumet la copie : la correction est calculée et renvoyée par le serveur.
+export async function submitQcm(setId: string, answers: Record<string, string>): Promise<Record<string, QcmCorrection> | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const payload: Record<string, number> = {};
+  for (const [qid, optionId] of Object.entries(answers)) {
+    const idx = Number(optionId.slice(optionId.lastIndexOf('-') + 1));
+    if (Number.isInteger(idx)) payload[qid] = idx;
+  }
+  const { data, error } = await sb.rpc('qcm_submit', { p_set_id: setId, p_answers: payload });
+  if (error || !data) return null;
+  const out: Record<string, QcmCorrection> = {};
+  for (const r of data as any[]) {
+    out[r.question_id] = {
+      correctOptionId: `${r.question_id}-${r.correct_index}`,
+      explanation: r.explanation || '',
+      source: r.explanation_source || '',
+    };
+  }
+  return out;
 }
 
 // ─── Progression du candidat (par support) ───────────────────────────────────

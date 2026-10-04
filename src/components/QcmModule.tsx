@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { mockQcmSets } from '../data/mockQcm';
-import { FALLBACK_FOLDERS, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, seenCount } from '../data/qcmApi';
+import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, seenCount, submitQcm } from '../data/qcmApi';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
   ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy
@@ -52,6 +52,10 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
+  // Correction renvoyée par le serveur après soumission (annales stockées en base).
+  const [corrections, setCorrections] = useState<Record<string, QcmCorrection> | null>(null);
+  const [grading, setGrading] = useState(false);
+  const [gradeError, setGradeError] = useState(false);
 
   // Supports : annales réelles (Supabase) puis entraînement KounKour, rangés par dossier.
   const [realSets, setRealSets] = useState<QcmSet[]>([]);
@@ -123,6 +127,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
     setUserAnswers(resuming ? readDraft(set.id) : {});
     setIsSubmitted(false);
     setTimerSeconds(0);
+    setCorrections(null);
+    setGradeError(false);
   };
 
   const handleSelectOption = (questionId: string, optionId: string) => {
@@ -134,22 +140,33 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
     });
   };
 
-  const handleSubmit = () => {
+  const correctionOf = (q: QcmSet['questions'][number]): QcmCorrection => {
+    if (selectedSet?.serverGraded) return corrections?.[q.id] ?? { correctOptionId: '', explanation: '', source: '' };
+    return { correctOptionId: q.correctOptionId, explanation: q.explanation[language], source: q.source || '' };
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedSet || grading) return;
+    let corr: Record<string, QcmCorrection> | null = null;
+    if (selectedSet.serverGraded) {
+      setGrading(true);
+      setGradeError(false);
+      corr = await submitQcm(selectedSet.id, userAnswers);
+      setGrading(false);
+      if (!corr) {
+        setGradeError(true);
+        return;
+      }
+    }
+    setCorrections(corr);
+    const score = selectedSet.questions.filter((q) => {
+      const right = selectedSet.serverGraded ? corr?.[q.id]?.correctOptionId : q.correctOptionId;
+      return !!right && userAnswers[q.id] === right;
+    }).length;
     setIsSubmitted(true);
-    if (selectedSet && onRecordScore) {
-      let score = 0;
-      selectedSet.questions.forEach((q) => {
-        if (userAnswers[q.id] === q.correctOptionId) {
-          score += 1;
-        }
-      });
-      onRecordScore(selectedSet.id, score, selectedSet.questions.length);
-    }
-    if (selectedSet) {
-      const score = selectedSet.questions.filter((q) => userAnswers[q.id] === q.correctOptionId).length;
-      saveProgress(selectedSet, { score });
-      writeDraft(selectedSet.id, null);
-    }
+    onRecordScore?.(selectedSet.id, score, selectedSet.questions.length);
+    saveProgress(selectedSet, { score });
+    writeDraft(selectedSet.id, null);
   };
 
   const formatTime = (totalSeconds: number) => {
@@ -359,7 +376,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
   let score = 0;
   if (isSubmitted) {
     selectedSet.questions.forEach((q) => {
-      if (userAnswers[q.id] === q.correctOptionId) score += 1;
+      const right = correctionOf(q).correctOptionId;
+      if (right && userAnswers[q.id] === right) score += 1;
     });
   }
 
@@ -433,7 +451,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
 
             {selectedSet.questions.map((q, idx) => {
               const userChoice = userAnswers[q.id];
-              const isCorrect = userChoice === q.correctOptionId;
+              const corr = correctionOf(q);
+              const isCorrect = !!corr.correctOptionId && userChoice === corr.correctOptionId;
 
               return (
                 <div key={q.id} dir={contentDir(selectedSet)} className="bg-white border border-[#F1E5EC] rounded-2xl p-5 shadow-xs">
@@ -460,7 +479,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
                   <div className="space-y-2 mb-4">
                     {q.options.map((opt) => {
                       const isUserChoice = userChoice === opt.id;
-                      const isRealCorrect = opt.id === q.correctOptionId;
+                      const isRealCorrect = opt.id === corr.correctOptionId;
 
                       let style = 'bg-[#F8F2F5] text-[#242126] border-transparent';
                       if (isRealCorrect) {
@@ -484,8 +503,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
                     <strong className="block text-[#8D174B] font-bold mb-1">
                       {t.preparation.explanation}
                     </strong>
-                    <p className="text-[#6E6773] leading-relaxed mb-1.5">{q.explanation[language]}</p>
-                    {q.source && <span className="text-[10px] text-[#6E6773] italic">Source : {q.source}</span>}
+                    <p className="text-[#6E6773] leading-relaxed mb-1.5">{corr.explanation}</p>
+                    {corr.source && <span className="text-[10px] text-[#6E6773] italic">Source : {corr.source}</span>}
                   </div>
                 </div>
               );
@@ -557,12 +576,20 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
                 <NextIcon className="w-4 h-4" />
               </button>
             ) : (
-              <button
-                onClick={handleSubmit}
-                className="px-6 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold shadow-xs cursor-pointer"
-              >
-                {t.preparation.finishQcm}
-              </button>
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  onClick={handleSubmit}
+                  disabled={grading}
+                  className="px-6 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold shadow-xs cursor-pointer active:scale-95 disabled:opacity-60"
+                >
+                  {grading ? (fr ? 'Correction…' : 'جارٍ التصحيح…') : t.preparation.finishQcm}
+                </button>
+                {gradeError && (
+                  <span className="text-[11px] text-rose-700">
+                    {fr ? 'Correction indisponible (connexion). Réessayez.' : 'تعذر التصحيح (الاتصال). أعد المحاولة.'}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -149,6 +149,8 @@ export interface QcmSet {
   sourceNote?: string | null;
   /** Dossier de préparation (un par concours). */
   folderSlug?: string | null;
+  // Correction calculée par le serveur (les bonnes réponses ne sont pas dans le chargement).
+  serverGraded?: boolean;
 }
 
 export interface CommunityComment {
