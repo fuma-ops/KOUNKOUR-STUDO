@@ -400,6 +400,8 @@ export default function App() {
           setContestsVersion((v) => v + 1);
         }}
         onDeleteContest={handleDeleteContest}
+        userEmail={session.user?.email ?? null}
+        userRole={session.role}
       />
     );
   }
