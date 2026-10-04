@@ -51,6 +51,11 @@ function mapRow(row: any): Contest {
   // Lire toutes les lignes de spécialité depuis contest_criteria
   const criteria = Array.isArray(row.contest_criteria) ? row.contest_criteria : [];
   const specCrits = criteria.filter((c: any) => c.criterion_type === 'specialite');
+  // Conditions lues dans l'arrêté (vides si l'arrêté n'a pas encore été analysé).
+  const crit = (type: string) => {
+    const c = criteria.find((x: any) => x.criterion_type === type);
+    return { fr: c?.value_fr || '', ar: c?.value_ar || c?.value_fr || '' };
+  };
   const specialtiesList: string[] = specCrits
     .map((c: any) => c.value_fr)
     .filter((v: any) => Boolean(v && !/mentionn|voir l.annonce/i.test(v)));
@@ -110,10 +115,10 @@ function mapRow(row: any): Contest {
       ar: row.summary_ar || '',
     },
     criteria: {
-      nationality: { fr: '', ar: '' },
-      ageLimit: { fr: '', ar: '' },
+      nationality: crit('nationalite'),
+      ageLimit: crit('age'),
       diplomas: row.diploma_fr ? [{ fr: row.diploma_fr, ar: row.diploma_ar || row.diploma_fr }] : [],
-      experience: { fr: '', ar: '' },
+      experience: crit('experience'),
       specialties: specialtiesList.map((s) => ({ fr: s, ar: s })),
     },
     // Épreuves : jamais déduites. Vides tant qu'elles ne sont pas lues dans l'arrêté.

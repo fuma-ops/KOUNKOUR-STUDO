@@ -459,7 +459,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                     {contest.criteria?.ageLimit?.fr?.trim() && (
                       <div className="p-3 bg-[#FAF7F9] rounded-2xl border border-[#F1E5EC]">
                         <span className="text-[10px] font-extrabold uppercase text-gray-400 block mb-0.5">
-                          {language === 'fr' ? 'Limite d’âge légale' : 'السن القانوني'}
+                          {language === 'fr' ? 'Âge (selon l’arrêté)' : 'السن (حسب القرار)'}
                         </span>
                         <strong className="text-xs text-[#242126] font-bold block">
                           {contest.criteria.ageLimit[language] || contest.criteria.ageLimit.fr}
@@ -475,6 +475,18 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                         </span>
                         <strong className="text-xs text-[#242126] font-bold block">
                           {contest.criteria.nationality[language] || contest.criteria.nationality.fr}
+                        </strong>
+                      </div>
+                    )}
+
+                    {/* Expérience (telle qu'écrite dans l'arrêté) */}
+                    {contest.criteria?.experience?.fr?.trim() && (
+                      <div className="p-3 bg-[#FAF7F9] rounded-2xl border border-[#F1E5EC]">
+                        <span className="text-[10px] font-extrabold uppercase text-gray-400 block mb-0.5">
+                          {language === 'fr' ? 'Expérience' : 'الخبرة'}
+                        </span>
+                        <strong className="text-xs text-[#242126] font-bold block">
+                          {contest.criteria.experience[language] || contest.criteria.experience.fr}
                         </strong>
                       </div>
                     )}

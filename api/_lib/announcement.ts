@@ -121,3 +121,17 @@ export function extractAnnouncement(html: string, pageUrl: string): Announcement
 
   return { text, media: media.slice(0, 8) };
 }
+
+// Contenu d'un article lu dans un flux RSS WordPress (balise content:encoded),
+// remis sous forme de page pour réutiliser extractAnnouncement.
+export function extractFromWordpressFeed(xml: string, pageUrl: string): string | null {
+  const $ = cheerio.load(xml, { xml: true });
+  const norm = (u: string) => u.replace(/\/+$/, '').toLowerCase();
+  const items = $('item').toArray();
+  const item = items.find((it) => norm($(it).find('link').first().text().trim()) === norm(pageUrl)) || (items.length === 1 ? items[0] : null);
+  if (!item) return null;
+  const content = $(item).find('content\\:encoded').first().text() || $(item).find('description').first().text();
+  if (!content || content.replace(/<[^>]+>/g, '').trim().length < 20) return null;
+  const title = $(item).find('title').first().text();
+  return `<html><body><article><div class="entry-content"><h1>${title.replace(/</g, '&lt;')}</h1>${content}</div></article></body></html>`;
+}

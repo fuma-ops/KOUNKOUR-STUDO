@@ -14,7 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import { BROWSER_HEADERS } from '../_lib/parsers.ts';
-import { extractAnnouncement } from '../_lib/announcement.ts';
+import { extractAnnouncement, extractFromWordpressFeed } from '../_lib/announcement.ts';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://zcxkxqsqzwtdnrupxlah.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -26,8 +26,39 @@ const MAX_LIMIT = 4;
 const TIME_BUDGET_MS = 40000; // la fonction est limitée à 60 s
 const ALLOWED_HOSTS = /(^|\.)(dreamjob\.ma|emploi-public\.ma|gov\.ma|ac\.ma|ma)$/i;
 
+// Politesse envers dreamjob.ma (cahier §13.1 : délai entre requêtes, pas de contournement).
+const DREAMJOB_HOST = /(^|\.)dreamjob\.ma$/i;
+const DREAMJOB_DELAY_MS = 2500;
+let lastDreamjobAt = 0;
+async function politeWait(url: string) {
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return;
+  }
+  if (!DREAMJOB_HOST.test(host)) return;
+  const wait = lastDreamjobAt + DREAMJOB_DELAY_MS - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastDreamjobAt = Date.now();
+}
+
+// Flux RSS public de WordPress pour un article (?feed=rss2&name=<slug>) :
+// canal prévu pour la lecture automatique, utilisé si la page HTML est refusée.
+async function fetchFromFeed(pageUrl: string): Promise<string | null> {
+  const u = new URL(pageUrl);
+  const slug = u.pathname.split('/').filter(Boolean).pop();
+  if (!slug) return null;
+  const feedUrl = `${u.origin}/?feed=rss2&name=${encodeURIComponent(slug)}`;
+  await politeWait(feedUrl);
+  const r = await fetch(feedUrl, { headers: { ...BROWSER_HEADERS, Accept: 'application/rss+xml,application/xml,text/xml' }, signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return null;
+  return extractFromWordpressFeed(await r.text(), pageUrl);
+}
+
 async function download(url: string): Promise<{ kind: 'image' | 'pdf'; mime: string; bytes: Buffer } | { error: string }> {
   try {
+    await politeWait(url);
     const r = await fetch(url, { headers: { ...BROWSER_HEADERS, Accept: 'image/*,application/pdf,*/*' }, signal: AbortSignal.timeout(15000), redirect: 'follow' });
     if (!r.ok) return { error: `HTTP ${r.status}` };
     const mime = (r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
@@ -87,9 +118,19 @@ export default async function handler(req: any, res: any) {
 
       let html = '';
       try {
-        const r = await fetch(c.source_url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(12000) });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        html = await r.text();
+        // dreamjob : le flux RSS d'abord (canal prévu pour la lecture automatique,
+        // contenu de l'article sans le menu du site), la page en secours.
+        const fromFeed = DREAMJOB_HOST.test(host) ? await fetchFromFeed(c.source_url).catch(() => null) : null;
+        if (fromFeed) {
+          html = fromFeed;
+          report.method = 'flux RSS';
+        } else {
+          await politeWait(c.source_url);
+          const r = await fetch(c.source_url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(12000) });
+          if (!r.ok) throw new Error(`HTTP ${r.status}${DREAMJOB_HOST.test(host) ? ' (flux RSS indisponible aussi)' : ''}`);
+          html = await r.text();
+          report.method = 'page';
+        }
       } catch (e: any) {
         report.errors.push(`page injoignable : ${e?.message || e}`);
         await supabase.from('radar_documents').upsert(
@@ -104,7 +145,7 @@ export default async function handler(req: any, res: any) {
       const { text, media } = extractAnnouncement(html, c.source_url);
       report.pageChars = text.length;
       const docs: any[] = [
-        { candidate_id: c.id, url: c.source_url, kind: 'page', mime: 'text/plain', size_bytes: text.length, sha256: createHash('sha256').update(text).digest('hex'), text_content: text },
+        { candidate_id: c.id, url: c.source_url, kind: 'page', mime: 'text/plain', size_bytes: text.length, sha256: createHash('sha256').update(text).digest('hex'), text_content: text, fetch_error: null },
       ];
       for (const m of media.slice(0, MAX_FILES)) {
         let src = m.url;
@@ -125,6 +166,7 @@ export default async function handler(req: any, res: any) {
             size_bytes: d.bytes.length,
             sha256: createHash('sha256').update(d.bytes).digest('hex'),
             content_b64: d.bytes.toString('base64'),
+            fetch_error: null,
           });
           report.files++;
         }

@@ -1,5 +1,5 @@
 // Tests de l'extraction d'une page d'annonce (texte + fichiers de l'arrêté) : npm run test:announcement
-import { extractAnnouncement, originalWpImage } from '../api/_lib/announcement.ts';
+import { extractAnnouncement, extractFromWordpressFeed, originalWpImage } from '../api/_lib/announcement.ts';
 
 let failed = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -36,6 +36,18 @@ check('PDF de l’avis trouvé', r.media.some((m) => m.kind === 'pdf' && m.url.e
 check('logo, icône, bannière pub exclus', !urls.some((u) => /logo|whatsapp|pub-banner/.test(u)), urls.join(' | '));
 check('miniature WordPress → original', originalWpImage('https://x.ma/a/img-300x200.png?v=2') === 'https://x.ma/a/img.png?v=2');
 check('page sans fichier', extractAnnouncement('<html><body><main><p>Avis de concours pour le recrutement de 3 techniciens spécialisés.</p></main></body></html>', 'https://www.emploi-public.ma/fr/x').media.length === 0);
+
+// Flux RSS WordPress (repli quand la page HTML est refusée)
+const feed = `<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel>
+<item><title>Concours SRM Marrakech – Safi 2026 (321 Postes)</title><link>https://www.dreamjob.ma/emploi-public/concours-srm-marrakech-safi-2026/</link>
+<description><![CDATA[Résumé court]]></description>
+<content:encoded><![CDATA[<p>La SRM-MS recrute 321 postes.</p><p><img width="1024" src="https://www.dreamjob.ma/wp-content/uploads/2026/09/srm-ms-1-724x1024.jpg"></p>]]></content:encoded></item>
+</channel></rss>`;
+const html = extractFromWordpressFeed(feed, 'https://www.dreamjob.ma/emploi-public/concours-srm-marrakech-safi-2026');
+const fromFeed = html ? extractAnnouncement(html, 'https://www.dreamjob.ma/emploi-public/concours-srm-marrakech-safi-2026/') : null;
+check('flux RSS : texte de l’article lu', !!fromFeed && fromFeed.text.includes('321 postes'), fromFeed?.text || 'rien');
+check('flux RSS : image de l’arrêté trouvée', !!fromFeed && fromFeed.media.some((m) => m.url.endsWith('srm-ms-1.jpg')), JSON.stringify(fromFeed?.media));
+check('flux RSS sans l’article demandé', extractFromWordpressFeed(feed.replace('<item>', '<item></item><item>'), 'https://www.dreamjob.ma/autre/') === null);
 
 console.log(failed ? `\n${failed} échec(s)` : '\nTous les tests d’extraction passent.');
 process.exit(failed ? 1 : 0);

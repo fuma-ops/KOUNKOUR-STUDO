@@ -106,7 +106,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
           files += p.files || 0;
           addLog(
             p.errors?.length ? 'warn' : 'success',
-            `[ANALYSE] « ${p.title} » : texte ${p.pageChars ?? 0} car., ${p.files} fichier(s) d’arrêté stocké(s)${p.errors?.length ? ` — ${p.errors.join(' ; ')}` : ''}.`
+            `[ANALYSE] « ${p.title} »${p.method ? ` (${p.method})` : ''} : texte ${p.pageChars ?? 0} car., ${p.files} fichier(s) d’arrêté stocké(s)${p.errors?.length ? ` — ${p.errors.join(' ; ')}` : ''}.`
           );
         }
         setPrepareInfo(language === 'fr' ? `${done} annonce(s) préparée(s), ${data.remaining} restante(s)…` : `${done} إعلان، ${data.remaining} متبقية…`);
