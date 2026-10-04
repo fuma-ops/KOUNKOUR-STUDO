@@ -140,6 +140,13 @@ export interface QcmSet {
   questionsCount: number;
   questions: QcmQuestion[];
   isDemo: boolean;
+  /** « annales » = vrai sujet transcrit ; « entrainement » = questions KounKour. */
+  kind?: 'annales' | 'entrainement';
+  /** Langue du contenu (une annale arabe s'affiche de droite à gauche). */
+  contentLanguage?: 'fr' | 'ar';
+  concoursLabel?: string | null;
+  examYear?: number | null;
+  sourceNote?: string | null;
 }
 
 export interface CommunityComment {

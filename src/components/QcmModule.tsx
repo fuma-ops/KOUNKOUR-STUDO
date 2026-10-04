@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { mockQcmSets } from '../data/mockQcm';
+import { fetchQcmSets } from '../data/qcmApi';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
-  ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle
+  ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck
 } from 'lucide-react';
 
 interface QcmModuleProps {
@@ -23,6 +24,20 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
+
+  // Annales réelles (Supabase) en premier, puis l'entraînement KounKour.
+  const [realSets, setRealSets] = useState<QcmSet[]>([]);
+  const [loadingSets, setLoadingSets] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    fetchQcmSets()
+      .then((sets) => { if (!cancelled) setRealSets(sets); })
+      .finally(() => { if (!cancelled) setLoadingSets(false); });
+    return () => { cancelled = true; };
+  }, []);
+  const allSets: QcmSet[] = [...realSets, ...mockQcmSets.map((m) => ({ ...m, kind: 'entrainement' as const }))];
+  // Une annale en arabe s'affiche de droite à gauche, même dans l'interface en français.
+  const contentDir = (set: QcmSet | null) => (set?.contentLanguage === 'ar' ? 'rtl' : set?.contentLanguage === 'fr' ? 'ltr' : undefined);
 
   // Timer effect when a set is active and not submitted
   useEffect(() => {
@@ -107,24 +122,46 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
           </div>
         </div>
 
+        {loadingSets && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {[0, 1].map((i) => <div key={i} className="h-44 rounded-2xl bg-[#FAF4F7] animate-pulse" />)}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {mockQcmSets.map((set) => (
+          {allSets.map((set) => (
             <div
               key={set.id}
               className="bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3">
-                  <span className="font-semibold text-[#8D174B] bg-[#FDF2F7] px-2.5 py-1 rounded-md">
-                    {t.preparation.categories[set.category]}
-                  </span>
+                <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3 gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {set.kind === 'annales' ? (
+                      <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        {language === 'fr' ? 'Annales réelles' : 'نماذج حقيقية'}
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-[#6E6773] bg-gray-100 px-2.5 py-1 rounded-md">
+                        {language === 'fr' ? 'Entraînement' : 'تدريب'}
+                      </span>
+                    )}
+                    <span className="font-semibold text-[#8D174B] bg-[#FDF2F7] px-2.5 py-1 rounded-md">
+                      {t.preparation.categories[set.category]}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-[#6E6773]" />
                     <span>{set.durationMinutes} {t.preparation.minutes}</span>
                   </div>
                 </div>
 
-                <h3 className="text-base font-bold text-[#242126] mb-2">{set.title[language]}</h3>
+                <h3 className="text-base font-bold text-[#242126] mb-1">{set.title[language]}</h3>
+                {set.kind === 'annales' && set.concoursLabel && (
+                  <p className="text-[11px] font-semibold text-[#8D174B] mb-2">
+                    {set.concoursLabel}{set.examYear ? ` • ${set.examYear}` : ''}
+                  </p>
+                )}
                 <p className="text-xs text-[#6E6773] leading-relaxed mb-4">{set.description[language]}</p>
               </div>
 
@@ -218,16 +255,27 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
             <h4 className="text-sm font-bold text-[#242126] uppercase tracking-wide">
               {language === 'fr' ? 'Correction détaillée des questions' : 'التصحيح المفصل للأسئلة'}
             </h4>
+            {selectedSet.kind === 'annales' && (
+              <p className="text-[11px] text-[#6E6773] bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl p-3 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {language === 'fr'
+                    ? `Questions réelles transcrites mot pour mot${selectedSet.concoursLabel ? ` (${selectedSet.concoursLabel}${selectedSet.examYear ? ' ' + selectedSet.examYear : ''})` : ''}. Corrigé établi par KounKour avec sa source.`
+                    : 'أسئلة حقيقية منقولة حرفيا. التصحيح من إعداد كونكور مع ذكر المصدر.'}
+                </span>
+              </p>
+            )}
 
             {selectedSet.questions.map((q, idx) => {
               const userChoice = userAnswers[q.id];
               const isCorrect = userChoice === q.correctOptionId;
 
               return (
-                <div key={q.id} className="bg-white border border-[#F1E5EC] rounded-2xl p-5 shadow-xs">
+                <div key={q.id} dir={contentDir(selectedSet)} className="bg-white border border-[#F1E5EC] rounded-2xl p-5 shadow-xs">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <span className="text-xs font-bold text-[#8D174B]">
                       {t.preparation.question} {idx + 1}
+                      {selectedSet.kind === 'annales' && q.number ? (language === 'fr' ? ` · n° ${q.number} du sujet` : ` · رقم ${q.number} في الموضوع`) : ''}
                     </span>
                     {isCorrect ? (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
@@ -272,7 +320,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
                       {t.preparation.explanation}
                     </strong>
                     <p className="text-[#6E6773] leading-relaxed mb-1.5">{q.explanation[language]}</p>
-                    <span className="text-[10px] text-[#6E6773] italic">Source : {q.source}</span>
+                    {q.source && <span className="text-[10px] text-[#6E6773] italic">Source : {q.source}</span>}
                   </div>
                 </div>
               );
@@ -294,13 +342,13 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
             <span className="text-xs font-bold text-[#8D174B] uppercase tracking-wider mb-2 block">
               {t.preparation.question} {currentQuestionIndex + 1} {t.preparation.of} {selectedSet.questions.length}
             </span>
-            <h3 className="text-base sm:text-lg font-bold text-[#242126] leading-snug">
+            <h3 dir={contentDir(selectedSet)} className="text-base sm:text-lg font-bold text-[#242126] leading-snug">
               {currentQ.text[language]}
             </h3>
           </div>
 
           {/* Options */}
-          <div className="space-y-3 mb-8">
+          <div className="space-y-3 mb-8" dir={contentDir(selectedSet)}>
             {currentQ.options.map((opt) => {
               const isSelected = userAnswers[currentQ.id] === opt.id;
               return (
