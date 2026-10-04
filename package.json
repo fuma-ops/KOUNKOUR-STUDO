@@ -12,7 +12,9 @@
     "lint": "tsc --noEmit",
     "test:eligibility": "tsx scripts/test-eligibility.ts",
     "test:scrapers": "tsx scripts/test-scrapers.ts",
-    "test:detail": "tsx scripts/test-detail-parser.ts"
+    "test:detail": "tsx scripts/test-detail-parser.ts",
+    "build:vercel": "vite build && node scripts/postbuild-vercel.mjs",
+    "test:seo": "tsx scripts/test-seo.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

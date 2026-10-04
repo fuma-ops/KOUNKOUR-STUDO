@@ -27,6 +27,7 @@ import { getAllActiveContests, loadImportedContests, getDeletedContestIds, delet
 import { fetchPublishedContests } from './data/supabaseContests';
 import { useSession } from './lib/useSession';
 import { AuthModal } from './components/AuthModal';
+import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
@@ -35,8 +36,20 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [language, setLanguage] = useState<Language>('fr');
-  const [activeTab, setActiveTab] = useState<string>('home');
+  // L'adresse de la page (cahier §5/§15) détermine l'écran ouvert au chargement.
+  const [language, setLanguage] = useState<Language>(() =>
+    new URLSearchParams(window.location.search).get('lang') === 'ar' ? 'ar' : 'fr'
+  );
+  const [activeTab, setActiveTab] = useState<string>(() => tabOf(parsePath(window.location.pathname)));
+  const [pendingContestSlug, setPendingContestSlug] = useState<string | null>(() => {
+    const r = parsePath(window.location.pathname);
+    return r.name === 'contest' ? r.slug : null;
+  });
+  const [qcmRoute, setQcmRoute] = useState<{ folder: string | null; set: string | null }>(() => {
+    const r = parsePath(window.location.pathname);
+    return { folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null };
+  });
+  const [contestsLoaded, setContestsLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<ContestStatus | 'all'>('open');
   const [selectedSector, setSelectedSector] = useState<string>('all');
@@ -174,11 +187,72 @@ export default function App() {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setContestsLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [contestsVersion]);
+
+  // Ouverture d'une fiche depuis son adresse /concours/<slug>.
+  useEffect(() => {
+    if (!pendingContestSlug) return;
+    const found = allActiveContests.find((c) => c.slug === pendingContestSlug);
+    if (found) {
+      setSelectedContest(found);
+      setPendingContestSlug(null);
+    } else if (contestsLoaded) {
+      setPendingContestSlug(null);
+    }
+  }, [pendingContestSlug, allActiveContests, contestsLoaded]);
+
+  // Navigation par onglet : repart de la racine de l'onglet.
+  const goTab = (tab: string) => {
+    setPendingContestSlug(null);
+    setQcmRoute({ folder: null, set: null });
+    setActiveTab(tab);
+  };
+
+  // Barre d'adresse synchronisée avec l'écran (partage de lien, bouton retour).
+  const currentPath = useMemo(() => {
+    let r: Route;
+    if (activeTab === 'admin') r = { name: 'admin' };
+    else if (selectedContest?.slug) r = { name: 'contest', slug: selectedContest.slug };
+    else if (pendingContestSlug) r = { name: 'contest', slug: pendingContestSlug };
+    else if (activeTab === 'contests') r = { name: 'contests' };
+    else if (activeTab === 'preparation')
+      r = qcmRoute.set ? { name: 'qcm', slug: qcmRoute.set } : qcmRoute.folder ? { name: 'folder', slug: qcmRoute.folder } : { name: 'prep' };
+    else if (activeTab === 'community') r = { name: 'community' };
+    else if (activeTab === 'profile') r = { name: 'profile' };
+    else r = { name: 'home' };
+    return withLang(routePath(r), language);
+  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, language]);
+  const firstSync = React.useRef(true);
+  useEffect(() => {
+    const here = window.location.pathname + window.location.search;
+    if (here === currentPath) {
+      firstSync.current = false;
+      return;
+    }
+    const samePage = window.location.pathname === currentPath.split('?')[0];
+    if (firstSync.current || samePage) window.history.replaceState(null, '', currentPath);
+    else window.history.pushState(null, '', currentPath);
+    firstSync.current = false;
+  }, [currentPath]);
+  useEffect(() => {
+    const onPop = () => {
+      const r = parsePath(window.location.pathname);
+      setLanguage(new URLSearchParams(window.location.search).get('lang') === 'ar' ? 'ar' : 'fr');
+      setActiveTab(tabOf(r));
+      setQcmRoute({ folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null });
+      setSelectedContest(null);
+      setPendingContestSlug(r.name === 'contest' ? r.slug : null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   const handleDeleteContest = async (contestId: string) => {
     await deleteContestFromSystem(contestId);
@@ -318,8 +392,8 @@ export default function App() {
     return (
       <AdminDashboard
         language={language}
-        onNavigateToUserApp={() => setActiveTab('home')}
-        onNavigateTab={(tab) => setActiveTab(tab)}
+        onNavigateToUserApp={() => goTab('home')}
+        onNavigateTab={(tab) => goTab(tab)}
         onSelectContest={setSelectedContest}
         onContestImported={() => {
           setAllActiveContests(getAllActiveContests());
@@ -349,7 +423,7 @@ export default function App() {
         language={language}
         onLanguageChange={setLanguage}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={goTab}
         savedCount={bookmarkedIds.length}
         isAuthed={!!session.user}
         isStaff={session.isStaff}
@@ -376,7 +450,7 @@ export default function App() {
               language={language}
               contests={allActiveContests}
               onSelectContest={setSelectedContest}
-              onNavigateTab={(tab) => setActiveTab(tab)}
+              onNavigateTab={(tab) => goTab(tab)}
               savedCount={bookmarkedIds.length}
             />
 
@@ -514,6 +588,9 @@ export default function App() {
           <QcmModule
             language={language}
             onRecordScore={handleRecordScore}
+            folderSlug={qcmRoute.folder}
+            setSlug={qcmRoute.set}
+            onNavigate={(folder, set) => setQcmRoute({ folder, set })}
           />
         )}
 
@@ -630,7 +707,7 @@ export default function App() {
       <BottomNav
         language={language}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={goTab}
         isAuthed={!!session.user}
         onAuthClick={() => setAuthOpen(true)}
       />

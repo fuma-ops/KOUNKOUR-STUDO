@@ -39,9 +39,16 @@ const TRAINING_FOLDER: Record<string, string> = {
 interface QcmModuleProps {
   language: Language;
   onRecordScore?: (qcmId: string, score: number, total: number) => void;
+  // Dossier / QCM ouverts, pilotés par l'adresse (/preparation/<dossier>, /preparation/qcm/<slug>).
+  folderSlug?: string | null;
+  setSlug?: string | null;
+  onNavigate?: (folder: string | null, set: string | null) => void;
 }
 
-export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore }) => {
+// Clé d'URL d'un support : slug pour les annales en base, id pour l'entraînement.
+const urlKey = (set: QcmSet) => (set.serverGraded ? set.slug : set.id);
+
+export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, folderSlug = null, setSlug = null, onNavigate }) => {
   const t = translations[language];
   const isRTL = language === 'ar';
   const NextIcon = isRTL ? ArrowLeft : ArrowRight;
@@ -62,7 +69,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
   const [folders, setFolders] = useState<QcmFolder[]>(FALLBACK_FOLDERS);
   const [loadingSets, setLoadingSets] = useState(true);
   const [progress, setProgress] = useState<Record<string, QcmProgress>>({});
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const selectedFolder = folderSlug;
+  const navigate = (folder: string | null, set: string | null) => onNavigate?.(folder, set);
   useEffect(() => {
     let cancelled = false;
     Promise.all([fetchQcmSets(), fetchQcmFolders(), loadQcmProgress()])
@@ -117,7 +125,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
     return () => clearInterval(interval);
   }, [selectedSet, isSubmitted]);
 
-  const handleStartSet = (set: QcmSet) => {
+  const initQuiz = (set: QcmSet) => {
     setSelectedSet(set);
     // « Continuer » : reprend à la première question pas encore vue.
     const p = progress[set.id];
@@ -130,6 +138,26 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
     setCorrections(null);
     setGradeError(false);
   };
+  const handleStartSet = (set: QcmSet) => {
+    initQuiz(set);
+    navigate(set.folderSlug || selectedFolder, urlKey(set));
+  };
+
+  // L'adresse décide du support ouvert (lien partagé, bouton retour du navigateur).
+  useEffect(() => {
+    if (loadingSets) return;
+    if (!setSlug) {
+      if (selectedSet) setSelectedSet(null);
+      return;
+    }
+    const target = allSets.find((x) => urlKey(x) === setSlug || x.id === setSlug);
+    if (!target) {
+      navigate(selectedFolder, null);
+      return;
+    }
+    if (selectedSet?.id !== target.id) initQuiz(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setSlug, loadingSets]);
 
   const handleSelectOption = (questionId: string, optionId: string) => {
     if (isSubmitted) return;
@@ -211,7 +239,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
               return (
                 <button
                   key={f.slug}
-                  onClick={() => setSelectedFolder(f.slug)}
+                  onClick={() => navigate(f.slug, null)}
                   className="text-start bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 rounded-3xl p-5 shadow-xs hover:shadow-md hover-scale active:scale-95 transition-all cursor-pointer animate-fade-in"
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
@@ -263,7 +291,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
         <button
-          onClick={() => setSelectedFolder(null)}
+          onClick={() => navigate(null, null)}
           className="mb-4 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF4F7] text-[#8D174B] border border-[#8D174B]/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
           <PrevIcon className="w-4 h-4" />
@@ -386,7 +414,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
       {/* Top action bar: Back to catalog, timer, progress */}
       <div className="bg-white border border-[#F1E5EC] rounded-2xl p-4 shadow-xs mb-6 flex items-center justify-between">
         <button
-          onClick={() => setSelectedSet(null)}
+          onClick={() => navigate(selectedSet.folderSlug || selectedFolder, null)}
           className="text-xs font-semibold text-[#8D174B] hover:underline flex items-center gap-1 cursor-pointer"
         >
           <PrevIcon className="w-4 h-4" />
@@ -425,7 +453,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore })
             </p>
 
             <button
-              onClick={() => handleStartSet(selectedSet)}
+              onClick={() => initQuiz(selectedSet)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
             >
               <RotateCcw className="w-4 h-4" />
