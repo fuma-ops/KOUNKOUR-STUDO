@@ -698,7 +698,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                   </h4>
                   <p className="text-xs text-[#6E6773] max-w-md mx-auto leading-relaxed">
                     {language === 'fr' 
-                      ? 'Échangez avec les autres candidats, partagez des résumés, des annales corrigées et posez vos questions aux admis.' 
+                      ? 'Échangez avec les autres candidats à ce concours : questions, conseils de préparation et retours d’expérience.' 
                       : 'تواصل مع باقي المترشحين، تبادل نصائح الامتحان ونماذج الاختبارات السابقة.'}
                   </p>
                   <div className="pt-2">

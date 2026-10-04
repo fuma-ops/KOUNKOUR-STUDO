@@ -15,7 +15,7 @@ import { CommunityModule } from './CommunityModule';
 import { PdfViewerModal } from './PdfViewerModal';
 import { ContestEditModal } from './ContestEditModal';
 import { AdminCommunityRequestsModal } from './AdminCommunityRequestsModal';
-import { loadCommunityRequests } from '../utils/communityStorage';
+import { listAccessRequests } from '../data/communityApi';
 import { getAllActiveContests, deleteContestFromSystem, updateContestInSystem, resolveAdministrationLogo } from '../utils/radarStorage';
 import { checkEligibility, CandidateProfile } from '../utils/candidateStorage';
 
@@ -69,9 +69,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [editingContest, setEditingContest] = useState<Contest | null>(null);
   const [isCommunityRequestsModalOpen, setIsCommunityRequestsModalOpen] = useState<boolean>(false);
-  const [communityRequestsCount, setCommunityRequestsCount] = useState<number>(() => {
-    return loadCommunityRequests().filter((r) => r.status === 'pending').length;
-  });
+  const [communityRequestsCount, setCommunityRequestsCount] = useState<number>(0);
+  const refreshCommunityRequestsCount = () => {
+    listAccessRequests()
+      .then((reqs) => setCommunityRequestsCount(reqs.filter((r) => r.status === 'pending').length))
+      .catch(() => setCommunityRequestsCount(0));
+  };
+  useEffect(() => {
+    refreshCommunityRequestsCount();
+  }, []);
 
   const handleSaveContest = async (updated: Contest) => {
     await updateContestInSystem(updated);
@@ -538,7 +544,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {language === 'fr' ? 'Espace d’entraide entre candidats marocains et modération des discussions sur les concours.' : 'فضاء التبادل والتوجيه بين المترشحين ومراقبة منشورات المباريات.'}
               </p>
             </div>
-            <CommunityModule language={language} />
+            <CommunityModule language={language} isAuthed isStaff />
           </div>
         ) : activeSidebarItem === 'smart_match' ? (
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6 animate-fade-in">
@@ -1327,7 +1333,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onClose={() => setIsCommunityRequestsModalOpen(false)}
         language={language}
         onRequestUpdated={() => {
-          setCommunityRequestsCount(loadCommunityRequests().filter((r) => r.status === 'pending').length);
+          refreshCommunityRequestsCount();
         }}
       />
     </div>

@@ -332,15 +332,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] flex flex-col justify-between text-[#242126]">
-      {/* Top Demo Compliance Banner required by Section 0 */}
+      {/* Bandeau bêta : les concours viennent des sources officielles ; l'arrêté fait foi. */}
       <div className="bg-[#8D174B] text-white py-1 px-4 text-center text-[11px] font-semibold flex items-center justify-center gap-2">
         <span className="px-1.5 py-0.2 rounded bg-amber-400 text-[#242126] font-bold text-[9px] uppercase">
-          DEMO
+          BÊTA
         </span>
         <span>
           {language === 'fr'
-            ? 'Plateforme KounKour V1 — Données de démonstration et sources officielles étiquetées'
-            : 'منصة كونكور النسخة الأولى — معطيات تجريبية ومصادر رسمية موثقة'}
+            ? 'Version bêta — Concours issus des sources officielles · seul l’arrêté officiel fait foi'
+            : 'نسخة تجريبية — مباريات من المصادر الرسمية · القرار الرسمي هو المرجع'}
         </span>
       </div>
 
@@ -523,6 +523,8 @@ export default function App() {
             language={language} 
             initialContestId={activeCommunityContestId}
             isAuthed={!!session.user}
+            isStaff={session.isStaff}
+            currentUserId={session.user?.id ?? null}
             onAuthClick={() => setAuthOpen(true)}
             allContests={allActiveContests}
           />
