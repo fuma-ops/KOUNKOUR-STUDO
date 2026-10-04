@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ContestPostsTable } from './ContestPostsTable';
 import { Contest, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { 
@@ -263,6 +264,8 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {contest.posts && contest.posts.length > 0 && <ContestPostsTable posts={contest.posts} language={language} />}
 
             {/* ========================================================================= */}
             {/* 3. DATES, DEADLINE & SALARY ROW */}

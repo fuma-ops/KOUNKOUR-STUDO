@@ -14,7 +14,8 @@
     "test:scrapers": "tsx scripts/test-scrapers.ts",
     "test:detail": "tsx scripts/test-detail-parser.ts",
     "build:vercel": "vite build && node scripts/postbuild-vercel.mjs",
-    "test:seo": "tsx scripts/test-seo.ts"
+    "test:seo": "tsx scripts/test-seo.ts",
+    "test:announcement": "tsx scripts/test-announcement.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

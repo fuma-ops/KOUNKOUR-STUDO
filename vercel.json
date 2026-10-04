@@ -9,6 +9,9 @@
     },
     "api/radar/scrape-live.ts": {
       "maxDuration": 60
+    },
+    "api/radar/fetch-docs.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

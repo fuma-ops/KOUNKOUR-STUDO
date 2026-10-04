@@ -33,6 +33,16 @@ export interface ContestExamItem {
   description?: { fr: string; ar: string };
 }
 
+// Un poste d'un avis (province × catégorie × diplôme × spécialité), lu dans l'arrêté.
+export interface ContestPost {
+  province: string | null;
+  category: string | null;
+  diploma: string | null;
+  specialty: string | null;
+  count: number | null;
+  note: string | null;
+}
+
 export interface Contest {
   id: string;
   slug: string;
@@ -56,6 +66,8 @@ export interface Contest {
   };
   status: ContestStatus;
   postsCount: number;
+  // Détail des postes (vide si l'avis n'a pas encore été analysé).
+  posts?: ContestPost[];
   degreeLevel: string; // e.g. "Bac+2", "Bac+5"
   specialty: {
     fr: string;

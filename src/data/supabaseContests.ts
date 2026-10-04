@@ -85,6 +85,9 @@ function mapRow(row: any): Contest {
     type: BILING_TYPE,
     status: mapStatus(row.status, row.deadline_date),
     postsCount: typeof row.positions === 'number' ? row.positions : 0,
+    posts: [...(row.contest_positions || [])]
+      .sort((a: any, b: any) => a.position - b.position)
+      .map((p: any) => ({ province: p.province, category: p.category, diploma: p.diploma, specialty: p.specialty, count: p.count, note: p.note })),
     degreeLevel: row.diploma_fr || '',
     grade: row.grade_fr || undefined,
     grade_fr: row.grade_fr || undefined,
@@ -128,7 +131,7 @@ export async function fetchPublishedContests(): Promise<Contest[] | null> {
     const { data, error } = await supabase
       .from('contests')
       .select(
-        '*, administrations ( name_fr, name_ar, category, official_site ), contest_criteria ( criterion_type, value_fr, value_ar )'
+        '*, administrations ( name_fr, name_ar, category, official_site ), contest_criteria ( criterion_type, value_fr, value_ar ), contest_positions ( position, province, category, diploma, specialty, count, note )'
       )
       // Statuts publics uniquement : un admin connecté ne doit pas voir sur le site
       // les brouillons ou concours archivés (lisibles par lui via les RLS staff).

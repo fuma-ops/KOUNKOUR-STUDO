@@ -31,6 +31,7 @@ export interface ContestRow {
   reference: string | null;
   administration_id: string | null;
   administrations?: { name_fr: string | null; name_ar: string | null } | null;
+  contest_positions?: { position: number; province: string | null; category: string | null; diploma: string | null; specialty: string | null; count: number | null; note: string | null }[];
 }
 
 export interface FolderRow {
@@ -323,6 +324,16 @@ export function prepFoldersFor(c: ContestRow, folders: FolderRow[], sets: QcmSet
   });
 }
 
+// Détail des postes lu dans l'arrêté, par province (contenu utile pour la recherche).
+function postsTable(c: ContestRow, lang: Lang): string {
+  const rows = [...(c.contest_positions || [])].sort((a, b) => a.position - b.position);
+  if (!rows.length) return '';
+  const h = lang === 'ar' ? ['الإقليم', 'الفئة', 'الشهادة', 'التخصص', 'العدد'] : ['Province', 'Catégorie', 'Diplôme', 'Spécialité', 'Postes'];
+  return `<h2>${lang === 'ar' ? 'المناصب المفتوحة' : 'Postes ouverts'}</h2><table style="border-collapse:collapse;font-size:13px"><thead><tr>${h.map((x) => `<th style="text-align:start;border-bottom:1px solid #eee;padding:4px">${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows
+    .map((p) => `<tr>${[p.province, p.category, p.diploma, p.specialty, p.count ?? (p.note || '?')].map((v) => `<td style="border-bottom:1px solid #f5f5f5;padding:4px">${esc(v ?? '')}</td>`).join('')}</tr>`)
+    .join('')}</tbody></table>`;
+}
+
 export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], base: string, today: string, prepFolders: FolderRow[] = []): Page {
   const t = L[lang];
   const st = contestState(c, today);
@@ -370,6 +381,7 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
     [{ href: '/', text: t.home }, { href: '/concours', text: t.contests }, { text: short }],
     `<h1>${esc(title)}</h1>` +
       `<dl>${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` +
+      postsTable(c, lang) +
       (summary ? `<h2>${lang === 'ar' ? 'ملخص' : 'Résumé'}</h2><p${summaryIsFallback ? ' lang="fr" dir="ltr"' : ''}>${esc(summary)}</p>` : '') +
       `<h2>${esc(t.source)}</h2>` +
       (c.source_org ? `<p>${esc(c.source_org)}</p>` : '') +

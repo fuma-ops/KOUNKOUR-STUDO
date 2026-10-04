@@ -54,6 +54,9 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
   const [scanningSourceId, setScanningSourceId] = useState<string | null>(null);
   const [scanStats, setScanStats] = useState<Record<string, SourceScanStat>>(loadSourceScanStats());
   const [isBackfilling, setIsBackfilling] = useState(false);
+  // Préparation à l'analyse : le serveur stocke le texte et les fichiers de l'arrêté.
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [prepareInfo, setPrepareInfo] = useState<string | null>(null);
   const [backfillProgress, setBackfillProgress] = useState(0);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -79,6 +82,47 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
       saveScrapeLogs(updated);
       return updated;
     });
+  };
+
+  const handlePrepareForAnalysis = async () => {
+    if (isPreparing) return;
+    const sb = getSupabase();
+    const token = sb ? (await sb.auth.getSession()).data.session?.access_token : null;
+    if (!token) {
+      addLog('warn', '[ANALYSE] Connexion admin requise pour préparer les annonces.');
+      return;
+    }
+    setIsPreparing(true);
+    setIsTerminalExpanded(true);
+    let done = 0;
+    let files = 0;
+    try {
+      for (let round = 0; round < 60; round++) {
+        const res = await fetch('/api/radar/fetch-docs?limit=2', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }));
+        if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        for (const p of data.processed || []) {
+          done++;
+          files += p.files || 0;
+          addLog(
+            p.errors?.length ? 'warn' : 'success',
+            `[ANALYSE] « ${p.title} » : texte ${p.pageChars ?? 0} car., ${p.files} fichier(s) d’arrêté stocké(s)${p.errors?.length ? ` — ${p.errors.join(' ; ')}` : ''}.`
+          );
+        }
+        setPrepareInfo(language === 'fr' ? `${done} annonce(s) préparée(s), ${data.remaining} restante(s)…` : `${done} إعلان، ${data.remaining} متبقية…`);
+        if (!data.remaining || !(data.processed || []).length) break;
+      }
+      setPrepareInfo(
+        language === 'fr'
+          ? `✅ ${done} annonce(s) prête(s) pour l’analyse (${files} fichier(s) d’arrêté). Écrivez « go » à Claude pour l’analyse et la publication.`
+          : `✅ ${done} إعلان جاهز للتحليل.`
+      );
+    } catch (err: any) {
+      addLog('warn', `[ANALYSE] Préparation interrompue : ${err?.message || err}`);
+      setPrepareInfo(language === 'fr' ? `Préparation interrompue après ${done} annonce(s) : ${err?.message || err}` : 'توقف التحضير.');
+    } finally {
+      setIsPreparing(false);
+    }
   };
 
   const handleBackfillDetails = async () => {
@@ -265,6 +309,8 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
 
       setScanProgress(100);
       setIsLiveRealScrape(true);
+      // Après chaque scan : texte et fichiers des nouvelles annonces stockés pour l'analyse.
+      if (data.persisted) setTimeout(() => handlePrepareForAnalysis(), 0);
     } catch (err: any) {
       addLog('warn', `[RADAR] Impossible de joindre le scraper (${err.message}).`, src.id);
       setScanProgress(100);
@@ -540,6 +586,23 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                   : (language === 'fr' ? 'Mettre à jour les fiches (emploi-public + dreamjob)' : 'تحديث البيانات (emploi-public + dreamjob)')}
               </span>
             </button>
+
+            <button
+              onClick={handlePrepareForAnalysis}
+              disabled={isScanning || isPreparing}
+              className={`px-4 py-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer active:scale-95 ${
+                isPreparing ? 'bg-amber-600/80 text-white cursor-wait' : 'bg-amber-400 hover:bg-amber-300 text-[#242126]'
+              }`}
+              title="Le serveur ouvre chaque nouvelle annonce et stocke son texte et les images / PDF de l’arrêté dans Supabase, pour l’analyse par Claude. Rien n’est publié."
+            >
+              <Download className={`w-4 h-4 ${isPreparing ? 'animate-bounce' : ''}`} />
+              <span>
+                {isPreparing
+                  ? (language === 'fr' ? 'Préparation…' : 'جارٍ التحضير…')
+                  : (language === 'fr' ? 'Préparer pour l’analyse (arrêtés)' : 'تحضير للتحليل')}
+              </span>
+            </button>
+            {prepareInfo && <p className="w-full text-[11px] text-amber-200 font-semibold">{prepareInfo}</p>}
 
             <button
               onClick={handleExportScrapedJson}

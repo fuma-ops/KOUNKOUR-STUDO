@@ -12,7 +12,7 @@ export interface AdminOverviewData {
   generated_at: string;
   users: { total: number; new_7d: number; active_7d: number; by_role: Record<string, number>; staff: { email: string; role: string }[] };
   contests: { public: number; open: number; closing_7d: number; no_deadline: number; archived: number; last_published_at: string | null };
-  radar: { pending_review: number; imported: number; last_scraped_at: string | null };
+  radar: { pending_review: number; imported: number; last_scraped_at: string | null; to_prepare?: number; to_analyze?: number; to_verify?: number; fetch_errors?: number };
   community: { rooms_active: number; rooms_proposed: number; requests_pending: number; reports_open: number; posts: number; posts_7d: number; comments: number };
   prep: { sets: number; questions_published: number; questions_to_verify: number; learners: number; attempts: number };
 }
@@ -173,7 +173,10 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
   }
 
   const todo = [
-    radar.pending_review > 0 && { n: radar.pending_review, label: fr ? 'annonces Radar à revoir' : 'إعلانات للمراجعة', go: () => onGo?.('concours_radar') },
+    (radar.to_analyze ?? 0) > 0 && { n: radar.to_analyze!, label: fr ? 'annonces prêtes pour l’analyse : écrivez « go » à Claude' : 'إعلانات جاهزة للتحليل', go: () => onGo?.('concours_radar') },
+    (radar.to_verify ?? 0) > 0 && { n: radar.to_verify!, label: fr ? 'annonces analysées à vérifier (champ illisible ou source non officielle)' : 'إعلانات للتحقق', go: () => onGo?.('concours_radar') },
+    (radar.to_prepare ?? 0) > 0 && { n: radar.to_prepare!, label: fr ? 'annonces à préparer (Radar → « Préparer pour l’analyse »)' : 'إعلانات للتحضير', go: () => onGo?.('concours_radar') },
+    (radar.fetch_errors ?? 0) > 0 && { n: radar.fetch_errors!, label: fr ? 'annonces dont la page n’a pas pu être lue' : 'إعلانات تعذرت قراءتها', go: () => onGo?.('concours_radar') },
     community.reports_open > 0 && { n: community.reports_open, label: fr ? 'signalements ouverts' : 'تبليغات مفتوحة', go: onOpenModeration },
     community.requests_pending > 0 && { n: community.requests_pending, label: fr ? 'demandes d’accès aux salons privés' : 'طلبات الانضمام', go: onOpenModeration },
     community.rooms_proposed > 0 && { n: community.rooms_proposed, label: fr ? 'salons proposés à valider' : 'فضاءات مقترحة', go: onOpenModeration },
