@@ -135,3 +135,26 @@ export function extractFromWordpressFeed(xml: string, pageUrl: string): string |
   const title = $(item).find('title').first().text();
   return `<html><body><article><div class="entry-content"><h1>${title.replace(/</g, '&lt;')}</h1>${content}</div></article></body></html>`;
 }
+
+// API REST publique de WordPress : article complet (content.rendered) et
+// fichiers rattachés à l'article (/wp/v2/media?parent=<id>).
+export function wpPostToHtml(json: unknown): { id: number; html: string } | null {
+  const post = Array.isArray(json) ? json[0] : null;
+  const html: string | undefined = post?.content?.rendered;
+  if (!post || typeof post.id !== 'number' || !html || html.replace(/<[^>]+>/g, '').trim().length + (html.match(/<img/gi)?.length || 0) * 50 < 20) return null;
+  const title = String(post.title?.rendered || '').replace(/</g, '&lt;');
+  return { id: post.id, html: `<html><body><article><div class="entry-content"><h1>${title}</h1>${html}</div></article></body></html>` };
+}
+
+export function wpMediaToList(json: unknown): AnnouncementMedia[] {
+  if (!Array.isArray(json)) return [];
+  const out: AnnouncementMedia[] = [];
+  for (const m of json) {
+    const url: string | undefined = m?.source_url;
+    const mime = String(m?.mime_type || '');
+    if (!url) continue;
+    if (mime === 'application/pdf') out.push({ url, kind: 'pdf' });
+    else if (/^image\/(jpe?g|png|webp)$/.test(mime) && !DECOR.test(fileName(url))) out.push({ url, kind: 'image' });
+  }
+  return out;
+}

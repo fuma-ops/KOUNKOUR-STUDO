@@ -1,5 +1,5 @@
 // Tests de l'extraction d'une page d'annonce (texte + fichiers de l'arrêté) : npm run test:announcement
-import { extractAnnouncement, extractFromWordpressFeed, originalWpImage } from '../api/_lib/announcement.ts';
+import { extractAnnouncement, extractFromWordpressFeed, originalWpImage, wpMediaToList, wpPostToHtml } from '../api/_lib/announcement.ts';
 
 let failed = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -48,6 +48,18 @@ const fromFeed = html ? extractAnnouncement(html, 'https://www.dreamjob.ma/emplo
 check('flux RSS : texte de l’article lu', !!fromFeed && fromFeed.text.includes('321 postes'), fromFeed?.text || 'rien');
 check('flux RSS : image de l’arrêté trouvée', !!fromFeed && fromFeed.media.some((m) => m.url.endsWith('srm-ms-1.jpg')), JSON.stringify(fromFeed?.media));
 check('flux RSS sans l’article demandé', extractFromWordpressFeed(feed.replace('<item>', '<item></item><item>'), 'https://www.dreamjob.ma/autre/') === null);
+
+// API REST WordPress (article complet + fichiers rattachés)
+const post = wpPostToHtml([{ id: 42, title: { rendered: 'Concours SRM Marrakech – Safi 2026' }, content: { rendered: '<p>Avis de recrutement</p><figure><img src="https://www.dreamjob.ma/wp-content/uploads/2026/09/srm-ms-avis-1.jpg" width="900"></figure>' } }]);
+const viaApi = post ? extractAnnouncement(post.html, 'https://www.dreamjob.ma/emploi-public/srm/') : null;
+check('API WordPress : image de l’arrêté dans l’article', !!viaApi && viaApi.media.some((m) => m.url.endsWith('srm-ms-avis-1.jpg')), JSON.stringify(viaApi?.media));
+check('API WordPress : réponse vide → rien', wpPostToHtml([]) === null && wpPostToHtml({ code: 'rest_forbidden' }) === null);
+const att = wpMediaToList([
+  { source_url: 'https://www.dreamjob.ma/wp-content/uploads/2026/09/srm-ms-avis-2.jpg', mime_type: 'image/jpeg' },
+  { source_url: 'https://www.dreamjob.ma/wp-content/uploads/2026/09/arrete.pdf', mime_type: 'application/pdf' },
+  { source_url: 'https://www.dreamjob.ma/wp-content/uploads/logo-dreamjob.png', mime_type: 'image/png' },
+]);
+check('API WordPress : fichiers rattachés (image + PDF, logo exclu)', att.length === 2 && att[1].kind === 'pdf', JSON.stringify(att));
 
 console.log(failed ? `\n${failed} échec(s)` : '\nTous les tests d’extraction passent.');
 process.exit(failed ? 1 : 0);

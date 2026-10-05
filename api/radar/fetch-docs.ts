@@ -14,7 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import { BROWSER_HEADERS } from '../_lib/parsers.ts';
-import { extractAnnouncement, extractFromWordpressFeed } from '../_lib/announcement.ts';
+import { AnnouncementMedia, extractAnnouncement, extractFromWordpressFeed, wpMediaToList, wpPostToHtml } from '../_lib/announcement.ts';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://zcxkxqsqzwtdnrupxlah.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -54,6 +54,27 @@ async function fetchFromFeed(pageUrl: string): Promise<string | null> {
   const r = await fetch(feedUrl, { headers: { ...BROWSER_HEADERS, Accept: 'application/rss+xml,application/xml,text/xml' }, signal: AbortSignal.timeout(12000) });
   if (!r.ok) return null;
   return extractFromWordpressFeed(await r.text(), pageUrl);
+}
+
+// API REST publique de WordPress (/wp-json/wp/v2) : article complet, avec les
+// images de l'arrêté insérées dans le texte et les fichiers rattachés.
+async function fetchFromWpApi(pageUrl: string): Promise<{ html: string; attachments: AnnouncementMedia[] } | null> {
+  const u = new URL(pageUrl);
+  const slug = u.pathname.split('/').filter(Boolean).pop();
+  if (!slug) return null;
+  const headers = { ...BROWSER_HEADERS, Accept: 'application/json' };
+  const postUrl = `${u.origin}/wp-json/wp/v2/posts?slug=${encodeURIComponent(slug)}&_fields=id,title,content`;
+  await politeWait(postUrl);
+  const r = await fetch(postUrl, { headers, signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return null;
+  const post = wpPostToHtml(await r.json().catch(() => null));
+  if (!post) return null;
+  let attachments: AnnouncementMedia[] = [];
+  const mediaUrl = `${u.origin}/wp-json/wp/v2/media?parent=${post.id}&per_page=20&_fields=source_url,mime_type`;
+  await politeWait(mediaUrl);
+  const m = await fetch(mediaUrl, { headers, signal: AbortSignal.timeout(12000) }).catch(() => null);
+  if (m?.ok) attachments = wpMediaToList(await m.json().catch(() => null));
+  return { html: post.html, attachments };
 }
 
 async function download(url: string): Promise<{ kind: 'image' | 'pdf'; mime: string; bytes: Buffer } | { error: string }> {
@@ -117,11 +138,18 @@ export default async function handler(req: any, res: any) {
       }
 
       let html = '';
+      let extraMedia: AnnouncementMedia[] = [];
       try {
         // dreamjob : le flux RSS d'abord (canal prévu pour la lecture automatique,
         // contenu de l'article sans le menu du site), la page en secours.
-        const fromFeed = DREAMJOB_HOST.test(host) ? await fetchFromFeed(c.source_url).catch(() => null) : null;
-        if (fromFeed) {
+        // 1) API WordPress (article complet + fichiers rattachés), 2) flux RSS, 3) page.
+        const fromApi = DREAMJOB_HOST.test(host) ? await fetchFromWpApi(c.source_url).catch(() => null) : null;
+        const fromFeed = DREAMJOB_HOST.test(host) && !fromApi ? await fetchFromFeed(c.source_url).catch(() => null) : null;
+        if (fromApi) {
+          html = fromApi.html;
+          extraMedia = fromApi.attachments;
+          report.method = 'API WordPress';
+        } else if (fromFeed) {
           html = fromFeed;
           report.method = 'flux RSS';
         } else {
@@ -142,7 +170,9 @@ export default async function handler(req: any, res: any) {
         continue;
       }
 
-      const { text, media } = extractAnnouncement(html, c.source_url);
+      const extracted = extractAnnouncement(html, c.source_url);
+      const text = extracted.text;
+      const media = [...extracted.media, ...extraMedia.filter((x) => !extracted.media.some((y) => y.url === x.url))];
       report.pageChars = text.length;
       const docs: any[] = [
         { candidate_id: c.id, url: c.source_url, kind: 'page', mime: 'text/plain', size_bytes: text.length, sha256: createHash('sha256').update(text).digest('hex'), text_content: text, fetch_error: null },
