@@ -13,7 +13,8 @@ cahier §13.5. Claude publie ensuite et rend compte de ce qui a été mis en lig
 2. **Préparation** (automatique après le scan, ou bouton « Préparer pour
    l'analyse ») : `api/radar/fetch-docs.ts` — exécuté sur Vercel, qui a accès aux
    sites sources — ouvre chaque annonce et stocke dans `radar_documents` :
-   - `kind = 'page'` : texte lisible de l'annonce (`text_content`) ;
+   - `kind = 'page'` : texte lisible de l'annonce (`text_content`) et HTML brut
+     de la page (`raw_html`, ≤ 400 Ko) pour vérifier l'extraction ;
    - `kind = 'image' | 'pdf'` : fichier de l'arrêté en base64 (`content_b64`),
      avec `sha256`, `mime`, `size_bytes` (fichiers > 3 Mo : lien seul, `fetch_error`).
    L'annonce passe en `analysis_status = 'a_analyser'`.

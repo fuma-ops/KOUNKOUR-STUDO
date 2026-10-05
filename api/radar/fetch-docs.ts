@@ -28,7 +28,10 @@ const ALLOWED_HOSTS = /(^|\.)(dreamjob\.ma|emploi-public\.ma|gov\.ma|ac\.ma|ma)$
 
 // Politesse envers dreamjob.ma (cahier §13.1 : délai entre requêtes, pas de contournement).
 const DREAMJOB_HOST = /(^|\.)dreamjob\.ma$/i;
-const DREAMJOB_DELAY_MS = 2500;
+// 8 s entre deux requêtes : la première version (≈ 1 requête/s, 04/10 21:07)
+// a déclenché la protection de dreamjob, qui refuse depuis notre serveur.
+const DREAMJOB_DELAY_MS = 8000;
+const DREAMJOB_MAX_FILES = 2;
 let lastDreamjobAt = 0;
 async function politeWait(url: string) {
   let host = '';
@@ -142,22 +145,29 @@ export default async function handler(req: any, res: any) {
       try {
         // dreamjob : le flux RSS d'abord (canal prévu pour la lecture automatique,
         // contenu de l'article sans le menu du site), la page en secours.
-        // 1) API WordPress (article complet + fichiers rattachés), 2) flux RSS, 3) page.
-        const fromApi = DREAMJOB_HOST.test(host) ? await fetchFromWpApi(c.source_url).catch(() => null) : null;
-        const fromFeed = DREAMJOB_HOST.test(host) && !fromApi ? await fetchFromFeed(c.source_url).catch(() => null) : null;
-        if (fromApi) {
-          html = fromApi.html;
-          extraMedia = fromApi.attachments;
-          report.method = 'API WordPress';
-        } else if (fromFeed) {
-          html = fromFeed;
-          report.method = 'flux RSS';
-        } else {
-          await politeWait(c.source_url);
-          const r = await fetch(c.source_url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(12000) });
-          if (!r.ok) throw new Error(`HTTP ${r.status}${DREAMJOB_HOST.test(host) ? ' (flux RSS indisponible aussi)' : ''}`);
+        // La page d'abord : c'est elle qui contient le texte complet (spécialités,
+        // diplômes, dates). Pour dreamjob, si elle est refusée : API WordPress,
+        // puis flux RSS (extrait seulement). Lentement, sans contournement.
+        await politeWait(c.source_url);
+        const r = await fetch(c.source_url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(12000) });
+        if (r.ok) {
           html = await r.text();
           report.method = 'page';
+        } else if (DREAMJOB_HOST.test(host)) {
+          const fromApi = await fetchFromWpApi(c.source_url).catch(() => null);
+          const fromFeed = fromApi ? null : await fetchFromFeed(c.source_url).catch(() => null);
+          if (fromApi) {
+            html = fromApi.html;
+            extraMedia = fromApi.attachments;
+            report.method = 'API WordPress';
+          } else if (fromFeed) {
+            html = fromFeed;
+            report.method = 'flux RSS (extrait seulement)';
+          } else {
+            throw new Error(`HTTP ${r.status} (page, API et flux refusés)`);
+          }
+        } else {
+          throw new Error(`HTTP ${r.status}`);
         }
       } catch (e: any) {
         report.errors.push(`page injoignable : ${e?.message || e}`);
@@ -175,9 +185,9 @@ export default async function handler(req: any, res: any) {
       const media = [...extracted.media, ...extraMedia.filter((x) => !extracted.media.some((y) => y.url === x.url))];
       report.pageChars = text.length;
       const docs: any[] = [
-        { candidate_id: c.id, url: c.source_url, kind: 'page', mime: 'text/plain', size_bytes: text.length, sha256: createHash('sha256').update(text).digest('hex'), text_content: text, fetch_error: null },
+        { candidate_id: c.id, url: c.source_url, kind: 'page', mime: 'text/plain', size_bytes: text.length, sha256: createHash('sha256').update(text).digest('hex'), text_content: text, fetch_error: null, raw_html: report.method === 'page' ? html.slice(0, 400000) : null },
       ];
-      for (const m of media.slice(0, MAX_FILES)) {
+      for (const m of media.slice(0, DREAMJOB_HOST.test(host) ? DREAMJOB_MAX_FILES : MAX_FILES)) {
         let src = m.url;
         let d = await download(src);
         if ('error' in d && m.fallbackUrl) {
