@@ -6,6 +6,19 @@ annonces est faite par **Claude dans une session Claude Code**, gratuitement
 l'analyse en écrivant **« go »** ; ce « go » vaut validation humaine au sens du
 cahier §13.5. Claude publie ensuite et rend compte de ce qui a été mis en ligne.
 
+## Passage automatique quotidien (cahier §13.2)
+
+- Supabase `pg_cron` appelle `public.radar_daily_tick()` toutes les 2 minutes.
+  Chaque jour (à partir de minuit, heure du Maroc), la fonction enchaîne via
+  `pg_net` : scan des 3 listes emploi-public (`stat=service_etat`, `collec`,
+  `etab_publics`, avec reprise `from=` pour les listes longues), puis
+  `fetch-docs?limit=4` jusqu'à ce qu'il ne reste rien à préparer. État et
+  journal : table `radar_daily_state` (visible dans le tableau de bord admin).
+- Authentification du robot : clé `radar_robot_key` (en base uniquement),
+  transmise en `?key=` et vérifiée par les RLS via l'en-tête `x-radar-key`.
+  Le robot n'accède qu'à `radar_candidates`, `radar_documents`, `radar_runs`.
+- Rien n'est publié automatiquement : la publication reste sur « go ».
+
 ## Flux
 
 1. **Scan** (admin → Radar → « Scanner ») : `api/radar/scrape-live.ts` stocke les

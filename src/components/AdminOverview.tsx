@@ -40,6 +40,8 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
   const fr = language === 'fr';
   const Go = language === 'ar' ? ArrowLeft : ArrowRight;
   const [data, setData] = useState<AdminOverviewData | null>(null);
+  // Passage automatique du jour (tâche planifiée Supabase).
+  const [robot, setRobot] = useState<{ day: string | null; phase: string; log: any[]; updated_at: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +59,8 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
     const ok = d && typeof d === 'object' && !Array.isArray(d) && ['users', 'contests', 'radar', 'community', 'prep'].every((k) => k in (d as object));
     if (e || !ok) setError(e?.message || (fr ? 'Réponse inattendue du serveur.' : 'استجابة غير متوقعة.'));
     else setData(d as AdminOverviewData);
+    const { data: r } = await sb.from('radar_daily_state').select('day, phase, log, updated_at').maybeSingle();
+    setRobot((r as any) || null);
     setLoading(false);
   }, [fr]);
 
@@ -188,6 +192,37 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
       {header}
+
+      {/* Scan automatique du jour */}
+      {robot && (
+        <div className="bg-white rounded-3xl border border-[#F1E5EC] p-4 sm:p-5 shadow-xs mb-4 animate-fade-in">
+          <h2 className="text-sm font-extrabold text-[#242126] mb-1 flex items-center gap-2">
+            <Radio className="w-4 h-4 text-[#8D174B]" />
+            {fr ? 'Scan automatique emploi-public' : 'المسح التلقائي'}
+            <span className={`ms-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${robot.phase === 'done' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800 animate-pulse'}`}>
+              {robot.phase === 'done' ? (fr ? 'terminé' : 'منتهي') : robot.phase === 'scan' ? (fr ? 'lecture des listes…' : 'جارٍ…') : fr ? 'préparation des arrêtés…' : 'جارٍ…'}
+            </span>
+          </h2>
+          <p className="text-[11px] text-[#6E6773] mb-2">
+            {fr
+              ? `Chaque jour à partir de minuit (heure du Maroc) : 3 listes (État, collectivités, établissements publics) puis fiches et arrêtés. Dernière activité : ${fmtDateTime(robot.updated_at, language)}.`
+              : `يومياً ابتداءً من منتصف الليل. آخر نشاط: ${fmtDateTime(robot.updated_at, language)}.`}
+          </p>
+          {(() => {
+            const scans = (robot.log || []).filter((e: any) => e.phase === 'scan');
+            const nouvelles = scans.reduce((a: number, e: any) => a + (Number(e.nouvelles) || 0), 0);
+            const docs = (robot.log || []).filter((e: any) => e.phase === 'docs').length;
+            const errors = (robot.log || []).filter((e: any) => e.http !== 200).length;
+            return (
+              <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                <span className="px-2 py-1 rounded-lg bg-[#FAF7F9] text-[#242126]">{nouvelles} {fr ? 'nouvelle(s) annonce(s) aujourd’hui' : 'إعلان جديد'}</span>
+                <span className="px-2 py-1 rounded-lg bg-[#FAF7F9] text-[#242126]">{docs} {fr ? 'passage(s) de préparation' : 'تحضير'}</span>
+                {errors > 0 && <span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-800">{errors} {fr ? 'appel(s) en erreur' : 'أخطاء'}</span>}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* À traiter */}
       <div className="bg-white rounded-3xl border border-[#F1E5EC] p-4 sm:p-5 shadow-xs mb-4 animate-fade-in">
