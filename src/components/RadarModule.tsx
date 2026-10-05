@@ -248,9 +248,9 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
       // publics), une par appel pour rester sous la limite de 60 s par fonction.
       const passes = src.scanKey === 'emploi-public' ? ['service_etat', 'collec', 'etab_publics'] : [null];
       const data: any = { items: [], logs: [], count: 0, inserted: 0, persisted: false, robotsAllowed: true, source: src.domain, executionTimeMs: 0 };
-      for (let p = 0; p < passes.length; p++) {
+      for (let p = 0, from = 1, rounds = 0; p < passes.length; rounds++) {
         const stat = passes[p];
-        const response = await fetch(`/api/radar/scrape-live?source=${encodeURIComponent(src.scanKey)}${stat ? `&stat=${stat}` : ''}`, {
+        const response = await fetch(`/api/radar/scrape-live?source=${encodeURIComponent(src.scanKey)}${stat ? `&stat=${stat}&from=${from}` : ''}`, {
           headers: authHeaders,
         });
         if (!response.ok) {
@@ -267,6 +267,13 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
         data.executionTimeMs += part.executionTimeMs || 0;
         setScanProgress(35 + Math.round(((p + 1) / passes.length) * 55));
         if (part.robotsAllowed === false) break;
+        // Liste longue : on reprend à la page suivante, sinon liste suivante.
+        if (part.nextFrom && rounds < 12) {
+          from = part.nextFrom;
+        } else {
+          p++;
+          from = 1;
+        }
       }
 
       if (data.logs && Array.isArray(data.logs)) {

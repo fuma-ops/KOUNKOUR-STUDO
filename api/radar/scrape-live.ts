@@ -41,7 +41,8 @@ const SUPABASE_ANON_KEY =
 const EMPLOI_PUBLIC_SOURCE_ID = '11111111-1111-4111-8111-111111111111';
 const DREAMJOB_SOURCE_ID = '33333333-3333-4333-8333-333333333333';
 
-const EP_MAX_PAGES = 30; // par liste ; l'arrêt se fait d'abord quand il n'y a plus d'annonce ouverte
+const EP_MAX_PAGES = 120; // par liste ; l'arrêt se fait d'abord quand il n'y a plus d'annonce ouverte
+const EP_PARALLEL = 6;
 const LIST_BUDGET_MS = 30000;
 const DETAIL_BUDGET_MS = 48000; // la fonction est limitée à 60 s
 
@@ -578,6 +579,7 @@ export default async function handler(req: any, res: any) {
     const canWrite = !!(token || robotKey);
 
     let items: any[] = [];
+    let nextFrom: number | null = null;
 
     if (sourceKey === 'emploi-public') {
       // Les 3 listes (ou celle demandée via ?stat=), pages les plus récentes d'abord,
@@ -585,13 +587,16 @@ export default async function handler(req: any, res: any) {
       // date de publication). Les annonces clôturées ne sont pas ajoutées à la file.
       const requestedStat = typeof req.query?.stat === 'string' && req.query.stat in EP_LISTS ? req.query.stat : null;
       const stats = requestedStat ? [requestedStat] : Object.keys(EP_LISTS);
+      // ?from=N : reprise d'une liste longue là où le passage précédent s'est arrêté.
+      const fromPage = Math.max(1, Math.min(EP_MAX_PAGES, Number(req.query?.from) || 1));
       const today = todayMa();
       const seen = new Set<string>();
       for (const stat of stats) {
         let pagesWithoutOpen = 0;
         let read = 0;
-        for (let first = 1; first <= EP_MAX_PAGES && pagesWithoutOpen < 3 && Date.now() - startTime < LIST_BUDGET_MS; first += 3) {
-          const nums = [first, first + 1, first + 2].filter((n) => n <= EP_MAX_PAGES);
+        let first = fromPage;
+        for (; first <= EP_MAX_PAGES && pagesWithoutOpen < 3 && Date.now() - startTime < LIST_BUDGET_MS; first += EP_PARALLEL) {
+          const nums = Array.from({ length: EP_PARALLEL }, (_v, j) => first + j).filter((n) => n <= EP_MAX_PAGES);
           // eslint-disable-next-line no-await-in-loop
           const pages = await fetchPages(nums.map((n) => epListUrl(stat, n)));
           for (let k = 0; k < pages.length; k++) {
@@ -610,7 +615,9 @@ export default async function handler(req: any, res: any) {
             items.push(...found);
           }
         }
-        addLog('info', `${EP_LISTS[stat]} : ${read} page(s) lue(s).`);
+        const unfinished = pagesWithoutOpen < 3 && first <= EP_MAX_PAGES;
+        if (unfinished && requestedStat) nextFrom = first;
+        addLog('info', `${EP_LISTS[stat]} : ${read} page(s) lue(s)${unfinished ? ` — suite à partir de la page ${first}` : ' — fin des annonces ouvertes'}.`);
       }
       addLog('info', `${items.length} annonce(s) ouverte(s) ou en cours sur emploi-public.`);
 
@@ -813,7 +820,7 @@ export default async function handler(req: any, res: any) {
 
     // Retire le champ interne _db avant de renvoyer au client.
     const clientItems = items.map(({ _db, ...rest }) => rest);
-    reply({ items: clientItems, count: clientItems.length, inserted, persisted });
+    reply({ items: clientItems, count: clientItems.length, inserted, persisted, nextFrom });
   } catch (err: any) {
     addLog('warn', `Erreur crawler : ${err?.message || 'inconnue'}`);
     reply({});
