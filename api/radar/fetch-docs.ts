@@ -102,12 +102,14 @@ async function download(url: string): Promise<{ kind: 'image' | 'pdf'; mime: str
 export default async function handler(req: any, res: any) {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) {
+  // Préparation quotidienne : la tâche planifiée Supabase passe ?key= (vérifiée par les RLS).
+  const robotKey = !token && typeof req.query?.key === 'string' && /^[0-9a-f]{64}$/.test(req.query.key) ? req.query.key : null;
+  if (!token && !robotKey) {
     res.status(401).json({ ok: false, error: 'Connexion admin requise.' });
     return;
   }
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: { headers: token ? { Authorization: `Bearer ${token}` } : { 'x-radar-key': robotKey as string } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query?.limit) || 2));

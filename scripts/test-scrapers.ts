@@ -16,6 +16,8 @@ import {
   findPossibleDuplicate,
   parseFrDateISO,
   degreeFromTitle,
+  EP_LISTS,
+  epListUrl,
 } from '../api/radar/scrape-live.ts';
 import { findOfficialLink } from '../api/radar/enrich.ts';
 import { parseDreamjobPost, toCandidateRow, canonicalEmploiPublicUrl } from '../api/_lib/parsers.ts';
@@ -269,6 +271,11 @@ check('Grade : Administrateur de 3ème grade → Licence', degreeFromTitle('Admi
 check('Grade : Technicien de 3ème grade → Bac+2', degreeFromTitle('Technicien de 3ème grade - echelle 9'), 'Bac+2');
 check('Grade : Technicien 4ème grade → inconnu', degreeFromTitle('Technicien de 4ème grade - echelle 8'), null);
 check('Grade : Adjoint technique → inconnu', degreeFromTitle('Adjoint technique de 2ème grade'), null);
+
+// emploi-public : les 3 listes du portail (filtre « stat ») et leur pagination
+check('emploi-public : 3 listes', Object.keys(EP_LISTS).join(','), 'service_etat,collec,etab_publics');
+check('emploi-public : URL liste collectivités', epListUrl('collec', 1), 'https://www.emploi-public.ma/fr/concours-liste?key_word=&stat=collec&corps=0&region=0&datePicker=&date_from=&date_to=&procedure=0');
+check('emploi-public : pagination', epListUrl('etab_publics', 3).endsWith('&procedure=0&page=3'), true);
 
 console.log(failures === 0 ? '\nTous les tests passent.' : `\n${failures} test(s) en échec.`);
 process.exit(failures === 0 ? 0 : 1);

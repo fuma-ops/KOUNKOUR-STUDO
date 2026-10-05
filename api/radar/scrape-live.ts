@@ -41,6 +41,10 @@ const SUPABASE_ANON_KEY =
 const EMPLOI_PUBLIC_SOURCE_ID = '11111111-1111-4111-8111-111111111111';
 const DREAMJOB_SOURCE_ID = '33333333-3333-4333-8333-333333333333';
 
+const EP_MAX_PAGES = 30; // par liste ; l'arrêt se fait d'abord quand il n'y a plus d'annonce ouverte
+const LIST_BUDGET_MS = 30000;
+const DETAIL_BUDGET_MS = 48000; // la fonction est limitée à 60 s
+
 const BROWSER_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
@@ -170,6 +174,19 @@ async function fetchPages(urls: string[]): Promise<{ page: number; url: string; 
 }
 
 // ─── emploi-public.ma ─────────────────────────────────────────────────────────
+
+// Les 3 listes du portail (filtre « stat ») : la liste par défaut ne montre que
+// les services de l'État — collectivités et établissements publics manquaient.
+export const EP_LISTS: Record<string, string> = {
+  service_etat: 'Services de l’État',
+  collec: 'Collectivités territoriales',
+  etab_publics: 'Établissements publics',
+};
+export function epListUrl(stat: string, page: number): string {
+  const q = `key_word=&stat=${encodeURIComponent(stat)}&corps=0&region=0&datePicker=&date_from=&date_to=&procedure=0`;
+  return `https://www.emploi-public.ma/fr/concours-liste?${q}${page > 1 ? `&page=${page}` : ''}`;
+}
+const todayMa = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Casablanca' }).format(new Date());
 
 function parseEmploiPublicPage(html: string, pageNo: number, seen: Set<string>, addLog: AddLog): any[] {
   const items: any[] = [];
@@ -548,23 +565,67 @@ export default async function handler(req: any, res: any) {
 
     const authHeader = req.headers?.authorization || req.headers?.Authorization;
     const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    // Scan quotidien : la tâche planifiée Supabase passe ?key= (clé stockée en base,
+    // vérifiée par les RLS via l'en-tête x-radar-key). Sinon : jeton de l'admin.
+    const robotKey = !token && typeof req.query?.key === 'string' && /^[0-9a-f]{64}$/.test(req.query.key) ? req.query.key : null;
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (robotKey) headers['x-radar-key'] = robotKey;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+      global: { headers },
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    const canWrite = !!(token || robotKey);
 
     let items: any[] = [];
 
     if (sourceKey === 'emploi-public') {
-      const urls = Array.from({ length: 6 }, (_v, i) => `https://www.emploi-public.ma/fr/concours-liste?page=${i + 1}`);
-      const pages = await fetchPages(urls);
+      // Les 3 listes (ou celle demandée via ?stat=), pages les plus récentes d'abord,
+      // 3 pages à la fois ; arrêt après 3 pages sans annonce ouverte (classement par
+      // date de publication). Les annonces clôturées ne sont pas ajoutées à la file.
+      const requestedStat = typeof req.query?.stat === 'string' && req.query.stat in EP_LISTS ? req.query.stat : null;
+      const stats = requestedStat ? [requestedStat] : Object.keys(EP_LISTS);
+      const today = todayMa();
       const seen = new Set<string>();
-      for (const pr of pages) {
-        if (!pr.ok || !pr.html) {
-          addLog('warn', `Page ${pr.page} : non reçue${pr.status ? ` (HTTP ${pr.status})` : ''}.`);
-          continue;
+      for (const stat of stats) {
+        let pagesWithoutOpen = 0;
+        let read = 0;
+        for (let first = 1; first <= EP_MAX_PAGES && pagesWithoutOpen < 3 && Date.now() - startTime < LIST_BUDGET_MS; first += 3) {
+          const nums = [first, first + 1, first + 2].filter((n) => n <= EP_MAX_PAGES);
+          // eslint-disable-next-line no-await-in-loop
+          const pages = await fetchPages(nums.map((n) => epListUrl(stat, n)));
+          for (let k = 0; k < pages.length; k++) {
+            const pr = pages[k];
+            read++;
+            if (!pr.ok || !pr.html) {
+              addLog('warn', `${EP_LISTS[stat]} p.${nums[k]} : non reçue${pr.status ? ` (HTTP ${pr.status})` : ''}.`);
+              pagesWithoutOpen++;
+              continue;
+            }
+            const found = parseEmploiPublicPage(pr.html, nums[k], seen, addLog).filter(
+              (it) => !it._db.deadline_date || it._db.deadline_date >= today || it._db.raw?.scraped_status === 'in_progress'
+            );
+            for (const it of found) it._db.raw = { ...(it._db.raw || {}), ep_list: stat };
+            pagesWithoutOpen = found.length ? 0 : pagesWithoutOpen + 1;
+            items.push(...found);
+          }
         }
-        items.push(...parseEmploiPublicPage(pr.html, pr.page, seen, addLog));
+        addLog('info', `${EP_LISTS[stat]} : ${read} page(s) lue(s).`);
+      }
+      addLog('info', `${items.length} annonce(s) ouverte(s) ou en cours sur emploi-public.`);
+
+      // Fiche détail seulement pour les annonces NOUVELLES (déjà en file = déjà lues).
+      if (canWrite && items.length) {
+        const ids = items.map((it) => it.external_id);
+        const known = new Set<string>();
+        for (let i = 0; i < ids.length; i += 150) {
+          // eslint-disable-next-line no-await-in-loop
+          const { data } = await supabase.from('radar_candidates').select('external_id').in('external_id', ids.slice(i, i + 150));
+          for (const r of data || []) known.add(r.external_id);
+        }
+        const before = items.length;
+        items = items.filter((it) => !known.has(it.external_id));
+        addLog('info', `${before - items.length} déjà en file, ${items.length} nouvelle(s).`);
       }
 
       // Lecture des fiches détail officielles (4 en parallèle maximum, délai 7s, même User-Agent)
@@ -572,6 +633,11 @@ export default async function handler(req: any, res: any) {
         addLog('info', `Enrichissement des ${items.length} annonces depuis leur fiche détail officielle (4 en parallèle)...`);
         const BATCH_SIZE = 4;
         for (let i = 0; i < items.length; i += BATCH_SIZE) {
+          // Le reste sera complété par la préparation (fiche + arrêté) : rien n'est perdu.
+          if (Date.now() - startTime > DETAIL_BUDGET_MS) {
+            addLog('info', `Temps limite : ${items.length - i} fiche(s) détail lue(s) plus tard par la préparation.`);
+            break;
+          }
           const batch = items.slice(i, i + BATCH_SIZE);
           // eslint-disable-next-line no-await-in-loop
           await Promise.all(
@@ -694,7 +760,7 @@ export default async function handler(req: any, res: any) {
       for (const c of published || []) {
         refs.push({ kind: 'publie', title: c.title_fr || c.title_original || '', admin: c.source_org, deadline: c.deadline_date, url: c.source_url });
       }
-      if (token) {
+      if (canWrite) {
         const { data: epCands } = await supabase
           .from('radar_candidates')
           .select('title_original, administration_name, deadline_date, source_url')
@@ -714,7 +780,7 @@ export default async function handler(req: any, res: any) {
     // Écriture en base — seulement si un admin connecté a fourni son jeton.
     let inserted = 0;
     let persisted = false;
-    if (token && items.length > 0) {
+    if (canWrite && items.length > 0) {
       // ignoreDuplicates : les concours déjà en file/importés/ignorés ne sont pas
       // réinsérés — seuls les NOUVEAUX entrent dans la file de validation.
       const { data, error } = await supabase
@@ -728,8 +794,21 @@ export default async function handler(req: any, res: any) {
         persisted = true;
         addLog('success', `${inserted} nouveau(x) concours ajouté(s) à la file de validation.`);
       }
-    } else if (!token) {
+    } else if (!canWrite) {
       addLog('info', 'Non connecté : résultats affichés sans écriture en base.');
+    }
+
+    // Journal des passages (tableau de bord : « dernier scan »).
+    if (canWrite) {
+      await supabase.from('radar_runs').insert({
+        source_id: sourceKey === 'emploi-public' ? EMPLOI_PUBLIC_SOURCE_ID : DREAMJOB_SOURCE_ID,
+        status: 'success',
+        started_at: new Date(startTime).toISOString(),
+        finished_at: new Date().toISOString(),
+        items_detected: items.length,
+        items_new: inserted,
+        trigger: robotKey ? 'cron' : 'admin',
+      });
     }
 
     // Retire le champ interne _db avant de renvoyer au client.

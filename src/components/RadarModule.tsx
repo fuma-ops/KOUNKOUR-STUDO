@@ -244,17 +244,30 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
         if (token) authHeaders = { Authorization: `Bearer ${token}` };
       }
 
-      const response = await fetch(`/api/radar/scrape-live?source=${encodeURIComponent(src.scanKey)}`, {
-        headers: authHeaders,
-      });
-      setScanProgress(70);
-
-      if (!response.ok) {
-        throw new Error(`Erreur serveur HTTP ${response.status}`);
+      // emploi-public : 3 listes (services de l'État, collectivités, établissements
+      // publics), une par appel pour rester sous la limite de 60 s par fonction.
+      const passes = src.scanKey === 'emploi-public' ? ['service_etat', 'collec', 'etab_publics'] : [null];
+      const data: any = { items: [], logs: [], count: 0, inserted: 0, persisted: false, robotsAllowed: true, source: src.domain, executionTimeMs: 0 };
+      for (let p = 0; p < passes.length; p++) {
+        const stat = passes[p];
+        const response = await fetch(`/api/radar/scrape-live?source=${encodeURIComponent(src.scanKey)}${stat ? `&stat=${stat}` : ''}`, {
+          headers: authHeaders,
+        });
+        if (!response.ok) {
+          throw new Error(`Erreur serveur HTTP ${response.status}`);
+        }
+        const part = await response.json();
+        data.items.push(...(part.items || []));
+        data.logs.push(...(part.logs || []));
+        data.count += part.count || 0;
+        data.inserted += part.inserted || 0;
+        data.persisted = data.persisted || !!part.persisted;
+        data.robotsAllowed = data.robotsAllowed && part.robotsAllowed !== false;
+        data.source = part.source || data.source;
+        data.executionTimeMs += part.executionTimeMs || 0;
+        setScanProgress(35 + Math.round(((p + 1) / passes.length) * 55));
+        if (part.robotsAllowed === false) break;
       }
-
-      const data = await response.json();
-      setScanProgress(90);
 
       if (data.logs && Array.isArray(data.logs)) {
         data.logs.forEach((l: any) => addLog(l.level, l.message, src.id));
