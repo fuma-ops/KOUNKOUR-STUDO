@@ -16,6 +16,7 @@ import { PdfViewerModal } from './PdfViewerModal';
 import { ContestEditModal } from './ContestEditModal';
 import { AdminCommunityRequestsModal } from './AdminCommunityRequestsModal';
 import { AdminOverview } from './AdminOverview';
+import { RadarAttachDocs } from './RadarAttachDocs';
 import { listAccessRequests } from '../data/communityApi';
 import { getAllActiveContests, deleteContestFromSystem, updateContestInSystem, resolveAdministrationLogo } from '../utils/radarStorage';
 import { checkEligibility, CandidateProfile } from '../utils/candidateStorage';
@@ -262,6 +263,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* Dashboard Body */}
         {activeSidebarItem === 'concours_radar' || activeSidebarItem === 'revue_annonces' ? (
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            <RadarAttachDocs language={language} />
             <RadarModule
               language={language}
               onSelectContest={onSelectContest}

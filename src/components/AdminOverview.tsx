@@ -53,7 +53,9 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
       return;
     }
     const { data: d, error: e } = await sb.rpc('admin_overview');
-    if (e || !d) setError(e?.message || (fr ? 'Lecture impossible.' : 'تعذرت القراءة.'));
+    // Réponse inattendue (droits, version de la fonction…) : message, jamais d'écran blanc.
+    const ok = d && typeof d === 'object' && !Array.isArray(d) && ['users', 'contests', 'radar', 'community', 'prep'].every((k) => k in (d as object));
+    if (e || !ok) setError(e?.message || (fr ? 'Réponse inattendue du serveur.' : 'استجابة غير متوقعة.'));
     else setData(d as AdminOverviewData);
     setLoading(false);
   }, [fr]);
@@ -176,7 +178,7 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
     (radar.to_analyze ?? 0) > 0 && { n: radar.to_analyze!, label: fr ? 'annonces prêtes pour l’analyse : écrivez « go » à Claude' : 'إعلانات جاهزة للتحليل', go: () => onGo?.('concours_radar') },
     (radar.to_verify ?? 0) > 0 && { n: radar.to_verify!, label: fr ? 'annonces analysées à vérifier (champ illisible ou source non officielle)' : 'إعلانات للتحقق', go: () => onGo?.('concours_radar') },
     (radar.to_prepare ?? 0) > 0 && { n: radar.to_prepare!, label: fr ? 'annonces à préparer (Radar → « Préparer pour l’analyse »)' : 'إعلانات للتحضير', go: () => onGo?.('concours_radar') },
-    (radar.fetch_errors ?? 0) > 0 && { n: radar.fetch_errors!, label: fr ? 'annonces dont la page n’a pas pu être lue' : 'إعلانات تعذرت قراءتها', go: () => onGo?.('concours_radar') },
+    (radar.fetch_errors ?? 0) > 0 && { n: radar.fetch_errors!, label: fr ? 'annonces dont l’arrêté est à joindre (site bloqué) — Radar → « Arrêtés à joindre »' : 'قرارات للإرفاق', go: () => onGo?.('concours_radar') },
     community.reports_open > 0 && { n: community.reports_open, label: fr ? 'signalements ouverts' : 'تبليغات مفتوحة', go: onOpenModeration },
     community.requests_pending > 0 && { n: community.requests_pending, label: fr ? 'demandes d’accès aux salons privés' : 'طلبات الانضمام', go: onOpenModeration },
     community.rooms_proposed > 0 && { n: community.rooms_proposed, label: fr ? 'salons proposés à valider' : 'فضاءات مقترحة', go: onOpenModeration },

@@ -17,6 +17,12 @@ cahier §13.5. Claude publie ensuite et rend compte de ce qui a été mis en lig
    - `kind = 'image' | 'pdf'` : fichier de l'arrêté en base64 (`content_b64`),
      avec `sha256`, `mime`, `size_bytes` (fichiers > 3 Mo : lien seul, `fetch_error`).
    L'annonce passe en `analysis_status = 'a_analyser'`.
+   - Sites qui bloquent la lecture automatique (dreamjob : page, API WordPress
+     et flux RSS refusés ou sans l'arrêté) : l'annonce reste en `erreur` /
+     `a_verifier`. L'admin ouvre l'annonce, enregistre l'image ou le PDF de
+     l'arrêté et le joint dans Admin → Radar & revue → « Arrêtés à joindre »
+     (document `url = ajout-admin://…`, image recompressée en JPEG ≤ 3 Mo).
+     L'annonce passe alors en `a_analyser`. Aucun contournement de blocage.
 3. **« go » du propriétaire** → Claude applique la procédure ci-dessous.
 
 ## Procédure Claude (à suivre à la lettre)
