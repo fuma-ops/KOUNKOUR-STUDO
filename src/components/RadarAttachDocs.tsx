@@ -3,9 +3,10 @@ import { Language } from '../types';
 import { getSupabase } from '../lib/supabase';
 import { Paperclip, ExternalLink, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
 
-// Annonces dont le serveur n'a pas pu récupérer l'arrêté (site qui bloque les
-// robots, comme dreamjob). L'admin ouvre l'annonce sur son téléphone, enregistre
-// l'image ou le PDF de l'arrêté et le joint ici ; Claude l'analyse au « go ».
+// Annonces qui demandent une intervention de l'admin : chacune porte un court
+// commentaire « À traiter » (analysis.a_traiter, ou la raison de l'analyse)
+// qui dit quoi faire. L'admin joint l'annonce officielle (image ou PDF) ici,
+// ou répond à Claude ; les annonces réglées sortent de la liste.
 
 interface Candidate {
   id: string;
@@ -13,7 +14,11 @@ interface Candidate {
   source_url: string;
   analysis_status: string;
   created_at: string;
+  deadline_date: string | null;
+  analysis: { a_traiter?: string; raison?: string } | null;
 }
+
+const fmtDate = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
 const MAX_SIDE = 2400; // assez pour lire un tableau d'arrêté, sans dépasser ~3 Mo
 const MAX_BYTES = 3 * 1024 * 1024;
@@ -60,10 +65,10 @@ export const RadarAttachDocs: React.FC<{ language: Language }> = ({ language }) 
     setLoading(true);
     const { data } = await sb
       .from('radar_candidates')
-      .select('id, title_original, source_url, analysis_status, created_at')
+      .select('id, title_original, source_url, analysis_status, created_at, deadline_date, analysis')
       .eq('status', 'pending_review')
-      .in('analysis_status', ['erreur', 'a_verifier', 'nouveau'])
-      .order('created_at', { ascending: false })
+      .eq('analysis_status', 'a_verifier')
+      .order('deadline_date', { ascending: true, nullsFirst: false })
       .limit(200);
     setItems((data as Candidate[]) || []);
     setLoading(false);
@@ -123,12 +128,12 @@ export const RadarAttachDocs: React.FC<{ language: Language }> = ({ language }) 
         <div>
           <h2 className="text-sm sm:text-base font-extrabold text-[#242126] flex items-center gap-2">
             <Paperclip className="w-4 h-4 text-[#8D174B]" />
-            {fr ? 'Arrêtés à joindre' : 'قرارات للإرفاق'} <span className="text-xs font-bold text-[#8E8694]">({items.length})</span>
+            {fr ? 'À traiter' : 'للمعالجة'} <span className="text-xs font-bold text-[#8E8694]">({items.length})</span>
           </h2>
           <p className="text-[11px] sm:text-xs text-[#6E6773] mt-1">
             {fr
-              ? 'Le site source bloque la lecture automatique. Ouvrez l’annonce, enregistrez l’image ou le PDF de l’arrêté, puis joignez-le ici. Écrivez ensuite « go » à Claude.'
-              : 'الموقع يمنع القراءة الآلية. افتح الإعلان، احفظ صورة القرار ثم أرفقها هنا.'}
+              ? 'Seules les annonces qui demandent votre intervention. Lisez le commentaire, joignez l’annonce officielle si demandé, puis écrivez « go » à Claude (ou répondez « publie » / « rejette »).'
+              : 'الإعلانات التي تحتاج تدخلكم فقط. اقرأ التعليق ثم أرفق الإعلان الرسمي.'}
           </p>
         </div>
         <button onClick={load} className="shrink-0 p-2 rounded-xl border border-[#F1E5EC] text-[#8D174B] active:scale-95" aria-label={fr ? 'Actualiser' : 'تحديث'}>
@@ -158,6 +163,15 @@ export const RadarAttachDocs: React.FC<{ language: Language }> = ({ language }) 
                   <span className="line-clamp-2">{c.title_original}</span>
                   <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-[#8E8694]" />
                 </a>
+                <p className="text-[11px] text-[#6E6773] mt-0.5">
+                  {c.deadline_date ? (fr ? `Date limite : ${fmtDate(c.deadline_date)}` : `آخر أجل: ${fmtDate(c.deadline_date)}`) : fr ? 'Date limite inconnue' : 'آخر أجل غير معروف'}
+                </p>
+                {(c.analysis?.a_traiter || c.analysis?.raison) && (
+                  <p className="text-[11px] text-[#8D174B] bg-[#FAF4F7] border border-[#F1E5EC] rounded-lg px-2 py-1 mt-1">
+                    <span className="font-bold">{fr ? 'À traiter : ' : 'للمعالجة: '}</span>
+                    {c.analysis?.a_traiter || c.analysis?.raison}
+                  </p>
+                )}
                 {done[c.id] && <p className="text-[11px] text-emerald-700 font-bold mt-0.5">✅ {done[c.id]}</p>}
                 {error[c.id] && (
                   <p className="text-[11px] text-rose-700 mt-0.5 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error[c.id]}</p>
@@ -183,7 +197,7 @@ export const RadarAttachDocs: React.FC<{ language: Language }> = ({ language }) 
               </label>
             </li>
           ))}
-          {!shown.length && <li className="py-6 text-center text-xs text-[#6E6773]">{fr ? 'Aucune annonce en attente d’arrêté.' : 'لا شيء.'}</li>}
+          {!shown.length && <li className="py-6 text-center text-xs text-[#6E6773]">{fr ? 'Rien à traiter : tout est à jour.' : 'لا شيء.'}</li>}
         </ul>
       )}
     </section>
