@@ -20,7 +20,9 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL |
 const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 
-const MAX_FILE_BYTES = 3 * 1024 * 1024; // au-delà : lien conservé, fichier non stocké
+// Les arrêtés scannés dépassent souvent 3 Mo (SRM, ORMVA : 3,5 à 8 Mo) ; sans eux,
+// ni spécialités ni diplôme, donc pas de match profil. Plafond relevé à 15 Mo.
+const MAX_FILE_BYTES = 15 * 1024 * 1024; // au-delà : lien conservé, fichier non stocké
 const MAX_FILES = 6;
 const MAX_LIMIT = 4;
 const TIME_BUDGET_MS = 40000; // la fonction est limitée à 60 s
@@ -80,10 +82,10 @@ async function fetchFromWpApi(pageUrl: string): Promise<{ html: string; attachme
   return { html: post.html, attachments };
 }
 
-async function download(url: string): Promise<{ kind: 'image' | 'pdf'; mime: string; bytes: Buffer } | { error: string }> {
+async function download(url: string, timeoutMs = 25000): Promise<{ kind: 'image' | 'pdf'; mime: string; bytes: Buffer } | { error: string }> {
   try {
     await politeWait(url);
-    const r = await fetch(url, { headers: { ...BROWSER_HEADERS, Accept: 'image/*,application/pdf,*/*' }, signal: AbortSignal.timeout(15000), redirect: 'follow' });
+    const r = await fetch(url, { headers: { ...BROWSER_HEADERS, Accept: 'image/*,application/pdf,*/*' }, signal: AbortSignal.timeout(timeoutMs), redirect: 'follow' });
     if (!r.ok) return { error: `HTTP ${r.status}` };
     const mime = (r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
     const kind = mime === 'application/pdf' ? 'pdf' : mime.startsWith('image/') && mime !== 'image/svg+xml' && mime !== 'image/gif' ? 'image' : null;
@@ -114,6 +116,53 @@ export default async function handler(req: any, res: any) {
   });
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query?.limit) || 2));
   const started = Date.now();
+
+  // ?retry=heavy : nouvelle tentative sur les arrêtés PDF refusés (trop lourds ou
+  // délai dépassé) des annonces encore ouvertes, un à la fois (≤ 15 Mo, 45 s).
+  if (req.query?.retry === 'heavy') {
+    try {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+      const { data: cands, error: e1 } = await supabase
+        .from('radar_candidates')
+        .select('id')
+        .gte('deadline_date', today);
+      if (e1) throw new Error(e1.message);
+      const ids = (cands || []).map((x: any) => x.id);
+      const pending = async () => {
+        if (!ids.length) return [] as any[];
+        const { data, error } = await supabase
+          .from('radar_documents')
+          .select('id, candidate_id, url, fetch_error')
+          .eq('kind', 'pdf')
+          .is('content_b64', null)
+          .or('fetch_error.ilike.fichier trop lourd%,fetch_error.eq.délai dépassé')
+          .not('fetch_error', 'ilike', '%2e essai%')
+          .in('candidate_id', ids)
+          .limit(50);
+        if (error) throw new Error(error.message);
+        return data || [];
+      };
+      const todo = await pending();
+      const done: any[] = [];
+      for (const doc of todo.slice(0, 1)) {
+        const d = await download(doc.url, 45000);
+        if ('error' in d) {
+          await supabase.from('radar_documents').update({ fetch_error: `${d.error} (2e essai)` }).eq('id', doc.id);
+          done.push({ url: doc.url, error: d.error });
+        } else {
+          await supabase
+            .from('radar_documents')
+            .update({ mime: d.mime, size_bytes: d.bytes.length, sha256: createHash('sha256').update(d.bytes).digest('hex'), content_b64: d.bytes.toString('base64'), fetch_error: null })
+            .eq('id', doc.id);
+          done.push({ url: doc.url, bytes: d.bytes.length });
+        }
+      }
+      res.status(200).json({ ok: true, retried: done, remaining: Math.max(0, todo.length - done.length) });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err?.message || 'Erreur' });
+    }
+    return;
+  }
 
   try {
     const { data: rows, error } = await supabase
