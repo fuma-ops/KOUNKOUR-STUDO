@@ -1,7 +1,7 @@
 import React from 'react';
 import { Contest, Language } from '../types';
 import { translations } from '../i18n/translations';
-import { Calendar, Users, GraduationCap, MapPin, Bookmark, CheckCircle2, AlertTriangle, Clock, Sparkles, Check } from 'lucide-react';
+import { Calendar, Users, GraduationCap, MapPin, Bookmark, CheckCircle2, AlertTriangle, Clock, Sparkles, Check, MessageCircle } from 'lucide-react';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady } from '../utils/smartMatch';
 import { resolveAdministrationLogo } from '../utils/radarStorage';
@@ -12,6 +12,7 @@ interface ContestCardProps {
   isBookmarked: boolean;
   onToggleBookmark: (contestId: string, e: React.MouseEvent) => void;
   onSelectContest: (contest: Contest) => void;
+  commentCount?: number;
 }
 
 export const ContestCard: React.FC<ContestCardProps> = ({
@@ -20,6 +21,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({
   isBookmarked,
   onToggleBookmark,
   onSelectContest,
+  commentCount = 0,
 }) => {
   const t = translations[language];
   const profile = loadCandidateProfile();
@@ -233,6 +235,15 @@ export const ContestCard: React.FC<ContestCardProps> = ({
           <span>
             {t.contests.deadline} : <strong className="text-[#242126] font-semibold">{contest.deadlineDate}</strong>
           </span>
+          {commentCount > 0 && (
+            <span
+              className="ms-1 flex items-center gap-0.5 font-bold text-[#8D174B]"
+              title={language === 'fr' ? `${commentCount} commentaire(s) de candidats` : `${commentCount} تعليق`}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              {commentCount}
+            </span>
+          )}
         </div>
 
         {(contest.status === 'open' || contest.status === 'closing_soon') && contest.daysRemaining > 1 && (

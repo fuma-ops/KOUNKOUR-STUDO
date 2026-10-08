@@ -9,6 +9,7 @@ import {
   CheckCircle2, Tag, AlertTriangle, Eye, DollarSign, Building2
 } from 'lucide-react';
 import { PdfViewerModal } from './PdfViewerModal';
+import { ContestComments } from './ContestComments';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
 import { resolveAdministrationLogo } from '../utils/radarStorage';
@@ -24,6 +25,7 @@ interface ContestDetailModalProps {
   onToggleBookmark: (contestId: string, e: React.MouseEvent) => void;
   onOpenCommunityTopic?: (contestId: string) => void;
   onOpenSalarySimulator?: (contest: Contest) => void;
+  onRequestLogin?: () => void;
 }
 
 // Identifiant du concours SUR emploi-public.ma (pour l'arrêté et les listes officielles).
@@ -43,8 +45,10 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
   onToggleBookmark,
   onOpenCommunityTopic,
   onOpenSalarySimulator,
+  onRequestLogin,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'info' | 'apply' | 'exams' | 'docs' | 'community'>('info');
+  const [activeSubTab, setActiveSubTab] = useState<'info' | 'apply' | 'exams' | 'docs'>('info');
+  const [commentCount, setCommentCount] = useState(0);
   const [copied, setCopied] = useState(false);
   const [activePdfUrl, setActivePdfUrl] = useState<string | null>(null);
   const [activePdfTitle, setActivePdfTitle] = useState<string>('');
@@ -78,12 +82,11 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
     (contest.exams?.oral && contest.exams.oral.length > 0);
 
   // Available tabs (only non-empty ones!)
-  const tabs: { id: 'info' | 'apply' | 'exams' | 'docs' | 'community'; label: string; count?: number }[] = [
+  const tabs: { id: 'info' | 'apply' | 'exams' | 'docs'; label: string; count?: number }[] = [
     { id: 'info', label: language === 'fr' ? 'Informations' : 'معلومات' },
     { id: 'apply', label: language === 'fr' ? 'Comment postuler' : 'طريقة الترشيح' },
     ...(hasExams ? [{ id: 'exams' as const, label: language === 'fr' ? 'Épreuves' : 'الاختبارات' }] : []),
     { id: 'docs', label: language === 'fr' ? 'Documents' : 'الوثائق', count: (officialArreteUrl ? 1 : 0) + (contest.convoquesUrl ? 1 : 0) + (contest.documents?.length || 0) },
-    { id: 'community', label: language === 'fr' ? 'Discussion' : 'المنتدى' },
   ];
 
   // Resolve administration logo / image
@@ -110,6 +113,14 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => document.getElementById('contest-comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="flex items-center gap-1 px-2.5 py-2 rounded-2xl hover:bg-[#FAF0F5] text-[#6E6773] hover:text-[#8D174B] transition-colors cursor-pointer"
+              title={language === 'fr' ? 'Commentaires des candidats' : 'تعليقات المترشحين'}
+            >
+              <MessageCircle className="w-5 h-5" />
+              {commentCount > 0 && <span className="text-xs font-black">{commentCount}</span>}
+            </button>
             <button
               onClick={handleShare}
               className="p-2 rounded-2xl hover:bg-gray-100 text-[#6E6773] hover:text-[#8D174B] transition-colors relative cursor-pointer"
@@ -719,35 +730,14 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
               </div>
             )}
 
-            {/* TAB 5: DISCUSSION & ENTRAIDE */}
-            {activeSubTab === 'community' && (
-              <div className="space-y-4 animate-fade-in">
-                <div className="bg-white rounded-3xl border border-[#F1E5EC] p-6 text-center shadow-xs space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-[#FAF0F5] text-[#8D174B] flex items-center justify-center mx-auto">
-                    <MessageCircle className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-base font-extrabold text-[#242126]">
-                    {language === 'fr' ? 'Salon d’entraide pour ce concours' : 'فضاء النقاش والتبادل لهذه المباراة'}
-                  </h4>
-                  <p className="text-xs text-[#6E6773] max-w-md mx-auto leading-relaxed">
-                    {language === 'fr' 
-                      ? 'Échangez avec les autres candidats à ce concours : questions, conseils de préparation et retours d’expérience.' 
-                      : 'تواصل مع باقي المترشحين، تبادل نصائح الامتحان ونماذج الاختبارات السابقة.'}
-                  </p>
-                  <div className="pt-2">
-                    <button
-                      onClick={() => {
-                        onClose();
-                        if (onOpenCommunityTopic) onOpenCommunityTopic(contest.id);
-                      }}
-                      className="px-6 py-3 rounded-2xl bg-[#8D174B] hover:bg-[#70113B] text-white font-extrabold text-xs shadow-md shadow-[#8D174B]/20 transition-all cursor-pointer"
-                    >
-                      {language === 'fr' ? 'Rejoindre la communauté du concours →' : 'الانتقال إلى منتدى المباراة →'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Commentaires des candidats : toujours visibles sous le concours */}
+            <ContestComments
+              contestId={contest.id}
+              language={language}
+              onRequestLogin={onRequestLogin}
+              onCountChange={setCommentCount}
+              onOpenCommunity={onOpenCommunityTopic ? () => { onClose(); onOpenCommunityTopic(contest.id); } : undefined}
+            />
 
             {/* Disclaimer Footer Note */}
             <div className="pt-2">

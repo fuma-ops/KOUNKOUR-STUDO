@@ -30,6 +30,7 @@ import { AuthModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { buildMatchFeed } from './utils/matchFeed';
+import { getContestDiscussionCounts } from './data/communityApi';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
   ArrowRight, ArrowLeft, Bookmark, CheckCircle2, Calendar, Radio,
@@ -67,6 +68,8 @@ export default function App() {
   const [contestsVersion, setContestsVersion] = useState(0);
   const session = useSession();
   const [authOpen, setAuthOpen] = useState(false);
+  // Nombre de commentaires par concours (pastille 💬 sur les cartes).
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('kounkour_bookmarks');
@@ -92,6 +95,13 @@ export default function App() {
     document.documentElement.lang = language;
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   }, [language]);
+
+  // Compteurs de commentaires : au chargement et à la fermeture d'une fiche
+  // (le candidat vient peut-être d'écrire).
+  useEffect(() => {
+    if (selectedContest) return;
+    getContestDiscussionCounts().then(setCommentCounts).catch(() => {});
+  }, [selectedContest]);
 
   // Persist bookmarks
   useEffect(() => {
@@ -583,6 +593,7 @@ export default function App() {
                       isBookmarked={bookmarkedIds.includes(contest.id)}
                       onToggleBookmark={handleToggleBookmark}
                       onSelectContest={setSelectedContest}
+                      commentCount={commentCounts[contest.id] || 0}
                     />
                   ))}
                 </div>
@@ -695,6 +706,7 @@ export default function App() {
           setSalaryContestTarget(contest);
           setIsSalaryModalOpen(true);
         }}
+        onRequestLogin={() => setAuthOpen(true)}
       />
 
       {/* Official Salary Simulator Modal */}

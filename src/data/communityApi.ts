@@ -383,6 +383,85 @@ export async function report(target: { postId?: string; commentId?: string }, re
   if (error) fail(error, 'Signalement impossible.');
 }
 
+// ─── Commentaires sous chaque concours ───────────────────────────────────────
+// Le fil affiché sous un concours EST le salon public de ce concours : un message
+// = une discussion du salon, une réponse = un commentaire. Une seule conversation,
+// visible à la fois dans la fiche et dans l'onglet Communauté.
+
+export interface ContestReply {
+  id: string;
+  author: string;
+  headline: string | null;
+  content: string;
+  createdAt: string;
+  isMine: boolean;
+  isVerified: boolean;
+  likes: number;
+  liked: boolean;
+}
+
+export interface ContestMessage extends Omit<ContestReply, 'isVerified'> {
+  category: PostCategory;
+  isPinned: boolean;
+  replies: ContestReply[];
+}
+
+export interface ContestDiscussion {
+  roomId: string | null;
+  total: number;
+  messages: ContestMessage[];
+}
+
+const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+// Lecture publique (visiteurs compris) via une fonction en lecture seule.
+export async function getContestDiscussion(contestId: string): Promise<ContestDiscussion> {
+  if (!isUuid(contestId)) return { roomId: null, total: 0, messages: [] };
+  const { data, error } = await sb().rpc('contest_discussion', { p_contest: contestId });
+  if (error) fail(error, 'Impossible de charger les commentaires.');
+  const d = (data || {}) as any;
+  const reply = (r: any): ContestReply => ({
+    id: r.id,
+    author: r.author,
+    headline: r.headline || null,
+    content: r.content,
+    createdAt: r.created_at,
+    isMine: !!r.is_mine,
+    isVerified: !!r.is_verified,
+    likes: Number(r.likes || 0),
+    liked: !!r.liked,
+  });
+  return {
+    roomId: d.room_id || null,
+    total: Number(d.total || 0),
+    messages: (d.messages || []).map((m: any) => ({
+      ...reply(m),
+      category: m.category,
+      isPinned: !!m.is_pinned,
+      replies: (m.replies || []).map(reply),
+    })),
+  };
+}
+
+// Publie un message sous le concours (le salon du concours est créé au besoin).
+export async function postContestMessage(contestId: string, content: string, category: PostCategory): Promise<void> {
+  const text = content.trim();
+  if (text.length < 3) throw new CommunityError('Message trop court.');
+  const roomId = await ensureContestRoom(contestId);
+  const firstLine = text.split('\n')[0].trim();
+  const title = firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine.length >= 3 ? firstLine : text.slice(0, 120);
+  await createPost(roomId, title, text, category);
+}
+
+// Nombre de messages + réponses par concours (pastille sur les cartes).
+export async function getContestDiscussionCounts(): Promise<Record<string, number>> {
+  const client = getSupabase();
+  if (!client) return {};
+  const { data, error } = await client.rpc('contest_discussion_counts');
+  if (error || !data) return {};
+  return Object.fromEntries((data as any[]).map((r) => [r.contest_id, Number(r.messages || 0)]));
+}
+
 // ─── Modération (staff — re-vérifié par les RLS) ──────────────────────────────
 
 export async function setPostPinned(postId: string, pinned: boolean): Promise<void> {
