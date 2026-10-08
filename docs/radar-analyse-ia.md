@@ -85,6 +85,19 @@ fichier (images et PDF sont lisibles directement).
 3. `contest_positions` : une ligne par poste lu (ordre = `position`).
 4. `contest_criteria` : diplômes et spécialités distincts, `source_page`,
    `source_excerpt`, `verification_state = 'a_verifier'`.
+   **Spécialité obligatoire (Smart Match)** : chaque concours publié a au moins
+   un critère `specialite`, et chaque poste sa `specialty` quand l'avis la donne.
+   Dans l'ordre :
+   - spécialité écrite dans l'avis (tableau, article, fiche de poste) ;
+   - sinon, domaine écrit dans le diplôme demandé (« Bac+3 minimum en gestion »
+     → « Gestion ») ;
+   - sinon, si l'avis n'impose aucune spécialité (« Licence ou équivalent ») :
+     « Toutes spécialités (aucune spécialité exigée par l'avis) » ;
+   - sinon, métier de l'intitulé du poste (« Technicien en génie civil » →
+     « Génie civil »), avec `verification_state = 'a_verifier'` et la source
+     « intitulé du poste ».
+   Jamais « Spécialités mentionnées dans l'arrêté » : sans aucune de ces quatre
+   sources, laisser vide et le dire dans le rapport.
 5. `radar_candidates` : `status = 'imported'`, `imported_contest_id`,
    `analysis_status = 'publie'`, `analysis` (JSON de l'extraction + sources),
    `analyzed_at = now()`.
