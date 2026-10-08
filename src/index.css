@@ -39,3 +39,21 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #C73578;
 }
+
+/* Animations d'entrée et appel à l'action (utilisées par animate-fade-in / animate-cta-bounce). */
+@theme {
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-cta-bounce: cta-breathe 2.4s ease-in-out infinite;
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes cta-breathe {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(141, 23, 75, 0.35); }
+    50% { box-shadow: 0 0 0 8px rgba(141, 23, 75, 0); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in, .animate-cta-bounce { animation: none; }
+}

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { PdfViewerModal } from './PdfViewerModal';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
+import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
 import { resolveAdministrationLogo } from '../utils/radarStorage';
 import { inferSalaryScaleFromContest } from '../data/salaryScales';
 import { downloadContestIcs, getGoogleCalendarUrl } from '../utils/calendarExport';
@@ -206,6 +207,50 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
           {/* 2. THE 3 CORE INFORMATION BLOCKS (SECTION 10: DIPLÔME • SPÉCIALITÉ • POSTES) */}
           {/* ========================================================================= */}
           <div className="p-4 sm:p-6 space-y-5 bg-[#FAF7F9]/60">
+            {/* Smart Match : verdict expliqué critère par critère */}
+            {eligibility && isProfileReady(profile) && (
+              <div className={`p-3.5 rounded-2xl border text-xs space-y-2 ${
+                eligibility.verdict === 'eligible'
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                  : eligibility.verdict === 'verify'
+                  ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                  : 'bg-rose-50/80 border-rose-200 text-rose-950'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-bold flex items-center gap-2">
+                    <Sparkles className={`w-4 h-4 shrink-0 ${
+                      eligibility.verdict === 'eligible' ? 'text-emerald-700' : eligibility.verdict === 'verify' ? 'text-amber-700' : 'text-rose-700'
+                    }`} />
+                    {language === 'fr' ? 'Smart Match — votre profil' : 'المطابقة الذكية — ملفك'}
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                    eligibility.verdict === 'eligible' ? 'bg-emerald-600 text-white' : eligibility.verdict === 'verify' ? 'bg-amber-600 text-white' : 'bg-rose-600 text-white'
+                  }`}>
+                    {eligibility.verdict === 'eligible' ? (language === 'fr' ? 'Correspond' : 'مطابق') : eligibility.verdict === 'verify' ? (language === 'fr' ? 'À vérifier' : 'للتحقق') : (language === 'fr' ? 'Hors profil' : 'خارج ملفك')}
+                  </span>
+                </div>
+                <ul className="space-y-1">
+                  {eligibility.checks.filter((k) => k.key !== 'status' || k.status !== 'ok').map((k) => (
+                    <li key={k.key} className="flex items-start gap-1.5">
+                      <span className="font-black shrink-0">{k.status === 'ok' ? '✓' : k.status === 'verify' ? '?' : '✕'}</span>
+                      <span>{k[language]}</span>
+                    </li>
+                  ))}
+                </ul>
+                {eligibility.matchedPosts.length > 0 && eligibility.matchedPostsCount > 0 && (
+                  <p className="font-semibold">
+                    {language === 'fr'
+                      ? `${eligibility.matchedPostsCount} poste(s) pour votre profil : `
+                      : `${eligibility.matchedPostsCount} منصب مناسب لملفك: `}
+                    {eligibility.matchedPosts
+                      .map((p) => [p.specialty, p.province].filter(Boolean).join(' – ') + (p.count ? ` (${p.count})` : ''))
+                      .slice(0, 6)
+                      .join(' ; ')}
+                  </p>
+                )}
+                <p className="text-[10px] opacity-70">{MATCH_DISCLAIMER[language]}</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Block 1: DIPLÔME REQUIS */}
               <div className="bg-white rounded-2xl p-4 border border-[#F1E5EC] shadow-2xs flex items-center gap-3">
@@ -371,34 +416,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
               ) : null}
             </div>
 
-            {/* Smart Match Eligibility Verdict Banner */}
-            {eligibility && (
-              <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
-                eligibility.verdict === 'eligible' 
-                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
-                  : eligibility.verdict === 'verify'
-                  ? 'bg-amber-50/80 border-amber-200 text-amber-950'
-                  : 'bg-rose-50/80 border-rose-200 text-rose-950'
-              }`}>
-                <div className="flex items-center gap-2">
-                  <Sparkles className={`w-4 h-4 shrink-0 ${
-                    eligibility.verdict === 'eligible' ? 'text-emerald-700' : eligibility.verdict === 'verify' ? 'text-amber-700' : 'text-rose-700'
-                  }`} />
-                  <span className="font-bold">
-                    {language === 'fr' ? 'Smart Match :' : 'المطابقة الذكية :'}
-                  </span>
-                  <span className="font-medium truncate max-w-md">
-                    {eligibility.reasons?.[0]?.[language] || eligibility.reasons?.[0]?.fr || (language === 'fr' ? 'Profil vérifié' : 'تم التدقيق')}
-                  </span>
-                </div>
 
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase shrink-0 ${
-                  eligibility.verdict === 'eligible' ? 'bg-emerald-600 text-white' : eligibility.verdict === 'verify' ? 'bg-amber-600 text-white' : 'bg-rose-600 text-white'
-                }`}>
-                  {eligibility.verdict === 'eligible' ? (language === 'fr' ? 'Éligible' : 'مؤهل') : eligibility.verdict === 'verify' ? (language === 'fr' ? 'À vérifier' : 'للتحقق') : (language === 'fr' ? 'Non éligible' : 'غير مؤهل')}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* ========================================================================= */}

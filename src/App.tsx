@@ -29,6 +29,7 @@ import { useSession } from './lib/useSession';
 import { AuthModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
+import { buildMatchFeed } from './utils/matchFeed';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
   ArrowRight, ArrowLeft, Bookmark, CheckCircle2, Calendar, Radio,
@@ -62,6 +63,7 @@ export default function App() {
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState<boolean>(false);
   const [isAdminCvModalOpen, setIsAdminCvModalOpen] = useState<boolean>(false);
   const [profileVersion, setProfileVersion] = useState(0);
+  const [profileInitialTab, setProfileInitialTab] = useState<'tracking' | 'recommendations' | undefined>(undefined);
   const [contestsVersion, setContestsVersion] = useState(0);
   const session = useSession();
   const [authOpen, setAuthOpen] = useState(false);
@@ -272,12 +274,14 @@ export default function App() {
     return loadCandidateProfile();
   }, [profileVersion]);
 
-  const eligibleContests = useMemo(() => {
-    return allActiveContests.filter((c) => {
-      const eligibility = checkEligibility(c, candidateProfile);
-      return eligibility.isEligible;
-    });
-  }, [allActiveContests, candidateProfile]);
+  // « Pour vous » : correspondants + à vérifier (ne jamais rater un concours).
+  const matchFeed = useMemo(() => buildMatchFeed(allActiveContests, candidateProfile), [allActiveContests, candidateProfile]);
+  const eligibleContests = useMemo(() => [...matchFeed.eligible, ...matchFeed.verify].map((i) => i.contest), [matchFeed]);
+  const openForYou = () => {
+    setProfileInitialTab('recommendations');
+    goTab('profile');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Filter contests based on active criteria
   const filteredContests = useMemo(() => {
@@ -285,7 +289,7 @@ export default function App() {
       // Matching profile toggle
       if (onlyMatchingProfile) {
         const eligibility = checkEligibility(c, candidateProfile);
-        if (!eligibility.isEligible) {
+        if (eligibility.verdict === 'not_eligible' || !matchFeed.ready) {
           return false;
         }
       }
@@ -325,7 +329,7 @@ export default function App() {
       }
       return true;
     });
-  }, [allActiveContests, candidateProfile, onlyMatchingProfile, selectedStatus, selectedSector, selectedDegree, searchQuery]);
+  }, [allActiveContests, candidateProfile, matchFeed, onlyMatchingProfile, selectedStatus, selectedSector, selectedDegree, searchQuery]);
 
   // Contests closing soon (daysRemaining between 1 and 20)
   const closingSoonContests = useMemo(() => {
@@ -454,6 +458,8 @@ export default function App() {
               onSelectContest={setSelectedContest}
               onNavigateTab={(tab) => goTab(tab)}
               savedCount={bookmarkedIds.length}
+              matchFeed={matchFeed}
+              onOpenForYou={openForYou}
             />
 
             {/* Official Legal Compliance Disclaimer */}
@@ -505,7 +511,7 @@ export default function App() {
                     <Target className="w-3.5 h-3.5" />
                     <span>
                       {language === 'fr' 
-                        ? `🎯 Adaptés à mon profil (${eligibleContests.length})` 
+                        ? `🎯 Pour mon profil (${eligibleContests.length})`
                         : `🎯 ملائم لملفي (${eligibleContests.length})`}
                     </span>
                   </button>
@@ -621,7 +627,11 @@ export default function App() {
               completedQcmScores={completedQcmScores}
               onSelectContest={setSelectedContest}
               onRemoveBookmark={(id) => setBookmarkedIds((prev) => prev.filter((i) => i !== id))}
-              onProfileUpdated={() => setProfileVersion((v) => v + 1)}
+              initialTab={profileInitialTab}
+              onProfileUpdated={() => {
+                setProfileInitialTab('recommendations');
+                setProfileVersion((v) => v + 1);
+              }}
               onOpenSalarySimulator={(contest) => {
                 setSalaryContestTarget(contest || null);
                 setIsSalaryModalOpen(true);

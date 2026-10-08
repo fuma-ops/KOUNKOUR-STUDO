@@ -7,6 +7,7 @@ import {
   Users, MapPin, Tag, Briefcase
 } from 'lucide-react';
 import { resolveAdministrationLogo } from '../utils/radarStorage';
+import { deadlineBadge, type MatchFeed } from '../utils/matchFeed';
 
 interface FeaturedContestsSectionProps {
   language: Language;
@@ -14,6 +15,8 @@ interface FeaturedContestsSectionProps {
   onSelectContest: (contest: Contest) => void;
   onNavigateTab: (tab: string) => void;
   savedCount: number;
+  matchFeed?: MatchFeed;
+  onOpenForYou?: () => void;
 }
 
 export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = ({
@@ -22,6 +25,8 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
   onSelectContest,
   onNavigateTab,
   savedCount,
+  matchFeed,
+  onOpenForYou,
 }) => {
   const t = translations[language];
   const isRTL = language === 'ar';
@@ -47,6 +52,69 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-4 space-y-8 animate-fade-in">
       
+      {/* 0. POUR VOUS — Smart Match (le candidat ne rate aucun concours) */}
+      {matchFeed?.ready && (() => {
+        const top = [...matchFeed.eligible, ...matchFeed.verify].slice(0, 3);
+        const total = matchFeed.eligible.length + matchFeed.verify.length;
+        const fr = language === 'fr';
+        return (
+          <div className="bg-gradient-to-br from-[#8D174B] to-[#5C0E31] rounded-3xl p-5 sm:p-6 text-white shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                  <Target className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-extrabold">
+                    {fr ? `${total} concours ouverts pour votre profil` : `${total} مباراة مفتوحة لملفك`}
+                  </h3>
+                  <p className="text-[11px] text-rose-100">
+                    {fr
+                      ? `${matchFeed.eligible.length} correspondent • ${matchFeed.verify.length} à vérifier${matchFeed.closingSoon ? ` • ${matchFeed.closingSoon} ferment dans 7 jours` : ''}`
+                      : `${matchFeed.eligible.length} مطابقة • ${matchFeed.verify.length} للتحقق${matchFeed.closingSoon ? ` • ${matchFeed.closingSoon} تنتهي خلال 7 أيام` : ''}`}
+                  </p>
+                </div>
+              </div>
+              {matchFeed.newCount > 0 && (
+                <span className="self-start sm:self-center px-3 py-1 rounded-full bg-amber-400 text-[#242126] text-xs font-extrabold animate-pulse">
+                  {fr ? `${matchFeed.newCount} nouveau${matchFeed.newCount > 1 ? 'x' : ''} depuis votre dernière visite` : `${matchFeed.newCount} جديدة منذ آخر زيارة`}
+                </span>
+              )}
+            </div>
+            {top.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 mb-4">
+                {top.map(({ contest: c, elig, isNew }, i) => (
+                  <button
+                    key={c.id}
+                    onClick={() => onSelectContest(c)}
+                    style={{ animationDelay: `${i * 80}ms` }}
+                    className="animate-fade-in text-start bg-white/10 hover:bg-white/20 border border-white/15 rounded-2xl p-3 transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${elig.verdict === 'eligible' ? 'bg-emerald-400 text-emerald-950' : 'bg-amber-300 text-amber-950'}`}>
+                        {elig.verdict === 'eligible' ? (fr ? 'Correspond' : 'مطابقة') : fr ? 'À vérifier' : 'للتحقق'}
+                      </span>
+                      <span className="text-[10px] font-bold text-rose-100">
+                        {isNew ? (fr ? 'Nouveau • ' : 'جديد • ') : ''}
+                        {deadlineBadge(c.daysRemaining, language)}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold line-clamp-2">{c.title[language] || c.title.fr}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={onOpenForYou}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-white text-[#8D174B] text-xs font-extrabold hover:bg-rose-50 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 animate-cta-bounce"
+            >
+              <span>{fr ? 'Voir tous mes concours' : 'عرض جميع مبارياتي'}</span>
+              <ArrowIcon className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      })()}
+
       {/* 1. THREE MAIN ACTION SHORTCUTS (Matching Reference Image 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
         
@@ -290,7 +358,8 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
         </div>
       </div>
 
-      {/* 3. SMART MATCH DISCREET ENTRY POINT (As specified in Section 19) */}
+      {/* 3. SMART MATCH : invitation à compléter le profil (masquée une fois le profil prêt) */}
+      {!matchFeed?.ready && (
       <div className="bg-gradient-to-r from-[#FDF2F7] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#8D174B]/20 p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0 shadow-md">
@@ -304,7 +373,7 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
             </h3>
             <p className="text-xs text-[#6E6773] mt-0.5 font-medium">
               {language === 'fr' 
-                ? 'Complétez votre profil : Diplôme • Spécialité • Région...' 
+                ? 'Diplôme + spécialité : KounKour vous montre chaque concours ouvert fait pour vous.' 
                 : 'أكمل بيانات ملفك: الدبلوم • التخصص • الجهة...'}
             </p>
           </div>
@@ -318,6 +387,7 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
           <ArrowIcon className="w-4 h-4" />
         </button>
       </div>
+      )}
 
     </div>
   );

@@ -238,7 +238,9 @@ export interface CandidateProfile {
   phone: string;
   age: number;
   degreeLevel: string; // 'Bac', 'Bac+2', 'Licence', 'Master', 'Doctorat'
-  specialty: string; // 'Droit', 'Économie / Gestion', 'Informatique / Télécom', 'Génie Civil', 'Santé', 'Éducation', 'Autre'
+  specialty: string; // spécialité principale (compatibilité)
+  /** Toutes les spécialités du candidat (diplôme principal + autres), 1 à 3. */
+  specialties?: string[];
   region: string;
   currentSituation: 'student' | 'job_seeker' | 'employed' | 'civil_servant';
   notificationsEnabled: boolean;

@@ -3,6 +3,7 @@ import { Contest, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { Calendar, Users, GraduationCap, MapPin, Bookmark, CheckCircle2, AlertTriangle, Clock, Sparkles, Check } from 'lucide-react';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
+import { isProfileReady } from '../utils/smartMatch';
 import { resolveAdministrationLogo } from '../utils/radarStorage';
 
 interface ContestCardProps {
@@ -23,6 +24,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({
   const t = translations[language];
   const profile = loadCandidateProfile();
   const eligibility = checkEligibility(contest, profile);
+  const profileReady = isProfileReady(profile);
 
   // Helper for status formatting
   const getStatusBadge = () => {
@@ -149,23 +151,20 @@ export const ContestCard: React.FC<ContestCardProps> = ({
         <div className="p-4 sm:p-5">
           {/* Candidate match badge with score */}
           <div className="mb-2 flex items-center justify-between gap-2">
-            {eligibility.isHighMatch ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FDF2F7] text-[#8D174B] border border-[#8D174B]/25 shadow-2xs">
-                <Sparkles className="w-3 h-3 text-[#8D174B]" />
-                <span>{language === 'fr' ? `🎯 ${eligibility.score}% Match Profil Idéal` : `🎯 ${eligibility.score}% مطابقة مثالية لملفك`}</span>
-              </span>
+            {!profileReady ? (
+              <span />
             ) : eligibility.isEligible ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
                 <Check className="w-3 h-3 text-emerald-600" />
-                <span>{language === 'fr' ? `✅ ${eligibility.score}% Éligible` : `✅ ${eligibility.score}% مؤهل قانوناً`}</span>
+                <span>{language === 'fr' ? 'Pour votre profil' : 'مطابقة لملفك'}</span>
               </span>
             ) : eligibility.verdict === 'verify' ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                <span>{language === 'fr' ? '🔎 À vérifier' : '🔎 يُتحقق منه'}</span>
+                <span>{language === 'fr' ? '🔎 À vérifier pour vous' : '🔎 يُتحقق منه'}</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200">
-                <span>{language === 'fr' ? '⚠️ Non éligible' : '⚠️ غير مؤهل'}</span>
+                <span>{language === 'fr' ? 'Hors profil' : 'خارج ملفك'}</span>
               </span>
             )}
 

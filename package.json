@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:eligibility": "tsx scripts/test-eligibility.ts",
+    "test:eligibility": "tsx scripts/test-smartmatch.ts",
     "test:scrapers": "tsx scripts/test-scrapers.ts",
     "test:detail": "tsx scripts/test-detail-parser.ts",
     "build:vercel": "vite build && node scripts/postbuild-vercel.mjs",

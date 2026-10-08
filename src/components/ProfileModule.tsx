@@ -12,9 +12,13 @@ import {
   CandidateProfile, CandidateTrackingItem, ApplicationStatus,
   loadCandidateProfile, saveCandidateProfile,
   loadCandidateTracking, updateContestTracking,
-  checkEligibility, exportAllBrowserData, importBrowserData, clearAllBrowserData
+  exportAllBrowserData, importBrowserData, clearAllBrowserData
 } from '../utils/candidateStorage';
 import { inferSalaryScaleFromProfile, calculateMoroccanPublicSalary } from '../data/salaryScales';
+import { ForYouPanel } from './ForYouPanel';
+import { saveMatchPreferences, loadMatchPreferences } from '../data/matchPrefsApi';
+import { buildMatchFeed } from '../utils/matchFeed';
+import { profileSpecialties, specialtySuggestions } from '../utils/smartMatch';
 
 interface ProfileModuleProps {
   language: Language;
@@ -27,6 +31,7 @@ interface ProfileModuleProps {
   onProfileUpdated?: () => void;
   onOpenSalarySimulator?: (contest?: Contest) => void;
   onOpenAdminCv?: () => void;
+  initialTab?: 'tracking' | 'profile' | 'recommendations' | 'qcm' | 'storage';
 }
 
 export const ProfileModule: React.FC<ProfileModuleProps> = ({
@@ -40,13 +45,15 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
   onProfileUpdated,
   onOpenSalarySimulator,
   onOpenAdminCv,
+  initialTab,
 }) => {
   const t = translations[language];
   const isRTL = language === 'ar';
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
 
   // Tabs: 'tracking' | 'profile' | 'recommendations' | 'qcm' | 'storage'
-  const [activeProfileTab, setActiveProfileTab] = useState<'tracking' | 'profile' | 'recommendations' | 'qcm' | 'storage'>('tracking');
+  const [activeProfileTab, setActiveProfileTab] = useState<'tracking' | 'profile' | 'recommendations' | 'qcm' | 'storage'>(initialTab || 'tracking');
+  const [specDraft, setSpecDraft] = useState('');
 
   // Candidate Profile State from localStorage
   const [profile, setProfile] = useState<CandidateProfile>(loadCandidateProfile());
@@ -64,13 +71,51 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
     setTrackingMap(loadCandidateTracking());
   }, [bookmarkedContests]);
 
+  // Nouvel appareil : on reprend le profil Smart Match enregistré dans le compte.
+  useEffect(() => {
+    const local = loadCandidateProfile();
+    if (profileSpecialties(local).length && local.degreeLevel) return;
+    let alive = true;
+    loadMatchPreferences().then((remote) => {
+      if (!alive || !remote || !(remote.specialties || []).length) return;
+      const merged = { ...local, ...Object.fromEntries(Object.entries(remote).filter(([, v]) => (Array.isArray(v) ? v.length : v))) } as CandidateProfile;
+      saveCandidateProfile(merged);
+      setProfile(merged);
+      if (onProfileUpdated) onProfileUpdated();
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    saveCandidateProfile(profile);
+    // Spécialité en cours de saisie non validée par « Ajouter » : on la garde aussi.
+    const specs = [...profileSpecialties(profile), ...(specDraft.trim() ? [specDraft.trim()] : [])].slice(0, 3);
+    const toSave = { ...profile, specialties: specs, specialty: specs[0] || '' };
+    setProfile(toSave);
+    setSpecDraft('');
+    saveCandidateProfile(toSave);
+    void saveMatchPreferences(toSave);
     setIsEditingProfile(false);
     setProfileSaveSuccess(true);
     if (onProfileUpdated) onProfileUpdated();
     setTimeout(() => setProfileSaveSuccess(false), 3000);
+  };
+
+  const specialtyOptions = React.useMemo(() => specialtySuggestions(allContests), [allContests]);
+  const mySpecs = profileSpecialties(profile);
+  const addSpecialty = (raw: string) => {
+    const v = raw.trim();
+    if (!v || mySpecs.length >= 3 || mySpecs.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+    const next = [...mySpecs, v];
+    setProfile({ ...profile, specialties: next, specialty: next[0] });
+    setSpecDraft('');
+  };
+  const removeSpecialty = (v: string) => {
+    const next = mySpecs.filter((x) => x !== v);
+    setProfile({ ...profile, specialties: next, specialty: next[0] || '' });
   };
 
   const handleUpdateStatus = (contestId: string, status: ApplicationStatus) => {
@@ -156,10 +201,8 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
   };
 
   // Recommendations calculation
-  const recommendedContests = allContests.filter((contest) => {
-    const elig = checkEligibility(contest, profile);
-    return elig.isEligible;
-  });
+  const matchFeed = React.useMemo(() => buildMatchFeed(allContests, loadCandidateProfile()), [allContests, profileSaveSuccess]);
+  const recommendedContests = [...matchFeed.eligible, ...matchFeed.verify];
 
   // Calculate QCM Stats
   const avgQcmScore = completedQcmScores.length > 0
@@ -189,7 +232,7 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                 </span>
               </div>
               <p className="text-xs text-[#6E6773] mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>{profile.degreeLevel} • {profile.specialty}</span>
+                <span>{profile.degreeLevel} • {mySpecs.join(', ')}</span>
                 <span>•</span>
                 <span>{profile.age} {language === 'fr' ? 'ans' : 'سنة'}</span>
                 <span>•</span>
@@ -209,7 +252,7 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
             <div className="text-center">
               <span className="text-xl font-extrabold text-emerald-600 block">{recommendedContests.length}</span>
               <span className="text-[10px] text-[#6E6773] uppercase font-semibold">
-                {language === 'fr' ? 'Éligibles' : 'مطابقة'}
+                {language === 'fr' ? 'Pour vous' : 'لك'}
               </span>
             </div>
             <div className="text-center">
@@ -264,10 +307,15 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
           }`}
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          <span>{language === 'fr' ? 'Concours Recommandés' : 'مباريات مقترحة'}</span>
+          <span>{language === 'fr' ? 'Pour vous' : 'مباريات لك'}</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-900 font-bold">
             {recommendedContests.length}
           </span>
+          {matchFeed.newCount > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-600 text-white font-bold animate-pulse">
+              +{matchFeed.newCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -546,113 +594,15 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
         </div>
       )}
 
-      {/* TAB 2: Personalized Recommendations & Smart Matching */}
+      {/* TAB 2: Pour vous — Smart Match */}
       {activeProfileTab === 'recommendations' && (
-        <div className="space-y-4">
-          <div className="bg-[#FDF2F7] border border-[#8D174B]/20 rounded-2xl p-4 text-xs text-[#8D174B] flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-[#8D174B] shrink-0 mt-0.5" />
-            <div>
-              <strong className="font-bold block text-sm mb-0.5">
-                {language === 'fr' 
-                  ? `Concours correspondants à votre profil (${profile.degreeLevel || 'Diplôme'} • ${profile.specialty || 'Spécialité'} • ${profile.age || '-'} ans)` 
-                  : `المباريات المطابقة لمؤهلاتك (${profile.degreeLevel || 'الدبلوم'} • ${profile.specialty || 'التخصص'} • ${profile.age || '-'} سنة)`}
-              </strong>
-              <p className="text-[#6E6773]">
-                {language === 'fr' 
-                  ? 'Affichage exclusif des concours où votre diplôme, spécialité et âge remplissent 100% des conditions officielles d’accès.'
-                  : 'عرض حصري للمباريات التي تطابق فيها مؤهلاتك شروط الترشيح بنسبة 100%.'}
-              </p>
-            </div>
-          </div>
-
-          {(() => {
-            const onlyEligibleList = allContests
-              .map((c) => ({ c, elig: checkEligibility(c, profile) }))
-              .filter(({ elig }) => elig.isEligible)
-              .sort((a, b) => (b.elig.score || 0) - (a.elig.score || 0));
-
-            if (onlyEligibleList.length === 0) {
-              return (
-                <div className="bg-white border border-[#F1E5EC] rounded-3xl p-8 text-center space-y-4 shadow-xs">
-                  <div className="w-14 h-14 rounded-2xl bg-[#FAF0F5] text-[#8D174B] flex items-center justify-center mx-auto">
-                    <Sparkles className="w-7 h-7" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1">
-                    <h4 className="text-base font-extrabold text-[#242126]">
-                      {language === 'fr' 
-                        ? 'Aucun concours ouvert 100% éligible actuellement' 
-                        : 'لا توجد مباريات مفتوحة مطابقة لملفك حالياً'}
-                    </h4>
-                    <p className="text-xs text-[#6E6773] leading-relaxed">
-                      {language === 'fr'
-                        ? 'Assurez-vous que votre niveau de diplôme, spécialité exacte et âge sont bien renseignés dans votre profil, ou consultez l’ensemble des concours ouverts.'
-                        : 'تأكد من إدخال الدبلوم والتخصص والسن بدقة في ملفك الشخصي، أو تصفح جميع المباريات المفتوحة.'}
-                    </p>
-                  </div>
-                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      onClick={() => setActiveProfileTab('profile')}
-                      className="px-4 py-2.5 rounded-2xl bg-[#8D174B] text-white font-extrabold text-xs hover:bg-[#70113B] transition-all cursor-pointer"
-                    >
-                      {language === 'fr' ? 'Compléter / Modifier mon profil' : 'تحديث بيانات ملفي الشخصي'}
-                    </button>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {onlyEligibleList.map(({ c, elig }) => (
-                  <div
-                    key={c.id}
-                    onClick={() => onSelectContest(c)}
-                    className="bg-white border border-emerald-200/80 hover:border-[#8D174B]/40 rounded-2xl p-5 shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-[10px] font-bold text-[#8D174B] uppercase">
-                          {c.administration.name[language]}
-                        </span>
-
-                        {elig.isHighMatch ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            {language === 'fr' ? `🎯 ${elig.score}% Match Parfait` : `🎯 ${elig.score}% مطابقة تامة`}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            {language === 'fr' ? `✅ ${elig.score}% Éligible` : `✅ ${elig.score}% مؤهل`}
-                          </span>
-                        )}
-                      </div>
-
-                      <h4 className="text-sm font-bold text-[#242126] group-hover:text-[#8D174B] transition-colors mb-2 line-clamp-2">
-                        {c.title[language]}
-                      </h4>
-
-                      {/* Reasons breakdown */}
-                      <div className="space-y-1 mb-3">
-                        {elig.reasons.map((r, i) => (
-                          <p key={i} className="text-[11px] text-[#4A4250] flex items-start gap-1.5">
-                            <span className="text-emerald-600 font-bold">•</span>
-                            <span>{r[language]}</span>
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-[#F1E5EC] flex items-center justify-between text-xs text-[#6E6773]">
-                      <span>{c.degreeLevel} • {c.postsCount} {t.contests.posts}</span>
-                      <span className="text-[#8D174B] font-bold">{c.deadlineDate}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </div>
+        <ForYouPanel
+          language={language}
+          contests={allContests}
+          profile={loadCandidateProfile()}
+          onSelectContest={onSelectContest}
+          onEditProfile={() => setActiveProfileTab('profile')}
+        />
       )}
 
       {/* TAB 3: Candidate Profile Form */}
@@ -735,77 +685,81 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                   <option value="Master">Master / Ingénieur d’État (ماستر / مهندس دولة)</option>
                   <option value="Licence">Licence Fondamentale ou Professionnelle (الإجازة)</option>
                   <option value="Bac+2">Bac+2 : DTS / DUT / BTS (تقني متخصص)</option>
+                  <option value="Technicien">Diplôme de technicien – formation professionnelle (تقني)</option>
                   <option value="Bac">Baccalauréat (الباكالوريا)</option>
+                  <option value="CQP">CQP / qualification professionnelle (التأهيل المهني)</option>
                 </select>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-[#242126] block mb-1">
-                  {language === 'fr' ? 'Spécialité / Filière' : 'التخصص / الشعبة'}
+                  {language === 'fr' ? 'Vos spécialités (jusqu’à 3)' : 'تخصصاتك (حتى 3)'}
                 </label>
-                <input
-                  type="text"
-                  list="specialties-list"
-                  value={profile.specialty}
-                  onChange={(e) => setProfile({ ...profile, specialty: e.target.value })}
-                  placeholder={language === 'fr' ? 'Choisissez ou tapez votre spécialité…' : 'اختر أو اكتب تخصصك…'}
-                  className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white font-medium"
-                />
+                {mySpecs.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                    {mySpecs.map((sp) => (
+                      <span key={sp} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FDF2F7] text-[#8D174B] text-[11px] font-bold border border-[#8D174B]/20">
+                        {sp}
+                        <button type="button" onClick={() => removeSpecialty(sp)} className="hover:text-rose-700 cursor-pointer" aria-label={language === 'fr' ? 'Retirer' : 'حذف'}>
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {mySpecs.length < 3 && (
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      list="specialties-list"
+                      value={specDraft}
+                      onChange={(e) => setSpecDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addSpecialty(specDraft);
+                        }
+                      }}
+                      placeholder={language === 'fr' ? 'Ex. : Génie civil, Comptabilité, Infirmier polyvalent…' : 'مثال: الهندسة المدنية، المحاسبة…'}
+                      className="flex-1 min-w-0 bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addSpecialty(specDraft)}
+                      className="px-3 rounded-xl bg-[#8D174B] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                    >
+                      {language === 'fr' ? 'Ajouter' : 'إضافة'}
+                    </button>
+                  </div>
+                )}
                 <datalist id="specialties-list">
-                  <option value="Droit privé" />
-                  <option value="Droit public" />
-                  <option value="Sciences juridiques" />
-                  <option value="Économie" />
-                  <option value="Gestion" />
-                  <option value="Finance" />
-                  <option value="Comptabilité" />
-                  <option value="Audit et contrôle de gestion" />
-                  <option value="Management des systèmes d'information" />
-                  <option value="Gestion des ressources humaines" />
-                  <option value="Secrétariat et bureautique" />
-                  <option value="Informatique" />
-                  <option value="Développement informatique" />
-                  <option value="Réseaux et sécurité" />
-                  <option value="Cybersécurité" />
-                  <option value="Intelligence artificielle et data" />
-                  <option value="Statistique" />
-                  <option value="Génie civil" />
-                  <option value="BTP" />
-                  <option value="Architecture" />
-                  <option value="Génie électrique" />
-                  <option value="Systèmes embarqués" />
-                  <option value="Génie mécanique" />
-                  <option value="Mécanique et électricité automobiles" />
-                  <option value="Génie industriel" />
-                  <option value="Énergétique" />
-                  <option value="Agronomie" />
-                  <option value="Agriculture" />
-                  <option value="Techniques agricoles" />
-                  <option value="Médecine" />
-                  <option value="Pharmacie" />
-                  <option value="Soins infirmiers" />
-                  <option value="Kinésithérapie" />
-                  <option value="Santé publique" />
-                  <option value="Sciences de l'éducation" />
-                  <option value="Enseignement" />
-                  <option value="Mathématiques" />
-                  <option value="Mathématiques appliquées" />
-                  <option value="Physique" />
-                  <option value="Chimie" />
-                  <option value="Biologie" />
-                  <option value="Lettres et langues" />
-                  <option value="Traduction" />
-                  <option value="Sciences politiques" />
-                  <option value="Géographie et SIG" />
-                  <option value="Commerce" />
-                  <option value="Inspection du travail" />
-                  <option value="Douanes" />
-                  <option value="Sécurité (police / protection civile)" />
+                  {specialtyOptions.map((o) => (
+                    <option key={o} value={o} />
+                  ))}
                 </datalist>
                 <p className="text-[10px] text-[#9A93A0] mt-1">
                   {language === 'fr'
-                    ? 'Vous pouvez taper librement votre spécialité si elle n’est pas dans la liste.'
-                    : 'يمكنك كتابة تخصصك بحرية إذا لم يكن في القائمة.'}
+                    ? 'Choisissez dans la liste (spécialités des concours publiés) ou tapez la vôtre. Ajoutez vos autres diplômes pour ne rater aucun concours.'
+                    : 'اختر من القائمة أو اكتب تخصصك. أضف تخصصاتك الأخرى لكي لا تفوتك أي مباراة.'}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#242126] block mb-1">
+                  {language === 'fr' ? 'Situation actuelle' : 'الوضعية الحالية'}
+                </label>
+                <select
+                  value={profile.currentSituation}
+                  onChange={(e) => setProfile({ ...profile, currentSituation: e.target.value as CandidateProfile['currentSituation'] })}
+                  className="w-full bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl px-3.5 py-2.5 text-xs text-[#242126] focus:outline-none focus:border-[#8D174B] focus:bg-white cursor-pointer"
+                >
+                  <option value="student">{language === 'fr' ? 'Étudiant(e)' : 'طالب(ة)'}</option>
+                  <option value="job_seeker">{language === 'fr' ? 'En recherche d’emploi' : 'باحث(ة) عن عمل'}</option>
+                  <option value="employed">{language === 'fr' ? 'Salarié(e) du privé' : 'أجير(ة) بالقطاع الخاص'}</option>
+                  <option value="civil_servant">{language === 'fr' ? 'Fonctionnaire' : 'موظف(ة)'}</option>
+                </select>
+                <p className="text-[10px] text-[#9A93A0] mt-1">
+                  {language === 'fr' ? 'Utile pour l’âge : beaucoup d’arrêtés lèvent la limite pour les fonctionnaires.' : 'مفيد للسن: عدة قرارات لا تحدد سناً للموظفين.'}
                 </p>
               </div>
 
