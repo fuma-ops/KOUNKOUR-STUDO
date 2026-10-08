@@ -22,6 +22,8 @@ export async function saveMatchPreferences(profile: CandidateProfile): Promise<v
         diploma_level: years !== null && years >= 0 && years <= 8 ? years : null,
         specialty: profileSpecialties(profile).join(' ; ') || null,
         region: profile.region || null,
+        age: profile.age >= 15 && profile.age <= 80 ? profile.age : null,
+        situation: profile.currentSituation || null,
         match_consent: true,
         updated_at: new Date().toISOString(),
       },
@@ -57,5 +59,38 @@ export async function loadMatchPreferences(): Promise<Partial<CandidateProfile> 
     };
   } catch {
     return null;
+  }
+}
+
+/** Alertes e-mail (opt-in) : état actuel pour le compte connecté, null si non connecté. */
+export async function loadEmailAlerts(): Promise<boolean | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  try {
+    const { data } = await sb.auth.getUser();
+    const uid = data.user?.id;
+    if (!uid) return null;
+    const { data: row } = await sb.from('smart_match_preferences').select('email_alerts').eq('user_id', uid).maybeSingle();
+    return !!row?.email_alerts;
+  } catch {
+    return null;
+  }
+}
+
+/** Active / désactive les alertes e-mail (enregistre aussi le profil, nécessaire au tri). */
+export async function setEmailAlerts(enabled: boolean, profile: CandidateProfile): Promise<{ ok: boolean; error?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Service indisponible' };
+  try {
+    const { data } = await sb.auth.getUser();
+    const uid = data.user?.id;
+    if (!uid) return { ok: false, error: 'Connectez-vous pour recevoir les alertes.' };
+    await saveMatchPreferences(profile);
+    const { error } = await sb
+      .from('smart_match_preferences')
+      .upsert({ user_id: uid, email_alerts: enabled, match_consent: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Erreur réseau' };
   }
 }

@@ -212,7 +212,7 @@ export const CONCEPTS: Concept[] = [
   C('droit_prive', 'droit', 'Droit privé / des affaires', /droit prive|droit des affaires|droit civil|droit des societes|droit financier|droit maritime|propriete industrielle|droit du contentieux|droit medical|droit commercial/),
   C('droit_public', 'droit', 'Droit public / administratif', /droit public|droit administratif|sciences administratives|relations internationales|finances publiques|sciences politiques/),
   // BTP, eau, topographie, architecture
-  C('gc', 'btp', 'Génie civil / BTP', /genie civil|batiment|travaux publics|\bbtp\b|ponts et chaussees|gros (oeuvres?|travaux)|grands travaux|\bvrd\b|construction|infrastructures? de transport|travaux des gros/),
+  C('gc', 'btp', 'Génie civil / BTP', /genie civil|batiment|(?<!engins de )travaux publics|\bbtp\b|ponts et chaussees|gros (oeuvres?|travaux)|grands travaux|\bvrd\b|construction|infrastructures? de transport|travaux des gros/),
   C('hydro', 'btp|eau', 'Hydraulique / eau', /hydrauli|genie de l.eau|maitrise de l.eau|irrigation|traitement des eaux|techniques de l.eau|science de l.eau|eau et (de l.)?environnement/),
   C('genie_rural', 'btp|agriculture|eau', 'Génie rural', /genie rural/),
   C('topo', 'btp', 'Topographie / géomatique / SIG', /topograph|geomati|cartograph|\bsig\b|information geographique|geodesie|dessinateur/),

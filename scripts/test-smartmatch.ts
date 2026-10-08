@@ -42,6 +42,7 @@ expect('Gestion des entreprises ↔ Comptabilité → à vérifier', sp('Gestion
 expect('Audit et contrôle de gestion ↔ Audit', sp('Audit et contrôle de gestion', ['Audit et contrôle de gestion']) === 'match');
 expect('Toutes spécialités → correspond', sp('Toutes spécialités', ['Chimie']) === 'match');
 expect('Infirmier polyvalent ↔ Anesthésie (posts infirmiers) → à vérifier', sp('Anesthésie et réanimation', ['Infirmier polyvalent']) === 'close');
+expect('Conduite d’engins de travaux publics ≠ Génie civil', sp("Conduite de véhicules ou d'engins de travaux publics", ['Génie civil']) === 'none');
 expect('Génie électrique ≠ Génie civil', sp('Génie électrique', ['Génie civil']) === 'none');
 expect('Électromécanique ↔ Génie mécanique → à vérifier', sp('Électromécanique', ['Génie mécanique']) === 'close');
 expect('DESA, DESS, master… → Bac+5', JSON.stringify(degreeYearsIn('DESA, DESS, master ou master spécialisé')) === '[5]');

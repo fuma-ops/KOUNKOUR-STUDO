@@ -12,6 +12,9 @@
     },
     "api/radar/fetch-docs.ts": {
       "maxDuration": 60
+    },
+    "api/alerts/daily.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
