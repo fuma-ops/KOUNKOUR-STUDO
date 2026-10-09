@@ -159,6 +159,10 @@ export interface QcmSet {
   concoursLabel?: string | null;
   examYear?: number | null;
   sourceNote?: string | null;
+  /** Photos du sujet original (annales), dans l'ordre des pages. */
+  sourceImages?: string[];
+  /** Page où le sujet a été trouvé (attribution). */
+  sourceUrl?: string | null;
   /** Dossier de préparation (un par concours). */
   folderSlug?: string | null;
   // Correction calculée par le serveur (les bonnes réponses ne sont pas dans le chargement).

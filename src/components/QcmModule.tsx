@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
+import { AnnaleImages } from './AnnaleImages';
 import { translations } from '../i18n/translations';
 import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, seenCount, submitQcm } from '../data/qcmApi';
 import { 
@@ -342,6 +343,12 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                     {set.kind === 'annales' && set.concoursLabel && (
                       <p className="text-[11px] font-semibold text-[#8D174B] mb-2">{set.concoursLabel}{set.examYear ? ` • ${set.examYear}` : ''}</p>
                     )}
+                    {!!set.sourceImages?.length && (
+                      <p className="text-[11px] font-bold text-emerald-800 mb-2 flex items-center gap-1">
+                        <Eye className="w-3.5 h-3.5" />
+                        {fr ? `Photo du sujet original incluse (${set.sourceImages.length} p.)` : `صورة الموضوع الأصلي مرفقة (${set.sourceImages.length} ص)`}
+                      </p>
+                    )}
                     <p className="text-xs text-[#6E6773] leading-relaxed mb-4 line-clamp-3">{set.description[language]}</p>
                   </div>
 
@@ -420,6 +427,13 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
           </span>
         </div>
       </div>
+
+      {/* Photos du sujet original (annales) : consultables pendant l'entraînement et la correction */}
+      {!!selectedSet.sourceImages?.length && (
+        <div className="mb-6">
+          <AnnaleImages images={selectedSet.sourceImages} language={language} sourceUrl={selectedSet.sourceUrl} sourceNote={selectedSet.sourceNote} />
+        </div>
+      )}
 
       {/* Result view if submitted */}
       {isSubmitted ? (
