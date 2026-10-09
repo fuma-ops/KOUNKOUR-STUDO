@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
 import { translations } from '../i18n/translations';
-import { mockQcmSets } from '../data/mockQcm';
 import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, seenCount, submitQcm } from '../data/qcmApi';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
@@ -27,15 +26,6 @@ function writeDraft(setId: string, answers: Record<string, string> | null) {
   }
 }
 
-// Supports d'entraînement KounKour → dossier du concours correspondant.
-const TRAINING_FOLDER: Record<string, string> = {
-  'qcm-dgsn-gardiens-paix-annales': 'dgsn-gardiens-de-la-paix',
-  'qcm-dgsn-inspecteurs-police-fr': 'dgsn-inspecteurs-de-police',
-  'qcm-dgsn-inspecteurs-arabe': 'dgsn-inspecteurs-de-police',
-  'qcm-dgsn-officiers-police-droit': 'dgsn-officiers-de-police',
-  'qcm-dgsn-commissaires-police': 'dgsn-commissaires-de-police',
-};
-
 interface QcmModuleProps {
   language: Language;
   onRecordScore?: (qcmId: string, score: number, total: number) => void;
@@ -45,7 +35,7 @@ interface QcmModuleProps {
   onNavigate?: (folder: string | null, set: string | null) => void;
 }
 
-// Clé d'URL d'un support : slug pour les annales en base, id pour l'entraînement.
+// Clé d'URL d'un support : son slug en base.
 const urlKey = (set: QcmSet) => (set.serverGraded ? set.slug : set.id);
 
 export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, folderSlug = null, setSlug = null, onNavigate }) => {
@@ -83,10 +73,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
       .finally(() => { if (!cancelled) setLoadingSets(false); });
     return () => { cancelled = true; };
   }, []);
-  const allSets: QcmSet[] = [
-    ...realSets,
-    ...mockQcmSets.map((m) => ({ ...m, kind: 'entrainement' as const, folderSlug: TRAINING_FOLDER[m.id] || null })),
-  ];
+  // Annales réelles et QCM d'entraînement : tous stockés en base, corrigés par le serveur.
+  const allSets: QcmSet[] = realSets;
   const setsOf = (slug: string) => allSets.filter((x) => x.folderSlug === slug);
   const statsOf = (sets: QcmSet[]) => {
     const total = sets.reduce((a, x) => a + x.questions.length, 0);
@@ -474,6 +462,12 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                     ? `Questions réelles transcrites mot pour mot${selectedSet.concoursLabel ? ` (${selectedSet.concoursLabel}${selectedSet.examYear ? ' ' + selectedSet.examYear : ''})` : ''}. Corrigé établi par KounKour avec sa source.`
                     : 'أسئلة حقيقية منقولة حرفيا. التصحيح من إعداد كونكور مع ذكر المصدر.'}
                 </span>
+              </p>
+            )}
+            {selectedSet.kind !== 'annales' && selectedSet.sourceNote && (
+              <p className="text-[11px] text-[#6E6773] bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl p-3 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-[#8D174B] shrink-0" />
+                <span dir={contentDir(selectedSet)}>{selectedSet.sourceNote}</span>
               </p>
             )}
 
