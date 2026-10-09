@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
 import { AnnaleImages } from './AnnaleImages';
+import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
+import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
 import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, seenCount, submitQcm } from '../data/qcmApi';
 import { 
@@ -46,6 +48,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
   const PrevIcon = isRTL ? ArrowRight : ArrowLeft;
 
   const [selectedSet, setSelectedSet] = useState<QcmSet | null>(null);
+  const { isStaff } = useSession();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -429,9 +432,20 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
       </div>
 
       {/* Photos du sujet original (annales) : consultables pendant l'entraînement et la correction */}
-      {!!selectedSet.sourceImages?.length && (
-        <div className="mb-6">
-          <AnnaleImages images={selectedSet.sourceImages} language={language} sourceUrl={selectedSet.sourceUrl} sourceNote={selectedSet.sourceNote} />
+      {(!!selectedSet.sourceImages?.length || (isStaff && selectedSet.kind === 'annales')) && (
+        <div className="mb-6 space-y-2">
+          <AnnaleImages images={selectedSet.sourceImages || []} language={language} sourceUrl={selectedSet.sourceUrl} sourceNote={selectedSet.sourceNote} />
+          {isStaff && selectedSet.kind === 'annales' && (
+            <AnnalePhotosAdmin
+              setId={selectedSet.id}
+              slug={selectedSet.slug}
+              images={selectedSet.sourceImages || []}
+              onChange={(images) => {
+                setSelectedSet((s) => (s ? { ...s, sourceImages: images } : s));
+                setRealSets((all) => all.map((x) => (x.id === selectedSet.id ? { ...x, sourceImages: images } : x)));
+              }}
+            />
+          )}
         </div>
       )}
 

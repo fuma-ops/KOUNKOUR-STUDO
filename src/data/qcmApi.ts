@@ -264,3 +264,41 @@ export function seenCount(p: QcmProgress | undefined, questionIds: string[]): nu
   const seen = new Set(p.seen);
   return questionIds.filter((id) => seen.has(id)).length;
 }
+
+// ─── Photos du sujet original (équipe uniquement, re-vérifié par les RLS) ─────
+
+// Réduit la photo (≤ 1600 px, JPEG) pour un chargement rapide sur mobile.
+async function compressImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('compression'))), 'image/jpeg', 0.85),
+  );
+}
+
+// Envoie les photos (dans l'ordre choisi) et les ajoute à la série. Renvoie la liste complète.
+export async function addAnnaleImages(setId: string, slug: string, current: string[], files: File[]): Promise<string[]> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Service indisponible.');
+  const urls: string[] = [];
+  for (const [i, file] of files.entries()) {
+    const blob = await compressImage(file);
+    const path = `${slug}/${Date.now()}-${i + 1}.jpg`;
+    const { error } = await sb.storage.from('annales').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    if (error) throw new Error('Envoi refusé (compte équipe requis).');
+    urls.push(sb.storage.from('annales').getPublicUrl(path).data.publicUrl);
+  }
+  return setAnnaleImages(setId, [...current, ...urls]);
+}
+
+export async function setAnnaleImages(setId: string, images: string[]): Promise<string[]> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Service indisponible.');
+  const { data, error } = await sb.from('qcm_sets').update({ source_images: images }).eq('id', setId).select('source_images').single();
+  if (error || !data) throw new Error('Mise à jour refusée (compte équipe requis).');
+  return data.source_images as string[];
+}
