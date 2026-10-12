@@ -232,9 +232,15 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                 <button
                   key={f.slug}
                   onClick={() => navigate(f.slug, null)}
-                  className="text-start bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 rounded-3xl p-5 shadow-xs hover:shadow-md hover-scale active:scale-95 transition-all cursor-pointer animate-fade-in"
+                  className="text-start flex flex-col justify-start bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 rounded-3xl p-5 shadow-xs hover:shadow-md hover-scale active:scale-95 transition-all cursor-pointer animate-fade-in overflow-hidden"
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
+                  {f.coverImage && (
+                    <div className="-mx-5 -mt-5 mb-4 h-28 sm:h-32 relative">
+                      <img src={f.coverImage} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-white/70 to-transparent" />
+                    </div>
+                  )}
                   <div className="flex items-start gap-3 mb-4">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0 shadow-xs">
                       <FolderOpen className="w-6 h-6" />
@@ -290,6 +296,12 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
           {fr ? 'Tous les concours' : 'كل المباريات'}
         </button>
 
+        {folder?.coverImage && (
+          <div className="relative h-36 sm:h-48 rounded-3xl overflow-hidden mb-3 animate-fade-in">
+            <img src={folder.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
+          </div>
+        )}
         <div className="bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#F1E5EC] p-5 sm:p-6 mb-6">
           <div className="flex items-start gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0">

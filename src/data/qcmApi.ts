@@ -7,6 +7,7 @@ export interface QcmFolder {
   organization: string;
   description: { fr: string; ar: string };
   position: number;
+  coverImage?: string | null; // image d'en-tête du dossier (choisie par l'équipe)
 }
 
 // Repli si la base est injoignable (mêmes dossiers que dans Supabase).
@@ -29,6 +30,7 @@ export async function fetchQcmFolders(): Promise<QcmFolder[]> {
     organization: f.organization || '',
     description: { fr: f.description_fr || '', ar: f.description_ar || f.description_fr || '' },
     position: f.position,
+    coverImage: f.cover_image || null,
   }));
 }
 
@@ -268,9 +270,9 @@ export function seenCount(p: QcmProgress | undefined, questionIds: string[]): nu
 // ─── Photos du sujet original (équipe uniquement, re-vérifié par les RLS) ─────
 
 // Réduit la photo (≤ 1600 px, JPEG) pour un chargement rapide sur mobile.
-async function compressImage(file: File): Promise<Blob> {
+async function compressImage(file: File, max = 1600): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
@@ -301,4 +303,60 @@ export async function setAnnaleImages(setId: string, images: string[]): Promise<
   const { data, error } = await sb.from('qcm_sets').update({ source_images: images }).eq('id', setId).select('source_images').single();
   if (error || !data) throw new Error('Mise à jour refusée (compte équipe requis).');
   return data.source_images as string[];
+}
+
+// ─── Réglages équipe : séries d'annales et images d'en-tête des dossiers ─────
+
+export interface AdminQcmSet {
+  id: string;
+  slug: string;
+  title: string;
+  folderSlug: string | null;
+  kind: string;
+  examYear: number | null;
+  status: string;
+  sourceImages: string[];
+  questions: number;
+}
+
+// Toutes les séries (y compris non publiées), visibles par l'équipe grâce aux RLS.
+export async function fetchQcmSetsForAdmin(): Promise<AdminQcmSet[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from('qcm_sets')
+    .select('id, slug, title_fr, folder_slug, kind, exam_year, status, source_images, position, qcm_questions(id)')
+    .order('position', { ascending: true });
+  if (error || !data) return [];
+  return data.map((s: any) => ({
+    id: s.id,
+    slug: s.slug,
+    title: s.title_fr,
+    folderSlug: s.folder_slug,
+    kind: s.kind,
+    examYear: s.exam_year,
+    status: s.status,
+    sourceImages: s.source_images || [],
+    questions: (s.qcm_questions || []).length,
+  }));
+}
+
+// Envoie une nouvelle image d'en-tête (≤ 1600 px, JPEG) et l'attache au dossier.
+export async function uploadFolderCover(slug: string, file: File): Promise<string> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Service indisponible.');
+  const blob = await compressImage(file);
+  const path = `dossiers/${slug}/${Date.now()}.jpg`;
+  const { error } = await sb.storage.from('annales').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+  if (error) throw new Error('Envoi refusé (compte équipe requis).');
+  const url = sb.storage.from('annales').getPublicUrl(path).data.publicUrl;
+  await setFolderCover(slug, url);
+  return url;
+}
+
+export async function setFolderCover(slug: string, url: string | null): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Service indisponible.');
+  const { data, error } = await sb.from('qcm_folders').update({ cover_image: url }).eq('slug', slug).select('slug');
+  if (error || !data?.length) throw new Error('Mise à jour refusée (compte équipe requis).');
 }

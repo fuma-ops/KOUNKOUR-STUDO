@@ -45,7 +45,7 @@ async function contests(): Promise<ContestRow[]> {
   return (data || []) as unknown as ContestRow[];
 }
 async function folders(): Promise<FolderRow[]> {
-  const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar').eq('status', 'published').order('position');
+  const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image').eq('status', 'published').order('position');
   if (error) throw new Error(error.message);
   return (data || []) as FolderRow[];
 }

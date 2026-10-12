@@ -43,6 +43,7 @@ export interface FolderRow {
   organization: string | null;
   description_fr: string | null;
   description_ar: string | null;
+  cover_image?: string | null;
 }
 
 export interface QcmSetRow {
@@ -70,6 +71,7 @@ export interface Page {
   indexable: boolean;
   ogType?: 'website' | 'article';
   jsonLd?: object[];
+  image?: string | null; // image de partage (URL absolue) ; sinon image du site
   body: string;
 }
 
@@ -485,6 +487,7 @@ export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: 
     // Un dossier sans annale réelle n'a pas de contenu utile : non indexé (§15).
     indexable: sets.length > 0,
     jsonLd: [breadcrumbLd(base, lang, [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { href: `/preparation/${encodeURIComponent(f.slug)}`, text: name }])],
+    image: f.cover_image || null,
     body,
   };
 }
@@ -574,7 +577,7 @@ export function headTags(p: Page, base: string): string {
     `<meta property="og:type" content="${p.ogType || 'website'}" />`,
     `<meta property="og:url" content="${esc(self)}" />`,
     `<meta property="og:locale" content="${p.lang === 'ar' ? 'ar_MA' : 'fr_MA'}" />`,
-    `<meta property="og:image" content="${esc(base + OG_IMAGE)}" />`,
+    `<meta property="og:image" content="${esc(p.image && /^https:\/\//.test(p.image) ? p.image : base + OG_IMAGE)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`
   );
   for (const ld of p.jsonLd || []) {

@@ -7,10 +7,12 @@ import {
   Home, Award, BookOpen, CheckSquare, Layers, Newspaper, 
   Heart, PlusCircle, Database, Radio, BellRing, Sparkles,
   SlidersHorizontal, Check, RefreshCw, X, ShieldAlert, Filter, Trash2,
-  Edit3, Upload, Image as ImageIcon
+  Edit3, Upload, Image as ImageIcon,
+  Images,
 } from 'lucide-react';
 import { RadarModule } from './RadarModule';
 import { QcmModule } from './QcmModule';
+import { AnnalesSettings } from './AnnalesSettings';
 import { CommunityModule } from './CommunityModule';
 import { PdfViewerModal } from './PdfViewerModal';
 import { ContestEditModal } from './ContestEditModal';
@@ -124,6 +126,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { id: 'concours_radar', labelFr: 'Radar & revue', labelAr: 'الرادار والمراجعة', icon: Radio },
           { id: 'gestion_contenus', labelFr: 'Concours publiés', labelAr: 'المباريات المنشورة', icon: Database },
           { id: 'qcm', labelFr: 'QCM & annales', labelAr: 'الاختبارات', icon: CheckSquare },
+          { id: 'annales_reglages', labelFr: 'Annales & images', labelAr: 'النماذج والصور', icon: Images },
           { id: 'community', labelFr: 'Communauté', labelAr: 'المجتمع', icon: Users },
           { id: 'utilisateurs', labelFr: 'Utilisateurs', labelAr: 'المستخدمون', icon: ShieldCheck },
           { id: 'smart_match', labelFr: 'Smart Match', labelAr: 'المطابقة الذكية', icon: Sparkles },
@@ -475,6 +478,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </p>
             </div>
             <QcmModule language={language} />
+          </div>
+        ) : activeSidebarItem === 'annales_reglages' ? (
+          <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full animate-fade-in">
+            <div className="mb-6">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1F1924]">
+                {language === 'fr' ? 'Annales & images' : 'النماذج والصور'} <span className="text-[#8D174B] font-serif italic">• {language === 'fr' ? 'Réglages' : 'الإعدادات'}</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-[#6E6773] mt-1">
+                {language === 'fr'
+                  ? 'Combien d’annales sont en ligne, photos du sujet original de chaque série, et image d’en-tête de chaque dossier concours.'
+                  : 'عدد النماذج المنشورة، صور الموضوع الأصلي لكل سلسلة، وصورة رأس كل ملف مباراة.'}
+              </p>
+            </div>
+            <AnnalesSettings />
           </div>
         ) : activeSidebarItem === 'community' ? (
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full animate-fade-in">
