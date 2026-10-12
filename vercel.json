@@ -31,8 +31,36 @@
       "destination": "/api/seo?path=/sitemap.xml"
     },
     {
-      "source": "/:path((?!api/|assets/|images/).*)",
+      "source": "/:path((?!api/|assets/|images/|icons/|annales/|sw\\.js|manifest\\.webmanifest).*)",
       "destination": "/api/seo?path=/:path"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
     }
   ]
 }

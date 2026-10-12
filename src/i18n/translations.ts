@@ -164,7 +164,7 @@ export const translations = {
       languageSelect: 'Langue de l’interface',
       emailNotifications: 'Rappels d’échéances par e-mail',
       pushNotifications: 'Notifications d’alertes push',
-      privacyNote: 'Vos données sont stockées localement et protégées conformément aux exigences marocaines (Loi 09-08).',
+      privacyNote: 'Sans compte, votre profil reste sur cet appareil. Avec un compte, il est enregistré de façon sécurisée pour vous suivre sur tous vos appareils (voir la politique de confidentialité).',
     },
     emptyState: {
       noContestsTitle: 'Aucun concours trouvé',
@@ -337,7 +337,7 @@ export const translations = {
       languageSelect: 'لغة الواجهة',
       emailNotifications: 'تذكير بالمواعيد النهائية عبر البريد',
       pushNotifications: 'إشعارات التنبيه المباشرة',
-      privacyNote: 'بياناتك محفوظة بأمان وفق المقتضيات القانونية المغربية (القانون 09-08).',
+      privacyNote: 'بدون حساب يبقى ملفك على هذا الجهاز. مع حساب يُحفظ بشكل آمن لتتابعه على كل أجهزتك (انظر سياسة الخصوصية).',
     },
     emptyState: {
       noContestsTitle: 'لم يتم العثور على أي مباراة',

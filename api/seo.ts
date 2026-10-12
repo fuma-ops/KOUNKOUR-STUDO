@@ -21,6 +21,7 @@ import {
   renderNotFound,
   renderPrep,
   renderPrivate,
+  renderLegal,
   renderQcm,
   renderRobots,
   renderSitemap,
@@ -110,6 +111,9 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
     }
     case 'community':
       return renderCommunity(lang);
+    case 'privacy':
+    case 'terms':
+      return renderLegal(lang, r.name);
     case 'profile':
     case 'admin':
       return renderPrivate(lang, pathname);

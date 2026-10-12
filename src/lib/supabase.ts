@@ -24,5 +24,17 @@ export function getSupabase(): SupabaseClient | null {
   }
 }
 
+/** Connexion Google activée côté Supabase ? (lecture publique des réglages Auth, mise en cache). */
+let googleAuthCheck: Promise<boolean> | null = null;
+export function isGoogleAuthEnabled(): Promise<boolean> {
+  if (!googleAuthCheck) {
+    googleAuthCheck = fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_ANON_KEY } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => !!j?.external?.google)
+      .catch(() => false);
+  }
+  return googleAuthCheck;
+}
+
 export const SITE_ORIGIN =
   typeof window !== 'undefined' ? window.location.origin : '';

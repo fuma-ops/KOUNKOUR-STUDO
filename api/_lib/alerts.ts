@@ -1,26 +1,31 @@
 /**
- * Alertes e-mail Smart Match — sélection des concours et contenu de l'e-mail.
+ * Notifications Smart Match — sélection des concours et texte de la notification.
  * Le verdict vient du MÊME moteur que le site (src/utils/smartMatch.ts) : ce que
- * le candidat lit dans l'e-mail est exactement ce qu'il voit dans « Pour vous ».
+ * le candidat lit dans la notification est exactement ce qu'il voit dans « Pour vous ».
  */
-import { checkEligibility, MATCH_DISCLAIMER, type EligibilityResult } from '../../src/utils/smartMatch.ts';
+import { checkEligibility, type EligibilityResult } from '../../src/utils/smartMatch.ts';
 import type { CandidateProfile, Contest } from '../../src/types/index.ts';
 
 export const SITE_URL = (process.env.SITE_URL || 'https://kounkour-studo.vercel.app').replace(/\/$/, '');
 
 const DEGREE_BY_YEARS: Record<number, string> = { 8: 'Doctorat', 5: 'Master', 3: 'Licence', 2: 'Bac+2', 1: 'Technicien', 0: 'Bac' };
 
+export interface PushSub {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
 export interface Subscriber {
   user_id: string;
-  email: string;
   diploma_level: number | null;
   specialty: string | null;
   region: string | null;
   age: number | null;
   situation: CandidateProfile['currentSituation'] | null;
-  token: string;
-  name: string | null;
+  language: string | null;
   last_alert_at: string | null;
+  subs: PushSub[] | null;
   sent: [string, 'nouveau' | 'rappel'][];
 }
 
@@ -28,6 +33,7 @@ export interface ContestRow {
   id: string;
   slug: string;
   title_fr: string;
+  title_ar: string | null;
   diploma_fr: string | null;
   deadline_date: string;
   region_fr: string | null;
@@ -51,7 +57,7 @@ export function toContest(r: ContestRow, today: string): Contest {
   const days = daysLeft(r.deadline_date, today);
   const empty = { fr: '', ar: '' };
   return {
-    id: r.id, slug: r.slug, referenceCode: '', title: { fr: r.title_fr, ar: r.title_fr },
+    id: r.id, slug: r.slug, referenceCode: '', title: { fr: r.title_fr, ar: r.title_ar || r.title_fr },
     administration: { id: '', name: { fr: r.org || '', ar: r.org || '' }, shortName: empty, logo: '', category: 'autres', officialWebsite: '' },
     type: empty, status: days <= 0 ? 'closed' : days <= 7 ? 'closing_soon' : 'open', postsCount: r.positions || 0,
     posts: r.posts || [], degreeLevel: r.diploma_fr || '', specialtiesList: specs, specialty: { fr: specs.join(', '), ar: '' },
@@ -65,7 +71,7 @@ export function toContest(r: ContestRow, today: string): Contest {
 export function toProfile(s: Subscriber): CandidateProfile {
   const specialties = String(s.specialty || '').split(/\s*;\s*/).filter(Boolean);
   return {
-    fullName: s.name || '', email: s.email, phone: '', age: s.age || 0,
+    fullName: '', email: '', phone: '', age: s.age || 0,
     degreeLevel: s.diploma_level !== null ? DEGREE_BY_YEARS[s.diploma_level] || '' : '',
     specialty: specialties[0] || '', specialties, region: s.region || '',
     currentSituation: s.situation || 'job_seeker', notificationsEnabled: true, alertDaysBefore: 3,
@@ -102,123 +108,50 @@ export function planFor(s: Subscriber, contests: Contest[]): AlertPlan | null {
 }
 
 // ---------------------------------------------------------------------------
-// Contenu de l'e-mail
+// Texte de la notification (FR ou AR selon la langue du compte)
 // ---------------------------------------------------------------------------
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-const MAX_LIST = 15;
-
-function deadlineTxt(c: Contest) {
-  if (c.daysRemaining <= 1) return "Dernier jour : aujourd'hui";
-  if (c.daysRemaining === 2) return `Clôture demain (${c.deadlineDate})`;
-  return `Date limite : ${c.deadlineDate} (J-${c.daysRemaining - 1})`;
+export interface PushPayload {
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
+  lang: 'fr' | 'ar';
 }
 
-function item(p: Pick, campaign: string): { html: string; text: string } {
-  const c = p.contest;
-  const url = `${SITE_URL}/concours/${c.slug}?utm_source=alerte&utm_medium=email&utm_campaign=${campaign}`;
-  const badge = p.elig.verdict === 'eligible' ? 'Correspond à votre profil' : 'À vérifier';
-  const color = p.elig.verdict === 'eligible' ? '#047857' : '#B45309';
-  const issue = p.elig.checks.find((k) => k.status === 'verify' && k.key !== 'status');
-  const posts = p.elig.matchedPostsCount > 0 ? `${p.elig.matchedPostsCount} poste${p.elig.matchedPostsCount > 1 ? 's' : ''} pour votre profil` : '';
-  const urgent = c.daysRemaining <= 3;
-  const html = `
-<tr><td style="padding:12px 0;border-bottom:1px solid #F1E5EC">
-  <div style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase">${badge}</div>
-  <a href="${url}" style="font-size:15px;font-weight:700;color:#242126;text-decoration:none">${esc(c.title.fr)}</a>
-  <div style="font-size:13px;color:${urgent ? '#BE123C' : '#6E6773'};margin-top:2px">${esc(deadlineTxt(c))}${posts ? ` · ${posts}` : ''}</div>
-  ${issue ? `<div style="font-size:12px;color:#92400E;margin-top:4px">${esc(issue.fr)}</div>` : ''}
-</td></tr>`;
-  const text = `- [${badge}] ${c.title.fr}\n  ${deadlineTxt(c)}${posts ? ` · ${posts}` : ''}\n  ${url}${issue ? `\n  ${issue.fr}` : ''}`;
-  return { html, text };
+const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
+
+function closing(c: Contest, ar: boolean): string {
+  if (c.daysRemaining <= 1) return ar ? 'آخر أجل: اليوم' : "dernier jour aujourd'hui";
+  if (c.daysRemaining === 2) return ar ? 'آخر أجل: غدا' : 'clôture demain';
+  return ar ? `آخر أجل: ${c.deadlineDate}` : `clôture le ${c.deadlineDate}`;
 }
 
-export function renderEmail(plan: AlertPlan): { subject: string; html: string; text: string; shown: Pick[] } {
-  const s = plan.subscriber;
-  const unsub = `${SITE_URL}/api/alerts/unsubscribe?t=${s.token}`;
-  const forYou = `${SITE_URL}/profil?utm_source=alerte&utm_medium=email`;
-  const eligibleN = plan.fresh.filter((p) => p.elig.verdict === 'eligible').length;
-  const shown = plan.fresh.slice(0, MAX_LIST);
-  const more = plan.fresh.length - shown.length;
+export function renderPush(plan: AlertPlan): PushPayload {
+  const ar = plan.subscriber.language === 'ar';
+  const lang = ar ? 'ar' : 'fr';
+  const name = (p: Pick) => cut(ar ? p.contest.title.ar : p.contest.title.fr, 90);
+  const n = plan.fresh.length;
   const soon = plan.reminders.length;
+  const forYou = `${SITE_URL}/profil?onglet=pour-vous${ar ? '&lang=ar' : ''}&utm_source=alerte&utm_medium=push`;
+  const one = n + soon === 1 ? (plan.fresh[0] || plan.reminders[0]).contest : null;
+  const url = one ? `${SITE_URL}/concours/${one.slug}?${ar ? 'lang=ar&' : ''}utm_source=alerte&utm_medium=push` : forYou;
 
-  let subject: string;
-  if (plan.first) subject = `🎯 ${plan.fresh.length} concours ouverts pour votre profil sur KounKour`;
-  else if (plan.fresh.length) subject = `🎯 ${plan.fresh.length} nouveau${plan.fresh.length > 1 ? 'x' : ''} concours pour votre profil${eligibleN ? ` (${eligibleN} correspondent)` : ''}`;
-  else subject = `⏰ ${soon} concours pour vous ferme${soon > 1 ? 'nt' : ''} bientôt`;
-  if (plan.fresh.length && soon) subject += ` · ${soon} ferme${soon > 1 ? 'nt' : ''} bientôt`;
-
-  const hello = s.name ? `Bonjour ${esc(s.name)},` : 'Bonjour,';
-  const intro = plan.first
-    ? 'Voici les concours ouverts qui correspondent à votre profil (diplôme, spécialité, âge). Ensuite, vous ne recevrez que les nouveaux concours et les rappels avant clôture.'
-    : 'De nouveaux concours correspondant à votre profil ont été publiés.';
-  const sec = (title: string, rows: Pick[], campaign: string) =>
-    rows.length ? `<h2 style="font-size:15px;color:#8D174B;margin:22px 0 4px">${title}</h2><table width="100%" cellpadding="0" cellspacing="0">${rows.map((p) => item(p, campaign).html).join('')}</table>` : '';
-
-  const html = `<!doctype html><html lang="fr"><body style="margin:0;background:#FAF7F9;font-family:Arial,Helvetica,sans-serif;color:#242126">
-<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:20px 12px">
-<table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid #F1E5EC;border-radius:16px">
-<tr><td style="background:#8D174B;color:#fff;padding:18px 22px;border-radius:16px 16px 0 0;font-size:18px;font-weight:700">KounKour · Concours pour vous</td></tr>
-<tr><td style="padding:20px 22px">
-<p style="margin:0 0 8px">${hello}</p><p style="margin:0;color:#4A4250;font-size:14px">${intro}</p>
-${sec(soon ? '⏰ Derniers jours pour déposer votre dossier' : '', plan.reminders, 'rappel')}
-${sec(plan.first ? 'Vos concours ouverts' : 'Nouveaux concours pour vous', shown, plan.first ? 'bienvenue' : 'nouveaux')}
-${more > 0 ? `<p style="font-size:13px;margin:12px 0 0"><a href="${forYou}" style="color:#8D174B">+ ${more} autre${more > 1 ? 's' : ''} concours dans « Pour vous »</a></p>` : ''}
-<p style="margin:24px 0 0"><a href="${forYou}" style="display:inline-block;background:#8D174B;color:#fff;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px">Voir tous mes concours</a></p>
-<p style="font-size:11px;color:#9A93A0;margin:22px 0 0">${MATCH_DISCLAIMER.fr}</p>
-<p style="font-size:11px;color:#9A93A0;margin:8px 0 0">Vous recevez cet e-mail car vous avez activé les alertes dans votre profil KounKour. <a href="${unsub}" style="color:#9A93A0">Se désabonner</a></p>
-</td></tr></table></td></tr></table></body></html>`;
-
-  const text = [
-    hello.replace(/&amp;/g, '&'),
-    '',
-    intro,
-    plan.reminders.length ? '\nDERNIERS JOURS :\n' + plan.reminders.map((p) => item(p, 'rappel').text).join('\n') : '',
-    shown.length ? `\n${plan.first ? 'VOS CONCOURS OUVERTS' : 'NOUVEAUX CONCOURS POUR VOUS'} :\n` + shown.map((p) => item(p, 'nouveaux').text).join('\n') : '',
-    more > 0 ? `\n+ ${more} autres : ${forYou}` : '',
-    `\nTous vos concours : ${forYou}`,
-    `\n${MATCH_DISCLAIMER.fr}`,
-    `Se désabonner : ${unsub}`,
-  ].join('\n');
-  return { subject, html, text, shown };
-}
-
-// ---------------------------------------------------------------------------
-// Envoi : Brevo (BREVO_API_KEY) ou Resend (RESEND_API_KEY). Expéditeur :
-// ALERT_FROM_EMAIL (adresse vérifiée chez le fournisseur), ALERT_FROM_NAME.
-// ---------------------------------------------------------------------------
-export function mailProvider(): 'brevo' | 'resend' | null {
-  if (!process.env.ALERT_FROM_EMAIL) return null;
-  if (process.env.BREVO_API_KEY) return 'brevo';
-  if (process.env.RESEND_API_KEY) return 'resend';
-  return null;
-}
-
-export async function sendMail(to: string, mail: { subject: string; html: string; text: string }, unsubUrl: string): Promise<{ ok: boolean; error?: string }> {
-  const from = process.env.ALERT_FROM_EMAIL as string;
-  const name = process.env.ALERT_FROM_NAME || 'KounKour';
-  const headers = { 'List-Unsubscribe': `<${unsubUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' };
-  const provider = mailProvider();
-  try {
-    if (provider === 'brevo') {
-      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': process.env.BREVO_API_KEY as string, 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ sender: { name, email: from }, to: [{ email: to }], subject: mail.subject, htmlContent: mail.html, textContent: mail.text, headers }),
-        signal: AbortSignal.timeout(15000),
-      });
-      return r.ok ? { ok: true } : { ok: false, error: `Brevo ${r.status} ${(await r.text()).slice(0, 200)}` };
-    }
-    if (provider === 'resend') {
-      const r = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ from: `${name} <${from}>`, to: [to], subject: mail.subject, html: mail.html, text: mail.text, headers }),
-        signal: AbortSignal.timeout(15000),
-      });
-      return r.ok ? { ok: true } : { ok: false, error: `Resend ${r.status} ${(await r.text()).slice(0, 200)}` };
-    }
-    return { ok: false, error: 'aucun fournisseur e-mail configuré' };
-  } catch (e: any) {
-    return { ok: false, error: e?.message || 'erreur réseau' };
+  let title: string;
+  let body: string;
+  if (n) {
+    const eligibleN = plan.fresh.filter((p) => p.elig.verdict === 'eligible').length;
+    if (ar) title = plan.first ? `🎯 ${n} مباراة مفتوحة تناسب ملفك` : `🎯 ${n} مباراة جديدة لك`;
+    else if (plan.first) title = `🎯 ${n} concours ouvert${n > 1 ? 's' : ''} pour votre profil`;
+    else title = `🎯 ${n} nouveau${n > 1 ? 'x' : ''} concours pour vous${eligibleN ? ` (${eligibleN} correspond${eligibleN > 1 ? 'ent' : ''})` : ''}`;
+    const first = plan.fresh[0];
+    body = `${name(first)} · ${closing(first.contest, ar)}`;
+    if (n > 1) body += ar ? `\n+ ${n - 1} أخرى في « لك »` : `\n+ ${n - 1} autre${n > 2 ? 's' : ''} dans « Pour vous »`;
+    if (soon) body += ar ? `\n⏰ ${soon} تنتهي قريبا` : `\n⏰ ${soon} ferme${soon > 1 ? 'nt' : ''} bientôt`;
+  } else {
+    title = ar ? `⏰ ${soon} مباراة تنتهي قريبا` : `⏰ ${soon} concours ferme${soon > 1 ? 'nt' : ''} bientôt`;
+    const r = plan.reminders[0];
+    body = `${name(r)} · ${closing(r.contest, ar)}`;
+    if (soon > 1) body += ar ? `\n+ ${soon - 1} أخرى` : `\n+ ${soon - 1} autre${soon > 2 ? 's' : ''}`;
   }
+  return { title, body, url, tag: 'kounkour-alertes', lang };
 }

@@ -19,6 +19,7 @@ import { AdminCvModal } from './components/AdminCvModal';
 import { QcmModule } from './components/QcmModule';
 import { CommunityModule } from './components/CommunityModule';
 import { ProfileModule } from './components/ProfileModule';
+import { InstallAppBanner } from './components/InstallAppBanner';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
@@ -28,6 +29,7 @@ import { fetchPublishedContests } from './data/supabaseContests';
 import { useSession } from './lib/useSession';
 import { AuthModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
+import { LegalPage } from './components/LegalPage';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { buildMatchFeed } from './utils/matchFeed';
 import { getContestDiscussionCounts } from './data/communityApi';
@@ -64,7 +66,10 @@ export default function App() {
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState<boolean>(false);
   const [isAdminCvModalOpen, setIsAdminCvModalOpen] = useState<boolean>(false);
   const [profileVersion, setProfileVersion] = useState(0);
-  const [profileInitialTab, setProfileInitialTab] = useState<'tracking' | 'recommendations' | undefined>(undefined);
+  // /profil?onglet=pour-vous (lien des notifications) ouvre directement « Pour vous ».
+  const [profileInitialTab, setProfileInitialTab] = useState<'tracking' | 'recommendations' | undefined>(() =>
+    new URLSearchParams(window.location.search).get('onglet') === 'pour-vous' ? 'recommendations' : undefined,
+  );
   const [contestsVersion, setContestsVersion] = useState(0);
   const session = useSession();
   const [authOpen, setAuthOpen] = useState(false);
@@ -238,6 +243,8 @@ export default function App() {
       r = qcmRoute.set ? { name: 'qcm', slug: qcmRoute.set } : qcmRoute.folder ? { name: 'folder', slug: qcmRoute.folder } : { name: 'prep' };
     else if (activeTab === 'community') r = { name: 'community' };
     else if (activeTab === 'profile') r = { name: 'profile' };
+    else if (activeTab === 'privacy') r = { name: 'privacy' };
+    else if (activeTab === 'terms') r = { name: 'terms' };
     else r = { name: 'home' };
     return withLang(routePath(r), language);
   }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, language]);
@@ -461,6 +468,8 @@ export default function App() {
               }}
             />
 
+            <InstallAppBanner language={language} />
+
             {/* 3 Main Action Shortcuts, Concours à la une & Smart Match Entry */}
             <FeaturedContestsSection
               language={language}
@@ -627,6 +636,17 @@ export default function App() {
         )}
 
         {/* Profile Tab */}
+        {(activeTab === 'privacy' || activeTab === 'terms') && (
+          <LegalPage
+            kind={activeTab}
+            language={language}
+            onOpen={(k) => {
+              goTab(k);
+              window.scrollTo({ top: 0 });
+            }}
+          />
+        )}
+
         {activeTab === 'profile' && (
           session.user ? (
             <ProfileModule
@@ -744,10 +764,16 @@ export default function App() {
             <span>—</span>
             <span>{t.tagline}</span>
           </div>
-          <div className="text-[11px] text-[#6E6773]">
-            {language === 'fr' 
-              ? 'Conforme aux normes de protection des données (Loi 09-08) • Plateforme d’information indépendante' 
-              : 'مطابق لمقتضيات حماية المعطيات ذات الطابع الشخصي (القانون 09-08) • منصة إخبارية مستقلة'}
+          <div className="flex items-center gap-3 text-[11px] text-[#6E6773]">
+            <span>{language === 'fr' ? 'Plateforme d’information indépendante' : 'منصة إخبارية مستقلة'}</span>
+            <span>•</span>
+            <button type="button" onClick={() => { goTab('privacy'); window.scrollTo({ top: 0 }); }} className="hover:text-[#8D174B] hover:underline cursor-pointer">
+              {language === 'fr' ? 'Confidentialité' : 'الخصوصية'}
+            </button>
+            <span>•</span>
+            <button type="button" onClick={() => { goTab('terms'); window.scrollTo({ top: 0 }); }} className="hover:text-[#8D174B] hover:underline cursor-pointer">
+              {language === 'fr' ? 'Conditions d’utilisation' : 'شروط الاستخدام'}
+            </button>
           </div>
         </div>
       </footer>

@@ -12,6 +12,8 @@ export type Route =
   | { name: 'community' }
   | { name: 'profile' }
   | { name: 'admin' }
+  | { name: 'privacy' }
+  | { name: 'terms' }
   | { name: 'notfound' };
 
 const seg = (s: string) => {
@@ -35,6 +37,8 @@ export function parsePath(pathname: string): Route {
   if (a === 'communaute' && parts.length === 1) return { name: 'community' };
   if (a === 'profil') return { name: 'profile' };
   if (a === 'admin') return { name: 'admin' };
+  if (a === 'confidentialite' && parts.length === 1) return { name: 'privacy' };
+  if (a === 'conditions' && parts.length === 1) return { name: 'terms' };
   return { name: 'notfound' };
 }
 
@@ -60,6 +64,10 @@ export function routePath(r: Route): string {
       return '/profil';
     case 'admin':
       return '/admin';
+    case 'privacy':
+      return '/confidentialite';
+    case 'terms':
+      return '/conditions';
   }
 }
 
@@ -79,6 +87,10 @@ export function tabOf(r: Route): string {
       return 'profile';
     case 'admin':
       return 'admin';
+    case 'privacy':
+      return 'privacy';
+    case 'terms':
+      return 'terms';
     default:
       return 'home';
   }

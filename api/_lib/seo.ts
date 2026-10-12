@@ -4,6 +4,8 @@
 // Uniquement des données réelles lues dans Supabase (RLS publique) ; un champ
 // absent n'est jamais inventé, il est simplement omis.
 
+import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
+
 export type Lang = 'fr' | 'ar';
 
 export interface ContestRow {
@@ -527,6 +529,15 @@ export function renderCommunity(lang: Lang): Page {
   return { status: 200, lang, title: `${lang === 'ar' ? 'مجتمع المترشحين' : 'Communauté des candidats'} | KounKour`, description: desc, path: '/communaute', indexable: true, body: frame(lang, [{ href: '/', text: t.home }, { text: t.community }], `<h1>${esc(h1)}</h1><p>${esc(desc)}</p>`) };
 }
 
+export function renderLegal(lang: Lang, kind: LegalKind): Page {
+  const t = L[lang];
+  const d = legalDoc(kind, lang);
+  const inner = `<h1>${esc(d.title)}</h1><p>${esc(d.intro)}</p>${d.sections
+    .map((s) => `<h2>${esc(s.title)}</h2>${s.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}`)
+    .join('')}`;
+  return { status: 200, lang, title: `${d.title} | KounKour`, description: truncate(d.intro, 160), path: LEGAL_PATH[kind], indexable: true, body: frame(lang, [{ href: '/', text: t.home }, { text: d.title }], inner) };
+}
+
 export function renderPrivate(lang: Lang, path: string): Page {
   return { status: 200, lang, title: 'KounKour', description: '', path, indexable: false, body: '' };
 }
@@ -593,6 +604,14 @@ export function fallbackTemplate(): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#8D174B" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="KounKour" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -610,7 +629,7 @@ export function renderRobots(base: string): string {
 }
 
 export function renderSitemap(base: string, contests: ContestRow[], folders: FolderRow[], sets: QcmSetRow[]): string {
-  const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/concours' }, { loc: '/preparation' }, { loc: '/communaute' }];
+  const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/concours' }, { loc: '/preparation' }, { loc: '/communaute' }, { loc: LEGAL_PATH.privacy }, { loc: LEGAL_PATH.terms }];
   for (const c of contests) urls.push({ loc: `/concours/${encodeURIComponent(c.slug)}`, lastmod: (c.updated_at || '').slice(0, 10) || undefined });
   for (const f of folders) if (sets.some((s) => s.folder_slug === f.slug)) urls.push({ loc: `/preparation/${encodeURIComponent(f.slug)}` });
   // Pas de lastmod pour les QCM : aucune date de modification fiable n'est stockée.

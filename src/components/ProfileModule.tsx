@@ -16,7 +16,7 @@ import {
 } from '../utils/candidateStorage';
 import { inferSalaryScaleFromProfile, calculateMoroccanPublicSalary } from '../data/salaryScales';
 import { ForYouPanel } from './ForYouPanel';
-import { EmailAlertsToggle } from './EmailAlertsToggle';
+import { NotificationsToggle } from './NotificationsToggle';
 import { saveMatchPreferences, loadMatchPreferences } from '../data/matchPrefsApi';
 import { buildMatchFeed } from '../utils/matchFeed';
 import { profileSpecialties, specialtySuggestions } from '../utils/smartMatch';
@@ -787,7 +787,7 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
               </div>
             </div>
 
-            <EmailAlertsToggle language={language} profile={profile} />
+            <NotificationsToggle language={language} profile={profile} />
 
             {/* Smart Salary Estimate Card based on Diploma */}
             {(() => {

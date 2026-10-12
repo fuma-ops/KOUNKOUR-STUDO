@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CandidateProfile, Contest, Language } from '../types';
 import { Sparkles, Check, Search, X, Clock, ChevronDown, ChevronUp, Edit3, MapPin, BellRing } from 'lucide-react';
 import { buildMatchFeed, deadlineBadge, markMatchesSeen, type MatchItem } from '../utils/matchFeed';
-import { EmailAlertsToggle } from './EmailAlertsToggle';
+import { NotificationsToggle } from './NotificationsToggle';
 import { MATCH_DISCLAIMER, profileSpecialties, type CriterionCheck } from '../utils/smartMatch';
 
 // « Pour vous » : les concours ouverts qui correspondent au profil, puis ceux à
@@ -181,7 +181,7 @@ export const ForYouPanel: React.FC<Props> = ({ language, contests, profile, onSe
         </button>
       </div>
 
-      <EmailAlertsToggle language={language} profile={profile} compact />
+      <NotificationsToggle language={language} profile={profile} compact />
 
       {/* 1. Correspondent */}
       <section>
