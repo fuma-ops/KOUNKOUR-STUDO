@@ -2,13 +2,10 @@
 // Un seul contenu, utilisé par l'application (LegalPage) et par le rendu serveur
 // (api/_lib/seo.ts) pour que Google et la console Google OAuth lisent le texte.
 //
-// À COMPLÉTER PAR L'ÉDITEUR avant le lancement public (aucune valeur inventée) :
-// identité de l'éditeur, adresse de contact et numéro de récépissé CNDP. Tant
-// qu'une valeur est vide, la page affiche « à compléter » à cet endroit.
+// Adresse de contact : à renseigner dès qu'elle existe (aucune valeur inventée).
+// Tant qu'elle est vide, les pages indiquent qu'elle sera publiée prochainement.
 export const LEGAL_INFO = {
-  editor: '', // ex. nom de la personne ou de la société qui édite KounKour
   contactEmail: '', // adresse pour exercer les droits (accès, rectification, suppression)
-  cndpReceipt: '', // n° de récépissé de la déclaration auprès de la CNDP (loi 09-08)
   updatedAt: '2026-10-12',
 };
 
@@ -24,13 +21,11 @@ export interface LegalDoc {
   sections: LegalSection[];
 }
 
-const pending = (lang: Lang) => (lang === 'ar' ? '(سيتم استكماله)' : '(à compléter)');
-const v = (value: string, lang: Lang) => value || pending(lang);
-
 export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
-  const editor = v(LEGAL_INFO.editor, lang);
-  const contact = v(LEGAL_INFO.contactEmail, lang);
-  const cndp = v(LEGAL_INFO.cndpReceipt, lang);
+  const email = LEGAL_INFO.contactEmail;
+  const contact =
+    email || (lang === 'ar' ? 'عنوان التواصل (سيُنشر قريبا في هذه الصفحة)' : 'l\'adresse de contact (publiée prochainement sur cette page)');
+  const contactSection: LegalSection[] = email ? [{ title: lang === 'ar' ? 'التواصل' : 'Contact', paragraphs: [email] }] : [];
   const date = LEGAL_INFO.updatedAt.split('-').reverse().join('/');
 
   if (kind === 'privacy' && lang === 'fr') {
@@ -38,7 +33,7 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
       title: 'Politique de confidentialité',
       intro: `Dernière mise à jour : ${date}. Cette page explique quelles données KounKour enregistre, pourquoi, et comment exercer vos droits prévus par la loi n° 09-08 relative à la protection des personnes physiques à l'égard du traitement des données à caractère personnel.`,
       sections: [
-        { title: 'Responsable du traitement', paragraphs: [`Éditeur : ${editor}. Contact : ${contact}.`, `Déclaration auprès de la Commission nationale de contrôle de la protection des données à caractère personnel (CNDP) : ${cndp}.`] },
+        ...contactSection,
         {
           title: 'Données enregistrées',
           paragraphs: [
@@ -71,7 +66,7 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
         {
           title: 'Vos droits',
           paragraphs: [
-            'Conformément à la loi 09-08, vous disposez d\'un droit d\'accès, de rectification, d\'opposition et de suppression. Vous pouvez modifier votre profil et désactiver les notifications depuis la page Profil, et demander l\'accès à vos données ou leur suppression en écrivant à : ' + contact + '.',
+            'Conformément à la loi 09-08, vous disposez d\'un droit d\'accès, de rectification, d\'opposition et de suppression. Vous pouvez modifier votre profil et désactiver les notifications depuis la page Profil, et demander l\'accès à vos données ou leur suppression en écrivant à ' + contact + '.',
             'Vous pouvez aussi adresser une réclamation à la CNDP (www.cndp.ma).',
           ],
         },
@@ -84,7 +79,7 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
       title: 'سياسة الخصوصية',
       intro: `آخر تحديث: ${date}. توضح هذه الصفحة المعطيات التي يسجلها كونكور، والغرض منها، وكيفية ممارسة حقوقك المنصوص عليها في القانون رقم 09-08 المتعلق بحماية الأشخاص الذاتيين تجاه معالجة المعطيات ذات الطابع الشخصي.`,
       sections: [
-        { title: 'المسؤول عن المعالجة', paragraphs: [`الناشر: ${editor}. للتواصل: ${contact}.`, `التصريح لدى اللجنة الوطنية لمراقبة حماية المعطيات ذات الطابع الشخصي: ${cndp}.`] },
+        ...contactSection,
         {
           title: 'المعطيات المسجلة',
           paragraphs: [
@@ -127,7 +122,7 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
       title: 'Conditions d\'utilisation',
       intro: `Dernière mise à jour : ${date}. En utilisant KounKour, vous acceptez les conditions ci-dessous.`,
       sections: [
-        { title: 'Le service', paragraphs: [`KounKour (éditeur : ${editor}) est une plateforme d'information indépendante sur les concours publics au Maroc. Ce n'est pas un site officiel : KounKour n'organise aucun concours et ne reçoit aucune candidature.`] },
+        { title: 'Le service', paragraphs: [`KounKour est une plateforme d'information indépendante sur les concours publics au Maroc. Ce n'est pas un site officiel : KounKour n'organise aucun concours et ne reçoit aucune candidature.`] },
         {
           title: 'Exactitude des informations',
           paragraphs: [
@@ -151,7 +146,7 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
         },
         { title: 'Notifications', paragraphs: ['Les notifications sont facultatives et se désactivent depuis la page Profil ou les réglages de votre téléphone ou navigateur.'] },
         { title: 'Responsabilité', paragraphs: ['KounKour ne peut être tenu responsable d\'un dossier refusé, d\'une date manquée ou d\'une décision prise sur la base des informations du site sans vérification sur la source officielle.'] },
-        { title: 'Droit applicable', paragraphs: [`Ces conditions sont soumises au droit marocain. Contact : ${contact}.`] },
+        { title: 'Droit applicable', paragraphs: [`Ces conditions sont soumises au droit marocain.${email ? ` Contact : ${email}.` : ''}`] },
       ],
     };
   }
@@ -159,7 +154,7 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
     title: 'شروط الاستخدام',
     intro: `آخر تحديث: ${date}. باستعمالك لكونكور فإنك توافق على الشروط التالية.`,
     sections: [
-      { title: 'الخدمة', paragraphs: [`كونكور (الناشر: ${editor}) منصة إخبارية مستقلة حول المباريات العمومية بالمغرب. ليس موقعا رسميا: لا ينظم كونكور أي مباراة ولا يتلقى أي ترشيح.`] },
+      { title: 'الخدمة', paragraphs: [`كونكور منصة إخبارية مستقلة حول المباريات العمومية بالمغرب. ليس موقعا رسميا: لا ينظم كونكور أي مباراة ولا يتلقى أي ترشيح.`] },
       {
         title: 'دقة المعلومات',
         paragraphs: [
@@ -180,7 +175,7 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
       },
       { title: 'الإشعارات', paragraphs: ['الإشعارات اختيارية ويمكن إيقافها من صفحة الملف الشخصي أو من إعدادات الهاتف أو المتصفح.'] },
       { title: 'المسؤولية', paragraphs: ['لا يتحمل كونكور مسؤولية رفض ملف أو فوات أجل أو قرار اتُّخذ اعتمادا على معلومات الموقع دون التحقق من المصدر الرسمي.'] },
-      { title: 'القانون المطبق', paragraphs: [`تخضع هذه الشروط للقانون المغربي. للتواصل: ${contact}.`] },
+      { title: 'القانون المطبق', paragraphs: [`تخضع هذه الشروط للقانون المغربي.${email ? ` للتواصل: ${email}.` : ''}`] },
     ],
   };
 }
