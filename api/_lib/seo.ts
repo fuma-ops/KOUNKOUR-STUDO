@@ -59,6 +59,7 @@ export interface QcmSetRow {
   concours_label: string | null;
   exam_year: number | null;
   source_note: string | null;
+  statement?: string | null; // sujet écrit (kind = 'sujet') : texte transcrit
   qcm_questions?: { id: string; position: number; source_number: number | null; question: string; options: string[] }[];
 }
 
@@ -145,6 +146,7 @@ const L = {
     deadlineShort: 'date limite',
     questions: 'questions',
     realExam: 'Annales réelles',
+    writtenExam: 'Sujet d’examen écrit',
     training: 'Entraînement',
     answersAfter: 'Les réponses et la correction s’affichent après avoir répondu au QCM.',
     start: 'Faire ce QCM',
@@ -185,6 +187,7 @@ const L = {
     deadlineShort: 'آخر أجل',
     questions: 'سؤال',
     realExam: 'نماذج حقيقية',
+    writtenExam: 'موضوع امتحان كتابي',
     training: 'تدريب',
     answersAfter: 'تظهر الأجوبة والتصحيح بعد الإجابة على الاختبار.',
     start: 'إجراء هذا الاختبار',
@@ -324,7 +327,7 @@ export function prepFoldersFor(c: ContestRow, folders: FolderRow[], sets: QcmSet
   const admin = norm(`${c.administrations?.name_fr || ''} ${c.source_org || ''}`);
   return folders.filter((f) => {
     const key = norm((f.organization || '').split('—').pop() || '');
-    return key.length >= 6 && admin.includes(key) && sets.some((s) => s.folder_slug === f.slug && (s.qcm_questions?.length ?? 0) > 0);
+    return key.length >= 6 && admin.includes(key) && sets.some((s) => s.folder_slug === f.slug && hasContent(s));
   });
 }
 
@@ -441,10 +444,32 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
 const folderTitle = (f: FolderRow, lang: Lang) => (lang === 'ar' ? f.title_ar || f.title_fr : f.title_fr);
 const setTitle = (s: QcmSetRow, lang: Lang) => (lang === 'ar' ? s.title_ar || s.title_fr : s.title_fr);
 const qCount = (s: QcmSetRow) => s.qcm_questions?.length ?? 0;
+const isSujet = (s: QcmSetRow) => s.kind === 'sujet';
+// Contenu publiable : un QCM avec questions, ou un sujet écrit transcrit.
+export const hasContent = (s: QcmSetRow) => qCount(s) > 0 || (isSujet(s) && !!s.statement?.trim());
+const kindLabel = (s: QcmSetRow, t: (typeof L)[Lang]) => (isSujet(s) ? t.writtenExam : s.kind === 'annales' ? t.realExam : t.training);
+
+// Texte d'un sujet écrit : « ## » / « ### » = titres, ligne vide = paragraphe.
+function statementHtml(text: string): string {
+  // Une ligne = une direction : les sujets mêlent arabe et français dans un même bloc.
+  const lines = (t: string) => `<p>${t.split('\n').map((l) => `<span dir="auto" style="display:block">${esc(l)}</span>`).join('')}</p>`;
+  return text
+    .split(/\n\s*\n/)
+    .map((block) => {
+      const b = block.trim();
+      const h = /^(#{2,3})\s+(.*)$/.exec(b.split('\n')[0]);
+      if (h) {
+        const rest = b.split('\n').slice(1).join('\n').trim();
+        return `<h${h[1].length} dir="auto">${esc(h[2])}</h${h[1].length}>${rest ? lines(rest) : ''}`;
+      }
+      return lines(b);
+    })
+    .join('');
+}
 
 function setLi(s: QcmSetRow, lang: Lang) {
   const t = L[lang];
-  const meta = [s.kind === 'annales' ? t.realExam : t.training, s.concours_label, s.exam_year ? String(s.exam_year) : '', `${qCount(s)} ${t.questions}`].filter(Boolean);
+  const meta = [kindLabel(s, t), s.concours_label, s.exam_year ? String(s.exam_year) : '', isSujet(s) ? '' : `${qCount(s)} ${t.questions}`].filter(Boolean);
   return `<li>${link(`/preparation/qcm/${encodeURIComponent(s.slug)}`, setTitle(s, lang), lang)} <span class="muted">— ${esc(meta.join(' · '))}</span></li>`;
 }
 
@@ -500,14 +525,18 @@ export function renderQcm(lang: Lang, s: QcmSetRow, folder: FolderRow | null, ba
   const desc = (lang === 'ar' ? s.description_ar : null) || s.description_fr || '';
   const crumbs = [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }];
   if (folder) crumbs.push({ href: `/preparation/${encodeURIComponent(folder.slug)}`, text: folderTitle(folder, lang) });
-  const meta = [s.kind === 'annales' ? t.realExam : t.training, s.concours_label, s.exam_year ? String(s.exam_year) : '', `${qs.length} ${t.questions}`].filter(Boolean);
+  const meta = [kindLabel(s, t), s.concours_label, s.exam_year ? String(s.exam_year) : '', isSujet(s) ? '' : `${qs.length} ${t.questions}`].filter(Boolean);
   const list = qs
     .map((q) => `<li${q.source_number ? ` value="${q.source_number}"` : ''}><p>${esc(q.question)}</p><ul>${(q.options || []).map((o) => `<li>${esc(o)}</li>`).join('')}</ul></li>`)
     .join('');
   const body = frame(
     lang,
     [...crumbs, { text: name }],
-    `<h1>${esc(name)}</h1><p class="muted">${esc(meta.join(' · '))}</p>${desc ? `<p>${esc(desc)}</p>` : ''}${s.source_note ? `<p class="muted">${esc(s.source_note)}</p>` : ''}<p><strong>${esc(t.answersAfter)}</strong></p><ol lang="${cl}" dir="${cl === 'ar' ? 'rtl' : 'ltr'}">${list}</ol>`
+    `<h1>${esc(name)}</h1><p class="muted">${esc(meta.join(' · '))}</p>${desc ? `<p>${esc(desc)}</p>` : ''}${s.source_note ? `<p class="muted">${esc(s.source_note)}</p>` : ''}${
+      isSujet(s)
+        ? `<div lang="${cl}">${statementHtml(s.statement || "")}</div>`
+        : `<p><strong>${esc(t.answersAfter)}</strong></p><ol lang="${cl}" dir="${cl === 'ar' ? 'rtl' : 'ltr'}">${list}</ol>`
+    }`
   );
   return {
     status: 200,
@@ -515,7 +544,7 @@ export function renderQcm(lang: Lang, s: QcmSetRow, folder: FolderRow | null, ba
     title: `${truncate(name, 62)} | KounKour`,
     description: truncate(desc || `${name} — ${meta.join(' · ')}`, 158),
     path: `/preparation/qcm/${encodeURIComponent(s.slug)}`,
-    indexable: qs.length > 0,
+    indexable: hasContent(s),
     ogType: 'article',
     jsonLd: [breadcrumbLd(base, lang, [...crumbs, { href: `/preparation/qcm/${encodeURIComponent(s.slug)}`, text: name }] as { href: string; text: string }[])],
     body,
@@ -636,7 +665,7 @@ export function renderSitemap(base: string, contests: ContestRow[], folders: Fol
   for (const c of contests) urls.push({ loc: `/concours/${encodeURIComponent(c.slug)}`, lastmod: (c.updated_at || '').slice(0, 10) || undefined });
   for (const f of folders) if (sets.some((s) => s.folder_slug === f.slug)) urls.push({ loc: `/preparation/${encodeURIComponent(f.slug)}` });
   // Pas de lastmod pour les QCM : aucune date de modification fiable n'est stockée.
-  for (const s of sets) if (qCount(s) > 0) urls.push({ loc: `/preparation/qcm/${encodeURIComponent(s.slug)}` });
+  for (const s of sets) if (hasContent(s)) urls.push({ loc: `/preparation/qcm/${encodeURIComponent(s.slug)}` });
   const x = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
     .map((u) => `  <url><loc>${x(base + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`)

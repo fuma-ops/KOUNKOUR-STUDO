@@ -35,7 +35,7 @@ const SUPABASE_ANON_KEY =
 const CONTEST_COLS =
   'id,slug,title_fr,title_ar,title_original,status,summary_fr,summary_ar,diploma_fr,positions,region_fr,deadline_date,exam_date,apply_url,source_url,source_org,publication_date,published_at,verified_at,updated_at,grade_fr,reference,administration_id,administrations(name_fr,name_ar),contest_positions(position,province,category,diploma,specialty,count,note)';
 const SET_COLS =
-  'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,position,qcm_questions(id,position,source_number,question,options)';
+  'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,statement,position,qcm_questions(id,position,source_number,question,options)';
 
 const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, Camera, ChevronDown, FolderOpen, ImageOff, ImagePlus, Loader2, ShieldCheck } from 'lucide-react';
+import { BookOpen, Camera, ChevronDown, ExternalLink, FolderOpen, ImageOff, ImagePlus, Loader2, ShieldCheck } from 'lucide-react';
 import { AdminQcmSet, QcmFolder, fetchQcmFolders, fetchQcmSetsForAdmin, setFolderCover, uploadFolderCover } from '../data/qcmApi';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 
@@ -84,6 +84,9 @@ const SetRow: React.FC<{ set: AdminQcmSet; onImages: (images: string[]) => void 
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-bold text-[#242126] leading-snug">{set.title}</p>
           <div className="flex flex-wrap gap-1.5 mt-1 text-[10px]">
+            <span className={`px-1.5 py-0.5 rounded font-bold ${set.kind === 'sujet' ? 'bg-sky-50 text-sky-900' : 'bg-gray-100 text-gray-700'}`}>
+              {set.kind === 'sujet' ? 'Sujet écrit' : 'QCM'}
+            </span>
             {set.examYear && <span className="px-1.5 py-0.5 rounded bg-[#FDF2F7] text-[#8D174B] font-bold">{set.examYear}</span>}
             {set.status !== 'published' && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">non publiée</span>}
             <span className={`px-1.5 py-0.5 rounded font-bold ${n ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-700'}`}>
@@ -93,8 +96,24 @@ const SetRow: React.FC<{ set: AdminQcmSet; onImages: (images: string[]) => void 
         </div>
         <ChevronDown className={`w-4 h-4 text-[#8D174B] transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
+      {set.sourceUrl && n === 0 && (
+        <a
+          href={set.sourceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mx-3 mb-2 -mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[#8D174B] hover:underline"
+        >
+          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">Page source (photos de la copie) : {set.sourceUrl.replace(/^https?:\/\//, '')}</span>
+        </a>
+      )}
       {open && (
-        <div className="px-3 pb-3 animate-fade-in">
+        <div className="px-3 pb-3 space-y-2 animate-fade-in">
+          {set.sourceUrl && n > 0 && (
+            <a href={set.sourceUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[11px] font-bold text-[#8D174B] hover:underline">
+              <ExternalLink className="w-3.5 h-3.5" /> Page source
+            </a>
+          )}
           <AnnalePhotosAdmin setId={set.id} slug={set.slug} images={set.sourceImages} onChange={onImages} compact />
         </div>
       )}
@@ -122,8 +141,10 @@ export const AnnalesSettings: React.FC = () => {
     );
   }
 
-  const annales = sets.filter((s) => s.kind === 'annales');
-  const training = sets.filter((s) => s.kind !== 'annales');
+  // Annales réelles = QCM transcrits + sujets écrits (kind « sujet »).
+  const isReal = (s: AdminQcmSet) => s.kind === 'annales' || s.kind === 'sujet';
+  const annales = sets.filter(isReal);
+  const training = sets.filter((s) => !isReal(s));
   const withPhoto = annales.filter((s) => s.sourceImages.length > 0).length;
   const foldersWith = (xs: AdminQcmSet[]) => new Set(xs.map((s) => s.folderSlug)).size;
   const stats = [
@@ -168,8 +189,8 @@ export const AnnalesSettings: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {groups.map(({ folder, sets: gs }, i) => {
-          const ann = gs.filter((s) => s.kind === 'annales' && (!onlyMissing || s.sourceImages.length === 0));
-          const tr = gs.filter((s) => s.kind !== 'annales');
+          const ann = gs.filter((s) => isReal(s) && (!onlyMissing || s.sourceImages.length === 0));
+          const tr = gs.filter((s) => !isReal(s));
           return (
             <section
               key={folder?.slug || '__autres'}
@@ -185,7 +206,7 @@ export const AnnalesSettings: React.FC = () => {
               )}
               <div className="p-4 space-y-2">
                 <p className="text-[11px] font-extrabold text-emerald-800 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Annales réelles ({gs.filter((s) => s.kind === 'annales').length})
+                  <ShieldCheck className="w-3.5 h-3.5" /> Annales réelles ({gs.filter(isReal).length})
                 </p>
                 {ann.length === 0 ? (
                   <p className="text-[11px] text-[#8E8694] bg-white border border-dashed border-[#E9DCE4] rounded-xl p-3">

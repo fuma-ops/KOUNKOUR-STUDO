@@ -153,7 +153,8 @@ export interface QcmSet {
   questions: QcmQuestion[];
   isDemo: boolean;
   /** « annales » = vrai sujet transcrit ; « entrainement » = questions KounKour. */
-  kind?: 'annales' | 'entrainement';
+  kind?: 'annales' | 'entrainement' | 'sujet';
+  statement?: string | null; // sujet écrit : texte transcrit (kind = 'sujet')
   /** Langue du contenu (une annale arabe s'affiche de droite à gauche). */
   contentLanguage?: 'fr' | 'ar';
   concoursLabel?: string | null;

@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
 import { AnnaleImages } from './AnnaleImages';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
+import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
 import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, seenCount, submitQcm } from '../data/qcmApi';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
-  ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy
+  ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy, FileText
 } from 'lucide-react';
 
 // Réponses en cours d'un QCM non terminé (sur cet appareil), pour « Continuer ».
@@ -37,6 +38,9 @@ interface QcmModuleProps {
   setSlug?: string | null;
   onNavigate?: (folder: string | null, set: string | null) => void;
 }
+
+// Ordre dans un dossier : annales QCM, puis sujets écrits, puis entraînement.
+const KIND_ORDER: Record<string, number> = { annales: 0, sujet: 1, entrainement: 2 };
 
 // Clé d'URL d'un support : son slug en base.
 const urlKey = (set: QcmSet) => (set.serverGraded ? set.slug : set.id);
@@ -109,7 +113,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
   // Timer effect when a set is active and not submitted
   useEffect(() => {
     let interval: any = null;
-    if (selectedSet && !isSubmitted) {
+    if (selectedSet && selectedSet.kind !== 'sujet' && !isSubmitted) {
       interval = setInterval(() => {
         setTimerSeconds((prev) => prev + 1);
       }, 1000);
@@ -227,7 +231,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[...visibleFolders.map((f) => ({ f, sets: setsOf(f.slug) })), ...(orphans.length ? [{ f: { slug: '__autres', title: { fr: 'Autres supports', ar: 'دعامات أخرى' }, organization: '', description: { fr: '', ar: '' }, position: 999 } as QcmFolder, sets: orphans }] : [])].map(({ f, sets }, i) => {
               const st = statsOf(sets);
-              const annales = sets.filter((x) => x.kind === 'annales').length;
+              // Annales réelles = QCM transcrits + sujets écrits.
+              const annales = sets.filter((x) => x.kind === 'annales' || x.kind === 'sujet').length;
               return (
                 <button
                   key={f.slug}
@@ -259,9 +264,11 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                         {annales} {fr ? (annales > 1 ? 'annales réelles' : 'annale réelle') : 'نموذج حقيقي'}
                       </span>
                     )}
-                    <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-semibold">
-                      {st.total} {fr ? 'questions' : 'سؤال'}
-                    </span>
+                    {st.total > 0 && (
+                      <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-semibold">
+                        {st.total} {fr ? 'questions' : 'سؤال'}
+                      </span>
+                    )}
                   </div>
                   {progressBar(st.pct)}
                   <p className="text-[11px] text-[#6E6773] mt-1.5 flex items-center gap-1">
@@ -328,7 +335,44 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[...sets].sort((x, y) => (x.kind === y.kind ? 0 : x.kind === 'annales' ? -1 : 1)).map((set, i) => {
+            {[...sets].sort((x, y) => KIND_ORDER[x.kind || 'entrainement'] - KIND_ORDER[y.kind || 'entrainement']).map((set, i) => {
+              if (set.kind === 'sujet') {
+                return (
+                  <div
+                    key={set.id}
+                    className="bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between animate-fade-in"
+                    style={{ animationDelay: `${i * 80}ms` }}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3 gap-2">
+                        <span className="font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-md flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5" />
+                          {fr ? 'Sujet écrit réel' : 'موضوع كتابي حقيقي'}
+                        </span>
+                        {set.examYear && <span className="font-bold text-[#8D174B]">{set.examYear}</span>}
+                      </div>
+                      <h3 dir="auto" className="text-base font-bold text-[#242126] mb-1">{set.title[language]}</h3>
+                      {set.concoursLabel && <p className="text-[11px] font-semibold text-[#8D174B] mb-2">{set.concoursLabel}</p>}
+                      {!!set.sourceImages?.length && (
+                        <p className="text-[11px] font-bold text-emerald-800 mb-2 flex items-center gap-1">
+                          <Eye className="w-3.5 h-3.5" />
+                          {fr ? `Photo du sujet original incluse (${set.sourceImages.length} p.)` : `صورة الموضوع الأصلي مرفقة (${set.sourceImages.length} ص)`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="pt-3 border-t border-[#F1E5EC] flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-[#6E6773]">{fr ? 'Énoncé complet, sans corrigé officiel' : 'نص كامل، بدون تصحيح رسمي'}</span>
+                      <button
+                        onClick={() => handleStartSet(set)}
+                        className="px-4 py-2 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                      >
+                        {fr ? 'Lire le sujet' : 'قراءة الموضوع'}
+                        <NextIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
               const p = progress[set.id];
               const seen = seenCount(p, set.questions.map((q) => q.id));
               const total = set.questions.length;
@@ -404,6 +448,21 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
   }
 
   if (!selectedSet) return null;
+
+  if (selectedSet.kind === 'sujet') {
+    return (
+      <SujetView
+        set={selectedSet}
+        language={language}
+        isStaff={isStaff}
+        onBack={() => navigate(selectedSet.folderSlug || selectedFolder, null)}
+        onImages={(images) => {
+          setSelectedSet((s) => (s ? { ...s, sourceImages: images } : s));
+          setRealSets((all) => all.map((x) => (x.id === selectedSet.id ? { ...x, sourceImages: images } : x)));
+        }}
+      />
+    );
+  }
 
   // Active QCM Passage or Result view
   const currentQ = selectedSet.questions[currentQuestionIndex];

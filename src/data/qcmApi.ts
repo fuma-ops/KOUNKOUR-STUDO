@@ -47,7 +47,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, duration_minutes, difficulty, position, qcm_questions(id, position, source_number, question, options)')
+    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, duration_minutes, difficulty, position, qcm_questions(id, position, source_number, question, options)')
     .eq('status', 'published')
     .order('position', { ascending: true });
   if (error || !data) return [];
@@ -87,11 +87,13 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
         sourceNote: s.source_note,
         sourceImages: s.source_images || [],
         sourceUrl: s.source_url || null,
+        statement: s.statement || null,
         folderSlug: s.folder_slug,
         serverGraded: true,
       } as QcmSet;
     })
-    .filter((s) => s.questions.length > 0);
+    // Un sujet écrit n'a pas de QCM : il est gardé s'il a un texte.
+    .filter((s) => s.questions.length > 0 || (s.kind === 'sujet' && !!s.statement));
 }
 
 export interface QcmCorrection {
@@ -316,6 +318,7 @@ export interface AdminQcmSet {
   examYear: number | null;
   status: string;
   sourceImages: string[];
+  sourceUrl: string | null;
   questions: number;
 }
 
@@ -325,7 +328,7 @@ export async function fetchQcmSetsForAdmin(): Promise<AdminQcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, title_fr, folder_slug, kind, exam_year, status, source_images, position, qcm_questions(id)')
+    .select('id, slug, title_fr, folder_slug, kind, exam_year, status, source_images, source_url, position, qcm_questions(id)')
     .order('position', { ascending: true });
   if (error || !data) return [];
   return data.map((s: any) => ({
@@ -337,6 +340,7 @@ export async function fetchQcmSetsForAdmin(): Promise<AdminQcmSet[]> {
     examYear: s.exam_year,
     status: s.status,
     sourceImages: s.source_images || [],
+    sourceUrl: s.source_url || null,
     questions: (s.qcm_questions || []).length,
   }));
 }
