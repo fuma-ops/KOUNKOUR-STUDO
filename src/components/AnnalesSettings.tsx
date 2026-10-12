@@ -85,7 +85,6 @@ const SetRow: React.FC<{ set: AdminQcmSet; onImages: (images: string[]) => void 
           <p className="text-[13px] font-bold text-[#242126] leading-snug">{set.title}</p>
           <div className="flex flex-wrap gap-1.5 mt-1 text-[10px]">
             {set.examYear && <span className="px-1.5 py-0.5 rounded bg-[#FDF2F7] text-[#8D174B] font-bold">{set.examYear}</span>}
-            <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-semibold">{set.questions} questions</span>
             {set.status !== 'published' && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">non publiée</span>}
             <span className={`px-1.5 py-0.5 rounded font-bold ${n ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-700'}`}>
               {n ? `${n} photo${n > 1 ? 's' : ''}` : 'sans photo'}
@@ -126,10 +125,10 @@ export const AnnalesSettings: React.FC = () => {
   const annales = sets.filter((s) => s.kind === 'annales');
   const training = sets.filter((s) => s.kind !== 'annales');
   const withPhoto = annales.filter((s) => s.sourceImages.length > 0).length;
-  const q = (xs: AdminQcmSet[]) => xs.reduce((a, s) => a + s.questions, 0);
+  const foldersWith = (xs: AdminQcmSet[]) => new Set(xs.map((s) => s.folderSlug)).size;
   const stats = [
-    { label: 'Annales réelles', value: annales.length, sub: `${q(annales)} questions` },
-    { label: 'Entraînement', value: training.length, sub: `${q(training)} questions` },
+    { label: 'Annales réelles', value: annales.length, sub: `dans ${foldersWith(annales)} dossier${foldersWith(annales) > 1 ? 's' : ''}` },
+    { label: "QCM d'entraînement", value: training.length, sub: 'rédigés par KounKour' },
     { label: 'Annales avec photo', value: `${withPhoto}/${annales.length}`, sub: 'sujet original joint' },
     { label: 'Dossiers', value: folders.length, sub: `${folders.filter((f) => f.coverImage).length} avec image` },
   ];
@@ -197,7 +196,7 @@ export const AnnalesSettings: React.FC = () => {
                 )}
                 {tr.length > 0 && (
                   <p className="text-[11px] text-[#6E6773] flex items-center gap-1 pt-1">
-                    <BookOpen className="w-3.5 h-3.5" /> + {tr.length} QCM d'entraînement ({q(tr)} questions)
+                    <BookOpen className="w-3.5 h-3.5" /> + {tr.length} QCM d'entraînement
                   </p>
                 )}
               </div>
