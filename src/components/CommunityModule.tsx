@@ -15,6 +15,7 @@ import {
   timeAgo, uploadRoomImage,
 } from '../data/communityApi';
 import { AdminCommunityRequestsModal } from './AdminCommunityRequestsModal';
+import { isOfficialLogo } from './OrgLogo';
 
 interface CommunityModuleProps {
   language: Language;
@@ -241,7 +242,9 @@ export const CommunityModule: React.FC<CommunityModuleProps> = ({
   const emblemOf = (room: Room | null): string | undefined => {
     if (!room) return undefined;
     const c = room.contestId ? allContests.find((x) => x.id === room.contestId) : undefined;
-    return room.heroImage || c?.image || c?.administration?.logo || undefined;
+    // Image choisie pour le salon, sinon le logo OFFICIEL de l'organisme (jamais un logo deviné).
+    const logo = c?.administration?.logo || c?.image;
+    return room.heroImage || (isOfficialLogo(logo) ? logo : undefined);
   };
 
   const filteredRooms = useMemo(() => {

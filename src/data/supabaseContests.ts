@@ -1,6 +1,6 @@
 import { getSupabase } from '../lib/supabase';
 import { Contest, ContestCategory, ContestStatus } from '../types';
-import { resolveAdministrationLogo, removeImportedContest } from '../utils/radarStorage';
+import { removeImportedContest } from '../utils/radarStorage';
 
 // Lecture des concours PUBLIÉS depuis Supabase + mapping vers le type Contest de
 // studo. Source unique de vérité partagée (fini le localStorage/mockContests).
@@ -68,13 +68,15 @@ function mapRow(row: any): Contest {
   const rawRegionFr = row.region_fr || '';
   const regionFr = /National/i.test(rawRegionFr) ? '' : rawRegionFr;
   const regionAr = row.region_ar || regionFr;
-  const resolvedLogo = resolveAdministrationLogo(nameFr, admin.category, titleFr);
+  // Logo officiel de l'organisme (image de sa page emploi-public), sinon rien :
+  // jamais un logo « deviné » qui appartiendrait à un autre organisme.
+  const officialLogo: string = admin.logo_url || '';
 
   return {
     id: row.id,
     slug: row.slug,
     referenceCode: row.reference || '',
-    image: resolvedLogo,
+    image: officialLogo,
     title: {
       fr: titleFr,
       ar: titleAr,
@@ -83,7 +85,7 @@ function mapRow(row: any): Contest {
       id: row.administration_id || 'adm',
       name: { fr: nameFr, ar: nameAr },
       shortName: { fr: nameFr, ar: nameAr },
-      logo: resolvedLogo,
+      logo: officialLogo,
       category: mapCategory(admin.category),
       officialWebsite: admin.official_site || '',
     },
@@ -136,7 +138,7 @@ export async function fetchPublishedContests(): Promise<Contest[] | null> {
     const { data, error } = await supabase
       .from('contests')
       .select(
-        '*, administrations ( name_fr, name_ar, category, official_site ), contest_criteria ( criterion_type, value_fr, value_ar ), contest_positions ( position, province, category, diploma, specialty, count, note )'
+        '*, administrations ( name_fr, name_ar, category, official_site, logo_url ), contest_criteria ( criterion_type, value_fr, value_ar ), contest_positions ( position, province, category, diploma, specialty, count, note )'
       )
       // Statuts publics uniquement : un admin connecté ne doit pas voir sur le site
       // les brouillons ou concours archivés (lisibles par lui via les RLS staff).

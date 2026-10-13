@@ -9,10 +9,12 @@ import {
   SlidersHorizontal, Check, RefreshCw, X, ShieldAlert, Filter, Trash2,
   Edit3, Upload, Image as ImageIcon,
   Images,
+  Landmark,
 } from 'lucide-react';
 import { RadarModule } from './RadarModule';
 import { QcmModule } from './QcmModule';
 import { AnnalesSettings } from './AnnalesSettings';
+import { OrgLogosSettings } from './OrgLogosSettings';
 import { CommunityModule } from './CommunityModule';
 import { PdfViewerModal } from './PdfViewerModal';
 import { ContestEditModal } from './ContestEditModal';
@@ -20,7 +22,8 @@ import { AdminCommunityRequestsModal } from './AdminCommunityRequestsModal';
 import { AdminOverview } from './AdminOverview';
 import { RadarAttachDocs } from './RadarAttachDocs';
 import { listAccessRequests } from '../data/communityApi';
-import { getAllActiveContests, deleteContestFromSystem, updateContestInSystem, resolveAdministrationLogo } from '../utils/radarStorage';
+import { getAllActiveContests, deleteContestFromSystem, updateContestInSystem } from '../utils/radarStorage';
+import { OrgLogo } from './OrgLogo';
 import { checkEligibility, CandidateProfile } from '../utils/candidateStorage';
 
 interface AdminDashboardProps {
@@ -127,6 +130,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { id: 'gestion_contenus', labelFr: 'Concours publiés', labelAr: 'المباريات المنشورة', icon: Database },
           { id: 'qcm', labelFr: 'QCM & annales', labelAr: 'الاختبارات', icon: CheckSquare },
           { id: 'annales_reglages', labelFr: 'Annales & images', labelAr: 'النماذج والصور', icon: Images },
+          { id: 'logos_organismes', labelFr: 'Logos des organismes', labelAr: 'شعارات الإدارات', icon: Landmark },
           { id: 'community', labelFr: 'Communauté', labelAr: 'المجتمع', icon: Users },
           { id: 'utilisateurs', labelFr: 'Utilisateurs', labelAr: 'المستخدمون', icon: ShieldCheck },
           { id: 'smart_match', labelFr: 'Smart Match', labelAr: 'المطابقة الذكية', icon: Sparkles },
@@ -365,11 +369,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <td className="py-3.5 px-4">
                               <div className="flex items-center gap-2.5">
                                 <div className="w-7 h-7 rounded-lg bg-white border border-gray-200 p-0.5 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-                                  <img
-                                    src={resolveAdministrationLogo(c.administration?.name?.fr, c.administration?.category, c.title?.fr)}
-                                    alt="Logo"
-                                    className="w-full h-full object-contain"
-                                  />
+                                  <OrgLogo src={c.administration?.logo || c.image} name={c.administration?.name?.fr || 'Administration'} size="xs" />
                                 </div>
                                 <span className="font-bold text-[#8D174B] text-[11px] truncate max-w-[140px]">
                                   {c.administration?.name?.[language] || c.administration?.name?.fr || 'Administration'}
@@ -492,6 +492,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </p>
             </div>
             <AnnalesSettings />
+          </div>
+        ) : activeSidebarItem === 'logos_organismes' ? (
+          <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full animate-fade-in">
+            <div className="mb-6">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1F1924]">
+                {language === 'fr' ? 'Logos des organismes' : 'شعارات الإدارات'}
+              </h1>
+              <p className="text-xs sm:text-sm text-[#6E6773] mt-1">
+                {language === 'fr'
+                  ? 'Le logo officiel affiché sur chaque concours. Ajoutez ceux qui manquent ou remplacez-en un.'
+                  : 'الشعار الرسمي المعروض على كل مباراة. أضف الناقص أو استبدله.'}
+              </p>
+            </div>
+            <OrgLogosSettings />
           </div>
         ) : activeSidebarItem === 'community' ? (
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full animate-fade-in">

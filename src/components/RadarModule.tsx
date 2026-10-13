@@ -17,9 +17,10 @@ import {
   loadImportedContests, normalizeScrapedItem,
   importMultipleScrapedContestsToCatalog, ignoreMultipleScrapedContests,
   loadSourceScanStats, saveSourceScanStat, SourceScanStat,
-  resolveAdministrationLogo, deleteContestFromSystem
+  deleteContestFromSystem
 } from '../utils/radarStorage';
 import { getSupabase } from '../lib/supabase';
+import { OrgLogo } from './OrgLogo';
 import { publishScrapedToSupabase, publishManyScrapedToSupabase } from '../data/publishContest';
 
 interface RadarModuleProps {
@@ -1045,11 +1046,7 @@ export const RadarModule: React.FC<RadarModuleProps> = ({
                       <div className="flex-1 space-y-2.5">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
-                            <img
-                              src={resolveAdministrationLogo(item.administration?.name?.fr || item.administration?.name?.[language], item.administration?.category, item.title?.fr || item.title?.[language])}
-                              alt="Logo"
-                              className="w-full h-full object-contain"
-                            />
+                            <OrgLogo src={item.administration?.logo || item.image} name={item.administration?.name?.fr || 'Administration'} size="xs" />
                           </div>
                           <span className="text-xs font-bold text-[#8D174B] uppercase tracking-wide">
                             {item.administration?.name?.[language] || item.administration?.name?.fr || 'Administration'}

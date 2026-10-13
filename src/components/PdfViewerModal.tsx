@@ -5,7 +5,6 @@ import {
   FileText, ShieldCheck, Eye, Image as ImageIcon, AlertCircle,
   Building2, RefreshCw
 } from 'lucide-react';
-import { resolveAdministrationLogo } from '../utils/radarStorage';
 
 interface PdfViewerModalProps {
   isOpen: boolean;

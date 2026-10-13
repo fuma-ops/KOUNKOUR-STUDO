@@ -20,6 +20,7 @@ import { NotificationsToggle } from './NotificationsToggle';
 import { saveMatchPreferences, loadMatchPreferences } from '../data/matchPrefsApi';
 import { buildMatchFeed } from '../utils/matchFeed';
 import { profileSpecialties, specialtySuggestions } from '../utils/smartMatch';
+import { OrgLogo } from './OrgLogo';
 
 interface ProfileModuleProps {
   language: Language;
@@ -436,8 +437,8 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                       onClick={() => setExpandedContestId(isExpanded ? null : c.id)}
                       className="flex items-center gap-3.5 cursor-pointer flex-1"
                     >
-                      <div className="w-12 h-12 rounded-2xl bg-[#FDF2F7] flex items-center justify-center text-2xl shrink-0 border border-[#F1E5EC]">
-                        {c.administration.logo}
+                      <div className="w-12 h-12 rounded-2xl bg-[#FDF2F7] flex items-center justify-center shrink-0 border border-[#F1E5EC] p-1 overflow-hidden">
+                        <OrgLogo src={c.administration.logo || c.image} name={c.administration.name.fr} size="xs" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-0.5">

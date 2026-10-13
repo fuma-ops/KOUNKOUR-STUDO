@@ -12,7 +12,7 @@ import { PdfViewerModal } from './PdfViewerModal';
 import { ContestComments } from './ContestComments';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
-import { resolveAdministrationLogo } from '../utils/radarStorage';
+import { OrgLogo } from './OrgLogo';
 import { inferSalaryScaleFromContest } from '../data/salaryScales';
 import { downloadContestIcs, getGoogleCalendarUrl } from '../utils/calendarExport';
 
@@ -89,9 +89,9 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
     { id: 'docs', label: language === 'fr' ? 'Documents' : 'الوثائق', count: (officialArreteUrl ? 1 : 0) + (contest.convoquesUrl ? 1 : 0) + (contest.documents?.length || 0) },
   ];
 
-  // Resolve administration logo / image
-  const officialEmblem = contest.image || contest.administration?.logo || 
-    resolveAdministrationLogo(contest.administration?.name?.fr, contest.administration?.category, contest.title?.fr);
+  // Logo officiel de l'organisme uniquement (sinon emblème neutre, jamais un logo deviné).
+  const officialLogo = contest.administration?.logo || contest.image;
+  const orgName = contest.administration?.name?.[language] || contest.administration?.name?.fr || 'Administration';
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex justify-center items-start sm:items-center p-0 sm:p-4 animate-fade-in">
@@ -175,18 +175,9 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
             <div className="relative z-10 space-y-4">
               {/* Administration logo + Status tag */}
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white p-1.5 shadow-lg shrink-0 flex items-center justify-center overflow-hidden border border-white/80">
-                    <img
-                      src={officialEmblem}
-                      alt="Emblème officiel"
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        (e.target as any).src = resolveAdministrationLogo(contest.administration?.name?.fr, contest.administration?.category, contest.title?.fr);
-                      }}
-                    />
-                  </div>
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
+                  <OrgLogo src={officialLogo} name={orgName} surface="dark" size="md" className="self-start shrink-0" />
+                  <div className="min-w-0">
                     <span className="text-xs font-bold uppercase tracking-wider text-rose-200 block">
                       {contest.administration?.name?.[language] || contest.administration?.name?.fr}
                     </span>

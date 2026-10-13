@@ -326,109 +326,14 @@ export function saveImportedContests(contests: Contest[]): void {
   }
 }
 
-// Résolution dynamique des emblèmes et logos officiels marocains
-export function resolveAdministrationLogo(adminName: string = '', category: string = '', title: string = ''): string {
-  const raw = `${adminName} ${title}`.toLowerCase();
-  const text = raw
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/['’\-_/]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  // 1. Royal Air Maroc / RAM Maintenance / ONDA / Aviation civile / Transport Aérien
-  if (text.includes('royal air maroc') || text.includes('ram maintenance') || text.includes('ram handling') || text.includes('ram cargo') || text.includes('air maroc') || text.includes('onda') || text.includes('aeronautique') || text.includes('aviation civile')) {
-    return '/images/administrations/logo-ram.svg';
-  }
-
-  // 2. Forces Armées Royales / FAR / Défense / Gendarmerie
-  if (text.includes('far ma') || text.includes('forces armees') || text.includes('recrutement far') || text.includes('gendarmerie') || text.includes('defense nationale') || text.includes('marine royale') || text.includes('forces royales air')) {
-    return '/images/administrations/673d4e683bf65fbf906fa190831359e7.png';
-  }
-
-  // 3. Sûreté Nationale / Police / DGSN
-  if (text.includes('dgsn') || text.includes('police') || text.includes('surete nationale') || text.includes('امن وطني') || text.includes('شرطة') || text.includes('gardien de la paix') || text.includes('officier de paix') || text.includes('commissaire de police')) {
-    return '/images/administrations/logo-031.png';
-  }
-
-  // 4. Protection Civile
-  if (text.includes('protection civile') || text.includes('وقاية مدنية')) {
-    return '/images/administrations/logo-044.png';
-  }
-
-  // 5. Enseignement Supérieur / Universités / Facultés / Écoles Nationales
-  if (text.includes('universite') || text.includes('faculte') || text.includes('chouaib doukkali') || text.includes('chouaib') || text.includes('hassan 1er') || text.includes('hassan premier') || text.includes('hassan ii') || text.includes('mohammed v') || text.includes('cadi ayyad') || text.includes('ibn tofail') || text.includes('sidi mohamed') || text.includes('abdelmalek') || text.includes('maitre de conference') || text.includes('enseignement superieur') || text.includes('institut national') || text.includes('ecole nationale') || text.includes('enta') || text.includes('ensam') || text.includes('encg') || text.includes('ensa') || text.includes('fste') || text.includes('fst ')) {
-    return '/images/administrations/logo-008.png';
-  }
-
-  // 6. Équipement / Transport / Autoroutes du Maroc / ANP / Ports / Logistique / ONCF / ONEE
-  if (text.includes('autoroute') || text.includes('port ') || text.includes('ports') || text.includes('anp') || text.includes('equipement') || text.includes('transport') || text.includes('oncf') || text.includes('onee') || text.includes('ancfcc') || text.includes('logistique') || text.includes('marsa maroc')) {
-    return '/images/administrations/logo-019.png';
-  }
-
-  // 7. Finances / Économie / Douane / Impôts / Trésorerie / CDG / Bank Al-Maghrib
-  if (text.includes('douan') || text.includes('finance') || text.includes('economie') || text.includes('impot') || text.includes('tresorerie') || text.includes('cdg') || text.includes('bank al maghrib') || text.includes('ministere de l economie') || category === 'finances') {
-    return '/images/administrations/logo-013.png';
-  }
-
-  // 8. Agriculture / Pêche Maritime / Foodex / EACCE / ORMVA / Eaux et Forêts / ONSSA
-  if (text.includes('agriculture') || text.includes('peche') || text.includes('foodex') || text.includes('eacce') || text.includes('ormva') || text.includes('onssa') || text.includes('eaux et forets') || text.includes('developpement rural') || text.includes('agronome') || text.includes('agricole')) {
-    return '/images/administrations/logo-011.png';
-  }
-
-  // 9. Santé / CHU / Hôpitaux / Médecins / Infirmiers
-  if (text.includes('sante') || text.includes('chu ') || text.includes('centre hospitalier') || text.includes('medical') || text.includes('soins') || text.includes('صحة') || text.includes('medecin') || text.includes('infirmier') || category === 'sante') {
-    return '/images/administrations/logo-005.png';
-  }
-
-  // 10. Éducation Nationale / Préscolaire / AREF / Académies
-  if (text.includes('education nationale') || text.includes('prescolaire') || text.includes('aref') || text.includes('academie regionale') || text.includes('تعليم') || (text.includes('sport') && !text.includes('transport'))) {
-    return '/images/administrations/logo-006.png';
-  }
-
-  // 11. Justice / Tribunaux / Cours / Greffiers
-  if (text.includes('justice') || text.includes('tribunal') || text.includes('cour ') || text.includes('greffier') || text.includes('عدل') || text.includes('commissaire judiciaire')) {
-    return '/images/administrations/logo-017.png';
-  }
-
-  // 12. Affaires Étrangères / Coopération / MRE / Diplomatie
-  if (text.includes('affaires etrangeres') || text.includes('etrangeres') || text.includes('mre') || text.includes('cooperation africaine') || text.includes('diplomatie') || text.includes('consulat') || text.includes('ambassade')) {
-    return '/images/administrations/logo-023.png';
-  }
-
-  // 13. HCP / Haut-Commissariat au Plan
-  if (text.includes('hcp') || text.includes('haut commissariat') || text.includes('statistique')) {
-    return '/images/administrations/logo-024.png';
-  }
-
-  // 14. Intérieur / Collectivités Territoriales / Communes / Préfectures / Provinces
-  // NOTE: On vérifie explicitement les termes de l'Intérieur / Communes, PAS juste le mot "région" dans le texte !
-  if (
-    text.includes('ministere de l interieur') || 
-    text.includes('ministere de linterieur') || 
-    text.includes('interieur') ||
-    text.includes('wilaya') || 
-    text.includes('prefecture') || 
-    text.includes('province de') || 
-    text.includes('commune de') || 
-    text.includes('commune urbaine') || 
-    text.includes('commune rurale') || 
-    text.includes('conseil communal') || 
-    text.includes('conseil provincial') || 
-    text.includes('conseil de la region') || 
-    text.includes('conseil regional') || 
-    category === 'collectivites'
-  ) {
-    return '/images/administrations/logo-003.png';
-  }
-
-  // 15. Agences Urbaines, Établissements Publics, SRM, MAP, Offices
-  if (text.includes('srm') || text.includes('agence urbaine') || text.includes('agence') || text.includes('office') || text.includes('map ') || text.includes('maghreb arabe presse') || text.includes('etablissement') || category === 'entreprises' || category === 'autres') {
-    return '/images/administrations/logo-045.png';
-  }
-  
-  // Emblème officiel du Royaume du Maroc par défaut
-  return '/images/administrations/Ministre-sm-default-image.jpg';
+// Ancien choix d'image par mots-clés (« université » → un logo d'université
+// quelconque, etc.) : il affichait le logo d'un AUTRE organisme. Supprimé.
+// Le logo vient désormais uniquement de administrations.logo_url (/api/logo,
+// image officielle de la page emploi-public) ; sans logo connu, OrgLogo
+// affiche un emblème neutre. Gardé pour les anciens appels : ne devine plus rien.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function resolveAdministrationLogo(_adminName: string = '', _category: string = '', _title: string = ''): string {
+  return '';
 }
 
 // Convert a scraped contest to full Contest model and add to imported contests
@@ -654,21 +559,12 @@ export function sanitizeContestFields(c: Contest): Contest {
     }
   }
 
-  // Résolution et préservation propre de l'image réelle de l'annonce ou emblème officiel
-  const hasValidExternalScrapedImage = !!(updated.image && updated.image.startsWith('http'));
-  const adminFr = updated.administration?.name?.fr || (updated as any).source_org || '';
-  const adminCat = updated.administration?.category || '';
-  const tFr = updated.title?.fr || '';
-  const resolved = resolveAdministrationLogo(adminFr, adminCat, tFr);
-
-  if (!hasValidExternalScrapedImage) {
-    updated.image = resolved;
-  }
-  if (!updated.administration?.logo || !updated.administration.logo.startsWith('http')) {
-    updated.administration = {
-      ...updated.administration,
-      logo: resolved,
-    };
+  // On ne garde que le logo OFFICIEL de l'organisme (/api/logo ou image distante
+  // de sa page) ; tout ancien logo « deviné » (/images/administrations/…) est retiré.
+  const keep = (u?: string) => !!u && (u.startsWith('/api/logo?') || u.startsWith('http'));
+  if (!keep(updated.image)) updated.image = '';
+  if (!keep(updated.administration?.logo)) {
+    updated.administration = { ...updated.administration, logo: '' };
   }
 
   return updated;

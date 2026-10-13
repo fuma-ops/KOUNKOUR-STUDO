@@ -6,7 +6,7 @@ import {
   Calendar, ChevronRight, ChevronLeft, Sparkles, Target,
   Users, MapPin, Tag, Briefcase
 } from 'lucide-react';
-import { resolveAdministrationLogo } from '../utils/radarStorage';
+import { OrgLogo } from './OrgLogo';
 import { deadlineBadge, type MatchFeed } from '../utils/matchFeed';
 
 interface FeaturedContestsSectionProps {
@@ -37,17 +37,6 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
   const featuredContests = contests
     .filter((c) => c.status === 'open' || c.status === 'closing_soon' || !c.status)
     .slice(0, 6);
-
-  // Fallback default sample image for Moroccan visual realism if no specific image exists
-  const getContestHeroImage = (contest: Contest) => {
-    if (contest.image && contest.image.trim().length > 0) return contest.image;
-    const cat = (contest.administration?.category as string) || '';
-    if (cat === 'education') return '/images/classroom_prep.jpg';
-    if (cat === 'justice') return '/images/moroccan_court.jpg';
-    if (cat === 'interieur' || cat === 'securite') return '/images/moroccan_palace.jpg';
-    if (cat === 'finances') return '/images/hassan_palace.jpg';
-    return '/images/morocco_hero.jpg';
-  };
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-4 space-y-8 animate-fade-in">
@@ -218,7 +207,8 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
         {/* Featured Visual Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {featuredContests.map((contest) => {
-            const contestImageSrc = contest.image || contest.administration?.logo || resolveAdministrationLogo(contest.administration?.name?.fr, contest.administration?.category, contest.title?.fr);
+            const logoSrc = contest.administration?.logo || contest.image;
+            const orgName = contest.administration?.name?.[language] || contest.administration?.name?.fr || 'Administration';
 
             return (
               <div
@@ -269,15 +259,7 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
                   {/* Centered Image - Uncropped, Fit Pil-Poil with Object-Contain */}
                   <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-1">
                     <div className="transition-transform duration-300 group-hover:scale-105 flex items-center justify-center w-full h-full">
-                      <img
-                        src={contestImageSrc}
-                        alt={contest.administration?.name?.[language] || 'Administration'}
-                        referrerPolicy="no-referrer"
-                        className="max-h-20 sm:max-h-22 max-w-[180px] sm:max-w-[200px] w-auto h-auto object-contain drop-shadow-xs"
-                        onError={(e) => {
-                          (e.target as any).src = resolveAdministrationLogo(contest.administration?.name?.fr, contest.administration?.category, contest.title?.fr);
-                        }}
-                      />
+                      <OrgLogo src={logoSrc} name={orgName} size="md" />
                     </div>
                   </div>
                 </div>
@@ -287,13 +269,6 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
                   <div className="space-y-2.5">
                     {/* Administration name & Logo */}
                     <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-white border border-gray-200 p-0.5 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-                        <img
-                          src={resolveAdministrationLogo(contest.administration?.name?.fr, contest.administration?.category, contest.title?.fr)}
-                          alt="Logo"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
                       <span className="text-[11px] font-bold text-[#8D174B] uppercase tracking-wider block truncate">
                         {contest.administration?.name?.[language] || contest.administration?.name?.fr}
                       </span>

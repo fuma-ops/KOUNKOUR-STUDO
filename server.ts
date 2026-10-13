@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import scrapeLiveHandler from './api/radar/scrape-live.ts';
 import enrichHandler from './api/radar/enrich.ts';
+import logoHandler from './api/logo.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,15 @@ app.get('/api/radar/enrich', async (req, res) => {
     await enrichHandler(req, res);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Erreur enrichissement' });
+  }
+});
+
+// Logo officiel d'un organisme (même fonction que sur Vercel).
+app.get('/api/logo', async (req, res) => {
+  try {
+    await logoHandler(req, res);
+  } catch (err: any) {
+    res.status(500).send(err?.message || 'Erreur logo');
   }
 });
 

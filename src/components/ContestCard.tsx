@@ -4,7 +4,7 @@ import { translations } from '../i18n/translations';
 import { Calendar, Users, GraduationCap, MapPin, Bookmark, CheckCircle2, AlertTriangle, Clock, Sparkles, Check, MessageCircle } from 'lucide-react';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady } from '../utils/smartMatch';
-import { resolveAdministrationLogo } from '../utils/radarStorage';
+import { OrgLogo } from './OrgLogo';
 
 interface ContestCardProps {
   contest: Contest;
@@ -129,14 +129,10 @@ export const ContestCard: React.FC<ContestCardProps> = ({
           {/* Centered Scraped Official Emblem / Logo - Enlarged and Prominent */}
           <div className="relative z-10 flex-1 flex items-center justify-center px-4 -mt-2">
             <div className="transition-transform duration-300 group-hover:scale-105 flex items-center justify-center">
-              <img
-                src={contest.image || contest.administration?.logo || resolveAdministrationLogo(contest.administration?.name?.fr || contest.administration?.name?.[language], contest.administration?.category, contest.title?.fr || contest.title?.[language])}
-                alt={contest.administration?.name?.[language] || 'Administration'}
-                referrerPolicy="no-referrer"
-                className="max-h-24 sm:max-h-28 max-w-[210px] w-auto h-auto object-contain drop-shadow-sm"
-                onError={(e) => {
-                  (e.target as any).src = resolveAdministrationLogo(contest.administration?.name?.fr, contest.administration?.category, contest.title?.fr);
-                }}
+              <OrgLogo
+                src={contest.administration?.logo || contest.image}
+                name={contest.administration?.name?.[language] || contest.administration?.name?.fr || 'Administration'}
+                size="lg"
               />
             </div>
           </div>
