@@ -14,11 +14,11 @@ export const ConcoursRef: React.FC<{ set: QcmSet; language: Language; variant?: 
   if (!label) return null;
   const big = variant === 'header';
   return (
-    <div className={`flex items-center gap-2.5 rounded-xl border ${real ? 'border-emerald-200 bg-emerald-50/50' : 'border-[#F1E5EC] bg-[#FAF7F9]'} ${big ? 'p-3' : 'p-2'} mb-2`}>
+    <div className={`flex flex-wrap items-center gap-2.5 rounded-xl border ${real ? 'border-emerald-200 bg-emerald-50/50' : 'border-[#F1E5EC] bg-[#FAF7F9]'} ${big ? 'p-3' : 'p-2'} mb-2`}>
       <div className={`${big ? 'w-14 h-14' : 'w-10 h-10'} shrink-0 rounded-lg bg-white border border-[#F1E5EC] flex items-center justify-center p-1 overflow-hidden`}>
         <OrgLogo src={set.orgLogo} name={set.orgName || label} size="xs" />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[9rem] flex-1">
         <p className={`flex items-center gap-1 font-extrabold uppercase tracking-wide ${big ? 'text-[11px]' : 'text-[10px]'} ${real ? 'text-emerald-800' : 'text-[#6E6773]'}`}>
           {real ? <ShieldCheck className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
           {real ? (fr ? 'Concours réel' : 'مباراة حقيقية') : fr ? 'Préparation au concours' : 'تحضير لمباراة'}
