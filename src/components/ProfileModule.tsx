@@ -690,6 +690,8 @@ export const ProfileModule: React.FC<ProfileModuleProps> = ({
                   <option value="Technicien">Diplôme de technicien – formation professionnelle (تقني)</option>
                   <option value="Bac">Baccalauréat (الباكالوريا)</option>
                   <option value="CQP">CQP / qualification professionnelle (التأهيل المهني)</option>
+                  <option value="Lycee">Niveau lycée, sans bac (مستوى الثانوي التأهيلي)</option>
+                  <option value="College">Niveau collège – 9e année (مستوى الإعدادي)</option>
                 </select>
               </div>
 

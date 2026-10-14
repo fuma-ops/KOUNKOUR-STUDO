@@ -79,7 +79,10 @@ export function degreeYearsIn(text: string | undefined | null): number[] {
   if (/licence|bac ?\+ ?3|ingenieur d.application/.test(t)) found.add(3);
   if (/bac ?\+ ?2|\bdts\b|\bdut\b|\bbts\b|\bdeug\b|technicien specialise/.test(t)) found.add(2);
   if (/diplome de technicien(?! specialise)|\btechnicien\b(?! specialise)/.test(t) && !found.size) found.add(1);
-  if (/\bcqp\b|certificat de qualification/.test(t)) found.add(-1);
+  if (/\bcqp\b|certificat de qualification|qualification professionnelle/.test(t)) found.add(-1);
+  // Niveaux scolaires (concours de rang : Forces auxiliaires, FAR, chauffeurs…).
+  if (/secondaire qualifiant|niveau (du |de )?lycee|annee du bac(calaureat)?\b/.test(t)) found.add(-2);
+  if (/9 ?(e|eme) annee (fondamentale|de l.enseignement fondamental|du college)|3 ?(e|eme) annee (du |de l.)?(secondaire )?(college|collegial|enseignement secondaire collegial|secondaire inferieur|interieur)|secondaire collegial|niveau (du |de )?college/.test(t)) found.add(-3);
   if (/baccalaureat|\bbac\b(?! ?\+)/.test(t) && !found.size) found.add(0);
   return [...found].sort((x, y) => x - y);
 }
@@ -90,7 +93,9 @@ export function degreeRankOf(text: string | undefined | null): number | null {
 }
 
 const YEARS_LABEL: Record<number, { fr: string; ar: string }> = {
-  [-1]: { fr: 'CQP', ar: 'شهادة التأهيل المهني' },
+  [-3]: { fr: 'Niveau collège (9e année)', ar: 'مستوى الإعدادي (السنة التاسعة)' },
+  [-2]: { fr: 'Niveau lycée (sans bac)', ar: 'مستوى الثانوي التأهيلي' },
+  [-1]: { fr: 'CQP / qualification professionnelle', ar: 'شهادة التأهيل المهني' },
   1: { fr: 'Diplôme de technicien', ar: 'دبلوم التقني' },
   0: { fr: 'Bac', ar: 'الباكالوريا' },
   2: { fr: 'Bac+2', ar: 'باك+2' },
@@ -103,12 +108,42 @@ const yl = (y: number, lang: 'fr' | 'ar') => YEARS_LABEL[y]?.[lang] || `Bac+${y}
 
 type DegreeCheck = { status: CriterionStatus; fr: string; ar: string };
 
-function checkDegree(required: string, mine: number | null): DegreeCheck {
+// Diplôme exigé par le STATUT du grade (fonction publique), utilisé seulement quand
+// l'annonce ne l'écrit pas : un maître de conférences est recruté avec un doctorat,
+// un ingénieur d'État avec un diplôme d'ingénieur d'État, etc.
+export function degreeYearsFromGrade(text: string | undefined | null): number | null {
+  const t = norm(text);
+  if (!t.trim()) return null;
+  if (/maitres? de conferences|professeurs? (de l.enseignement superieur|habilites?|assistants?)/.test(t)) return 8;
+  if (/ingenieurs? d.etat|ingenieurs? en chef|\barchitectes?\b|administrateurs? (du |de )?(2e|deuxieme|2eme) grade/.test(t)) return 5;
+  if (/administrateurs? (du |de )?(3e|troisieme|3eme) grade|ingenieurs? d.application/.test(t)) return 3;
+  if (/techniciens? (de )?(3e|troisieme|3eme) grade/.test(t)) return 2;
+  if (/techniciens? (de )?(4e|quatrieme|4eme) grade/.test(t)) return 1;
+  return null;
+}
+
+function checkDegree(required: string, mine: number | null, gradeHints: (string | null | undefined)[] = []): DegreeCheck {
   if (mine === null) {
     return { status: 'verify', fr: 'Renseignez votre niveau de diplôme dans votre profil.', ar: 'يرجى تحديد مستواك الدراسي في ملفك.' };
   }
   const req = degreeYearsIn(required);
   if (req.length === 0) {
+    const grade = (gradeHints.find((h) => degreeYearsFromGrade(h) !== null) || '').split(/\s[–—-]\s/)[0].trim();
+    const g = grade ? degreeYearsFromGrade(grade) : null;
+    if (g !== null) {
+      if (mine < g) {
+        return {
+          status: 'ko',
+          fr: `Diplôme : le grade « ${grade} » exige ${yl(g, 'fr')} ; le vôtre est ${yl(mine, 'fr')}.`,
+          ar: `الدبلوم: الإطار « ${grade} » يشترط ${yl(g, 'ar')}، ودبلومك ${yl(mine, 'ar')}.`,
+        };
+      }
+      return {
+        status: 'verify',
+        fr: `Diplôme : l'annonce ne le précise pas ; le grade « ${grade} » demande en principe ${yl(g, 'fr')}. Vérifiez dans l'arrêté.`,
+        ar: `الدبلوم: غير محدد في الإعلان؛ الإطار « ${grade} » يتطلب مبدئياً ${yl(g, 'ar')}. تحقق من القرار.`,
+      };
+    }
     return {
       status: 'verify',
       fr: "Diplôme exigé non précisé par l'annonce : à vérifier dans l'arrêté officiel.",
@@ -118,7 +153,25 @@ function checkDegree(required: string, mine: number | null): DegreeCheck {
   const t = norm(required);
   const isMinimum = /au moins|au minimum|minimum|ou plus|et plus/.test(t);
   const isLevelOnly = /\bniveau\b/.test(t);
-  if (isMinimum) {
+  // « Le niveau d'études ne doit pas dépasser … » : plafond, pas plancher.
+  if (/ne (doit|doivent) pas depasser|ne pas depasser|ne depassant pas/.test(t)) {
+    const max = Math.max(...req);
+    if (mine > max) {
+      return {
+        status: 'ko',
+        fr: `Diplôme : l'annonce exige un niveau qui ne dépasse pas ${yl(max, 'fr')} ; le vôtre est ${yl(mine, 'fr')}.`,
+        ar: `الدبلوم: الإعلان يشترط مستوى لا يتجاوز ${yl(max, 'ar')}، ومستواك ${yl(mine, 'ar')}.`,
+      };
+    }
+    return {
+      status: mine === max ? 'ok' : 'verify',
+      fr: `Diplôme : l'annonce demande « ${required} » ; votre niveau (${yl(mine, 'fr')}) ${mine === max ? 'correspond' : 'est à vérifier'}.`,
+      ar: `الدبلوم: الإعلان يطلب « ${required} »؛ مستواك (${yl(mine, 'ar')}) ${mine === max ? 'مطابق' : 'يحتاج تحققاً'}.`,
+    };
+  }
+  // « Avoir le niveau (scolaire) … » pour un niveau ≤ bac : c'est un minimum —
+  // un candidat qui a dépassé ce niveau l'a forcément atteint.
+  if (isMinimum || (isLevelOnly && req.every((r) => r <= 0))) {
     const min = Math.min(...req);
     if (mine >= min) {
       return {
@@ -204,7 +257,10 @@ export const CONCEPTS: Concept[] = [
   C('rh', 'gestion', 'Ressources humaines', /ressources humaines|\brh\b|\bgrh\b/),
   C('innovation', 'gestion', "Management de l'innovation", /innovation|management technologique/),
   C('commerce', 'commerce', 'Commerce / marketing', /commerc|marketing|vente|relation client|evenementiel/),
-  C('logistique', 'logistique', 'Logistique / transport', /logisti|transport|supply chain|magasinier/),
+  C('logistique', 'logistique', 'Logistique / supply chain', /logisti|supply chain|magasinier|gestion des stocks|transport de marchandises/),
+  // « Mobilité et transport » (urbain) : voisin de la logistique, pas la même chose.
+  // « Infrastructures de transport » relève du génie civil, pas d'ici.
+  C('transport', 'logistique', 'Transport / mobilité', /(?<!infrastructures? de )transports?|mobilite/),
   C('stat', 'statistique', 'Statistique / démographie', /statisti|demograph|actuari|econometr/),
   C('secretariat', 'secretariat', 'Secrétariat / assistanat', /secretar|assistanat|assistant (de direction|administratif)|bureautique|techniques administratives/),
   // Droit
@@ -225,8 +281,11 @@ export const CONCEPTS: Concept[] = [
   C('energie', 'electricite', 'Énergétique / énergies renouvelables', /energ/),
   C('meca', 'mecanique', 'Génie mécanique / mécanique', /(?<!electro)mecani|fabrication mecanique|engins? (a moteur|de travaux)|moteur/),
   C('auto', 'mecanique', 'Mécanique et électricité automobiles', /automobile|diagnostic et electronique embarquee/),
-  C('indus', 'industrie', 'Génie industriel / procédés', /genie industriel|genie des procedes|procedes industriels|industriel|maintenance industrielle|entretien industriel/),
-  C('biomed', 'industrie|sante_tech', 'Génie biomédical', /biomedical/),
+  C('indus', 'industrie', 'Génie industriel / procédés', /genie industriel|ingenierie industrielle|genie des procedes|procedes industriels|gestion de (la )?production|production industrielle/),
+  // Maintenance industrielle : métier technique voisin de l'électricité, de la mécanique et du génie industriel.
+  C('maint_indus', 'maintenance|electricite|mecanique|industrie', 'Maintenance industrielle', /maintenance industrielle|entretien industriel|maintenance des (equipements|installations) industriel/),
+  // Génie biomédical : domaine à part (équipements médicaux), jamais « proche » du génie industriel.
+  C('biomed', 'biomedical', 'Génie biomédical', /biomedical/),
   C('mines', 'mines', 'Mines / géologie', /minier|miniere|\bmines\b|geolog/),
   C('plomberie', 'plomberie', 'Plomberie', /plomberie/),
   C('conduite', 'conduite', 'Conduite (permis)', /conduite|permis|chauffeur/),
@@ -385,6 +444,12 @@ export function parseAgeRule(text: string | null | undefined): AgeRule | null {
   const mMin = t.match(/(\d{2}) ans (au moins|minimum|au minimum)/) || t.match(/au moins (\d{2}) ans/);
   if (mMin) rule.min = Number(mMin[1]);
   const maxes: { n: number; strict: boolean }[] = [];
+  // « âgé entre 18 ans et 22 ans » / « entre 18 et 22 ans »
+  const between = t.match(/entre (\d{2})( ans)? et (de )?(\d{2}) ans/);
+  if (between) {
+    rule.min = rule.min ?? Number(between[1]);
+    maxes.push({ n: Number(between[4]), strict: false });
+  }
   for (const m of t.matchAll(/(\d{2}) ans (au plus|au maximum|maximum)/g)) maxes.push({ n: Number(m[1]), strict: false });
   for (const m of t.matchAll(/(?:au plus|au maximum|n.excedant pas|ne depassant pas) (\d{2}) ans/g)) maxes.push({ n: Number(m[1]), strict: false });
   for (const m of t.matchAll(/moins de (\d{2}) ans/g)) maxes.push({ n: Number(m[1]), strict: true });
@@ -456,7 +521,7 @@ function checkAge(profile: CandidateProfile, ageText: string): DegreeCheck {
 // -----------------------------------------------------------------------------
 // 4. Verdict global, poste par poste.
 // -----------------------------------------------------------------------------
-const PROFILE_YEARS: Record<string, number> = { Doctorat: 8, Master: 5, Licence: 3, 'Bac+2': 2, Technicien: 1, Bac: 0, CQP: -1 };
+const PROFILE_YEARS: Record<string, number> = { Doctorat: 8, Master: 5, Licence: 3, 'Bac+2': 2, Technicien: 1, Bac: 0, CQP: -1, Lycee: -2, College: -3 };
 
 export function profileDegreeYears(profile: CandidateProfile): number | null {
   if (!profile.degreeLevel) return null;
@@ -526,7 +591,7 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
     type Row = { p: ContestPost; d: DegreeCheck; s: SpecResult };
     const rows: Row[] = posts.map((p) => ({
       p,
-      d: checkDegree(p.diploma || contest.degreeLevel, myYears),
+      d: checkDegree(p.diploma || contest.degreeLevel, myYears, [p.category, contest.grade, contest.title?.fr]),
       s: p.specialty ? compareSpecialtyList([p.specialty], mine) : compareSpecialtyList(contestSpecs, mine),
     }));
     const tier = (r: Row) => (r.d.status === 'ko' || r.s.level === 'none' ? 0 : r.d.status === 'ok' && r.s.level === 'match' ? 2 : 1);
@@ -539,7 +604,7 @@ export function checkEligibility(contest: Contest, profile: CandidateProfile): E
       matchedPosts = bestRows.map((r) => ({ province: r.p.province, specialty: r.p.specialty, count: r.p.count }));
     }
   } else {
-    degree = checkDegree(contest.degreeLevel, myYears);
+    degree = checkDegree(contest.degreeLevel, myYears, [contest.grade, contest.title?.fr]);
     spec = compareSpecialtyList(contestSpecs, mine);
   }
   checks.push({ key: 'diploma', ...degree });

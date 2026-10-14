@@ -1,6 +1,6 @@
 /**
  * Smart Match V2 — régression sur les concours ouverts réels (instantané Supabase
- * du 08/10/2026, scripts/smartmatch-fixture.json). Lancer : npx tsx scripts/test-smartmatch.ts
+ * du 13/10/2026, 193 concours, scripts/smartmatch-fixture.json). Lancer : npx tsx scripts/test-smartmatch.ts
  * Affiche, pour des profils types, les concours « correspondent » et « à vérifier ».
  */
 import fs from 'fs';
@@ -45,6 +45,11 @@ expect('Infirmier polyvalent ↔ Anesthésie (posts infirmiers) → à vérifier
 expect('Conduite d’engins de travaux publics ≠ Génie civil', sp("Conduite de véhicules ou d'engins de travaux publics", ['Génie civil']) === 'none');
 expect('Génie électrique ≠ Génie civil', sp('Génie électrique', ['Génie civil']) === 'none');
 expect('Électromécanique ↔ Génie mécanique → à vérifier', sp('Électromécanique', ['Génie mécanique']) === 'close');
+// Signalés par le propriétaire (13/10/2026)
+expect('Génie biomédical ≠ Génie industriel et logistique', sp('Génie biomédical', ['Génie industriel et logistique']) === 'none');
+expect('Génie civil « infrastructures de transport » ≠ Logistique', sp('Génie civil : bâtiment, travaux publics, ponts et chaussées ou infrastructures de transport', ['Génie industriel et logistique']) === 'none');
+expect('Mobilité et transport ↔ Logistique → à vérifier (pas « correspond »)', sp('Mobilité et transport', ['Logistique']) === 'close');
+expect('Maintenance industrielle ↔ Génie industriel → à vérifier', sp('Maintenance industrielle', ['Génie industriel']) === 'close');
 expect('DESA, DESS, master… → Bac+5', JSON.stringify(degreeYearsIn('DESA, DESS, master ou master spécialisé')) === '[5]');
 expect('Baccalauréat et TS (Bac+2) → Bac+2', JSON.stringify(degreeYearsIn('Baccalauréat et diplôme de technicien spécialisé (Bac+2)')) === '[2]');
 expect("Ingénieur d'application → Bac+3", degreeYearsIn("licence, MST, ingénieur d'application").includes(3));
@@ -66,8 +71,11 @@ expect('Âge 41, limite 40 prolongeable à 45 → à vérifier', v(mk('Master', 
 expect('Âge 47, limite 45 → hors profil', v(mk('Master', 'Informatique', '45 ans au plus'), P('Master', 'Informatique', { age: 47 })) === 'not_eligible');
 expect('Âge 50 fonctionnaire, « sans limite pour les fonctionnaires » → correspond', v(mk('Master', 'Informatique', '45 ans au plus (sans limite pour les fonctionnaires)'), P('Master', 'Informatique', { age: 50, currentSituation: 'civil_servant' })) === 'eligible');
 expect('Concours clôturé → hors profil', checkEligibility({ ...mk('Master', 'Informatique'), status: 'closed' }, P('Master', 'Informatique')).verdict === 'not_eligible');
+const mdc: Contest = { ...mk('', 'Géographie physique'), grade: 'Maître de conférences', title: { fr: 'Maître de conférences – Géographie physique – ESEF Oujda', ar: '' } } as Contest;
+expect('Bac → Maître de conférences (diplôme non écrit, grade = doctorat) → hors profil', v(mdc, P('Bac', 'Géographie physique')) === 'not_eligible');
+expect('Doctorat → Maître de conférences (diplôme non écrit) → à vérifier', v(mdc, P('Doctorat', 'Géographie physique')) === 'verify');
 
-// --- Profils types sur les 216 concours ---------------------------------------
+// --- Profils types sur les concours ouverts ---------------------------------------
 const base: CandidateProfile = { fullName: '', email: '', phone: '', age: 27, degreeLevel: 'Master', specialty: '', region: '', currentSituation: 'job_seeker', notificationsEnabled: false, alertDaysBefore: 7 };
 const profiles: [string, Partial<CandidateProfile>, number][] = [
   // [libellé, profil, minimum de concours « correspondent » attendus]

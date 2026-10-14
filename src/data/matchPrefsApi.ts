@@ -6,7 +6,7 @@ import { profileDegreeYears, profileSpecialties } from '../utils/smartMatch';
 // RLS : chacun ne lit/écrit que sa ligne). Sert à retrouver son profil sur un autre
 // appareil et, plus tard, aux alertes « nouveau concours pour vous ».
 
-const DEGREE_BY_YEARS: Record<number, string> = { 8: 'Doctorat', 5: 'Master', 3: 'Licence', 2: 'Bac+2', 1: 'Technicien', 0: 'Bac' };
+const DEGREE_BY_YEARS: Record<number, string> = { 8: 'Doctorat', 5: 'Master', 3: 'Licence', 2: 'Bac+2', 1: 'Technicien', 0: 'Bac', [-1]: 'CQP', [-2]: 'Lycee', [-3]: 'College' };
 
 export async function saveMatchPreferences(profile: CandidateProfile): Promise<void> {
   const sb = getSupabase();
@@ -19,7 +19,7 @@ export async function saveMatchPreferences(profile: CandidateProfile): Promise<v
     await sb.from('smart_match_preferences').upsert(
       {
         user_id: uid,
-        diploma_level: years !== null && years >= 0 && years <= 8 ? years : null,
+        diploma_level: years !== null && years >= -3 && years <= 8 ? years : null,
         specialty: profileSpecialties(profile).join(' ; ') || null,
         region: profile.region || null,
         age: profile.age >= 15 && profile.age <= 80 ? profile.age : null,

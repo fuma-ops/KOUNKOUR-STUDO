@@ -8,7 +8,7 @@ import type { CandidateProfile, Contest } from '../../src/types/index.ts';
 
 export const SITE_URL = (process.env.SITE_URL || 'https://kounkour-studo.vercel.app').replace(/\/$/, '');
 
-const DEGREE_BY_YEARS: Record<number, string> = { 8: 'Doctorat', 5: 'Master', 3: 'Licence', 2: 'Bac+2', 1: 'Technicien', 0: 'Bac' };
+const DEGREE_BY_YEARS: Record<number, string> = { 8: 'Doctorat', 5: 'Master', 3: 'Licence', 2: 'Bac+2', 1: 'Technicien', 0: 'Bac', [-1]: 'CQP', [-2]: 'Lycee', [-3]: 'College' };
 
 export interface PushSub {
   endpoint: string;
