@@ -615,7 +615,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                     )}
                   </div>
 
-                  <p className="text-sm font-semibold text-[#242126] mb-3">{q.text[language]}</p>
+                  <p className="text-sm font-semibold text-[#242126] mb-3 whitespace-pre-line">{q.text[language]}</p>
 
                   <div className="space-y-2 mb-4">
                     {q.options.map((opt) => {
@@ -670,7 +670,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
             <span className="text-xs font-bold text-[#8D174B] uppercase tracking-wider mb-2 block">
               {t.preparation.question} {currentQuestionIndex + 1} {t.preparation.of} {selectedSet.questions.length}
             </span>
-            <h3 dir={contentDir(selectedSet)} className="text-base sm:text-lg font-bold text-[#242126] leading-snug">
+            <h3 dir={contentDir(selectedSet)} className="text-base sm:text-lg font-bold text-[#242126] leading-snug whitespace-pre-line">
               {currentQ.text[language]}
             </h3>
           </div>
