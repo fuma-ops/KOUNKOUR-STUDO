@@ -159,6 +159,9 @@ export interface QcmSet {
   contentLanguage?: 'fr' | 'ar';
   concoursLabel?: string | null;
   examYear?: number | null;
+  /** Organisme réel du concours d'origine et son logo officiel (/api/logo). */
+  orgName?: string | null;
+  orgLogo?: string | null;
   sourceNote?: string | null;
   /** Photos du sujet original (annales), dans l'ordre des pages. */
   sourceImages?: string[];

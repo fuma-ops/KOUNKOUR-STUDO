@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
 import { AnnaleImages } from './AnnaleImages';
+import { ConcoursRef, OrgLogosBand, setOrgs } from './ConcoursRef';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
@@ -240,11 +241,14 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                   className="text-start flex flex-col justify-start bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 rounded-3xl p-5 shadow-xs hover:shadow-md hover-scale active:scale-95 transition-all cursor-pointer animate-fade-in overflow-hidden"
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
-                  {f.coverImage && (
+                  {f.coverImage ? (
                     <div className="-mx-5 -mt-5 mb-4 h-28 sm:h-32 relative">
                       <img src={f.coverImage} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-gradient-to-t from-white/70 to-transparent" />
                     </div>
+                  ) : (
+                    // Par défaut : logo officiel de l'organisme des concours du dossier.
+                    <OrgLogosBand orgs={setOrgs(sets)} className="-mx-5 -mt-5 mb-4 h-28 sm:h-32 border-b border-[#F1E5EC]" />
                   )}
                   <div className="flex items-start gap-3 mb-4">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -303,11 +307,13 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
           {fr ? 'Tous les concours' : 'كل المباريات'}
         </button>
 
-        {folder?.coverImage && (
+        {folder?.coverImage ? (
           <div className="relative h-36 sm:h-48 rounded-3xl overflow-hidden mb-3 animate-fade-in">
             <img src={folder.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
           </div>
+        ) : (
+          <OrgLogosBand orgs={setOrgs(sets)} className="h-32 sm:h-40 rounded-3xl border border-[#F1E5EC] mb-3 animate-fade-in" />
         )}
         <div className="bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#F1E5EC] p-5 sm:p-6 mb-6">
           <div className="flex items-start gap-3">
@@ -351,8 +357,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                         </span>
                         {set.examYear && <span className="font-bold text-[#8D174B]">{set.examYear}</span>}
                       </div>
-                      <h3 dir="auto" className="text-base font-bold text-[#242126] mb-1">{set.title[language]}</h3>
-                      {set.concoursLabel && <p className="text-[11px] font-semibold text-[#8D174B] mb-2">{set.concoursLabel}</p>}
+                      <h3 dir="auto" className="text-base font-bold text-[#242126] mb-2">{set.title[language]}</h3>
+                      <ConcoursRef set={set} language={language} />
                       {!!set.sourceImages?.length && (
                         <p className="text-[11px] font-bold text-emerald-800 mb-2 flex items-center gap-1">
                           <Eye className="w-3.5 h-3.5" />
@@ -398,10 +404,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                         <span>{set.durationMinutes} {t.preparation.minutes}</span>
                       </div>
                     </div>
-                    <h3 className="text-base font-bold text-[#242126] mb-1">{set.title[language]}</h3>
-                    {set.kind === 'annales' && set.concoursLabel && (
-                      <p className="text-[11px] font-semibold text-[#8D174B] mb-2">{set.concoursLabel}{set.examYear ? ` • ${set.examYear}` : ''}</p>
-                    )}
+                    <h3 className="text-base font-bold text-[#242126] mb-2">{set.title[language]}</h3>
+                    <ConcoursRef set={set} language={language} />
                     {!!set.sourceImages?.length && (
                       <p className="text-[11px] font-bold text-emerald-800 mb-2 flex items-center gap-1">
                         <Eye className="w-3.5 h-3.5" />
@@ -502,6 +506,12 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
         </div>
       </div>
 
+      {/* Concours d'origine : titre réel et année de la session */}
+      <div className="bg-white border border-[#F1E5EC] rounded-2xl p-4 shadow-xs mb-6 animate-fade-in">
+        <h2 dir="auto" className="text-sm sm:text-base font-extrabold text-[#242126] leading-snug mb-2">{selectedSet.title[language] || selectedSet.title.fr}</h2>
+        <ConcoursRef set={selectedSet} language={language} variant="header" />
+      </div>
+
       {/* Photos du sujet original (annales) : consultables pendant l'entraînement et la correction */}
       {(!!selectedSet.sourceImages?.length || (isStaff && selectedSet.kind === 'annales')) && (
         <div className="mb-6 space-y-2">
@@ -511,6 +521,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
               setId={selectedSet.id}
               slug={selectedSet.slug}
               images={selectedSet.sourceImages || []}
+              sourceUrl={selectedSet.sourceUrl}
               onChange={(images) => {
                 setSelectedSet((s) => (s ? { ...s, sourceImages: images } : s));
                 setRealSets((all) => all.map((x) => (x.id === selectedSet.id ? { ...x, sourceImages: images } : x)));

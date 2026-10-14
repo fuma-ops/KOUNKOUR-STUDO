@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, ImagePlus, Loader2, Trash2, X } from 'lucide-react';
 import { addAnnaleImages, setAnnaleImages } from '../data/qcmApi';
 
 // Équipe KounKour : joindre, réordonner ou retirer les photos du sujet original
@@ -11,9 +11,11 @@ interface Props {
   images: string[];
   onChange: (images: string[]) => void;
   compact?: boolean;
+  /** Page où le sujet a été trouvé : ouverte à côté du bouton pour y récupérer les photos réelles. */
+  sourceUrl?: string | null;
 }
 
-export const AnnalePhotosAdmin: React.FC<Props> = ({ setId, slug, images, onChange, compact }) => {
+export const AnnalePhotosAdmin: React.FC<Props> = ({ setId, slug, images, onChange, compact, sourceUrl }) => {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -91,6 +93,18 @@ export const AnnalePhotosAdmin: React.FC<Props> = ({ setId, slug, images, onChan
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
           {images.length ? 'Ajouter des pages' : "Ajouter des photos (dans l'ordre des pages)"}
         </button>
+        {sourceUrl && (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={sourceUrl}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#8D174B]/25 bg-white text-[#8D174B] text-xs font-bold hover:bg-[#FAF4F7] active:scale-95 transition"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Page source du sujet
+          </a>
+        )}
         {images.length > 1 && (
           <button
             type="button"

@@ -47,7 +47,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, duration_minutes, difficulty, position, qcm_questions(id, position, source_number, question, options)')
+    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, duration_minutes, difficulty, position, administrations(name_fr, logo_url), qcm_questions(id, position, source_number, question, options)')
     .eq('status', 'published')
     .order('position', { ascending: true });
   if (error || !data) return [];
@@ -84,6 +84,8 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
         contentLanguage: s.language,
         concoursLabel: s.concours_label,
         examYear: s.exam_year,
+        orgName: s.administrations?.name_fr || null,
+        orgLogo: s.administrations?.logo_url || null,
         sourceNote: s.source_note,
         sourceImages: s.source_images || [],
         sourceUrl: s.source_url || null,
@@ -316,6 +318,9 @@ export interface AdminQcmSet {
   folderSlug: string | null;
   kind: string;
   examYear: number | null;
+  concoursLabel: string | null;
+  orgName: string | null;
+  orgLogo: string | null;
   status: string;
   sourceImages: string[];
   sourceUrl: string | null;
@@ -328,7 +333,7 @@ export async function fetchQcmSetsForAdmin(): Promise<AdminQcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, title_fr, folder_slug, kind, exam_year, status, source_images, source_url, position, qcm_questions(id)')
+    .select('id, slug, title_fr, folder_slug, kind, exam_year, concours_label, status, source_images, source_url, position, administrations(name_fr, logo_url), qcm_questions(id)')
     .order('position', { ascending: true });
   if (error || !data) return [];
   return data.map((s: any) => ({
@@ -338,6 +343,9 @@ export async function fetchQcmSetsForAdmin(): Promise<AdminQcmSet[]> {
     folderSlug: s.folder_slug,
     kind: s.kind,
     examYear: s.exam_year,
+    concoursLabel: s.concours_label || null,
+    orgName: s.administrations?.name_fr || null,
+    orgLogo: s.administrations?.logo_url || null,
     status: s.status,
     sourceImages: s.source_images || [],
     sourceUrl: s.source_url || null,

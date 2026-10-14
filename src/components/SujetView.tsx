@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ExternalLink, FileText, Info } from 'lucide-reac
 import type { Language, QcmSet } from '../types';
 import { AnnaleImages } from './AnnaleImages';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
+import { ConcoursRef } from './ConcoursRef';
 
 // Texte d'un sujet écrit transcrit : « ## » / « ### » = titres, ligne vide = paragraphe.
 // Chaque bloc prend la direction de sa langue (sujets bilingues arabe / français).
@@ -72,12 +73,9 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
           <FileText className="w-3.5 h-3.5" />
           {fr ? 'Sujet d’examen écrit (réel)' : 'موضوع امتحان كتابي (حقيقي)'}
         </span>
-        <h2 className="text-lg sm:text-xl font-extrabold text-[#242126] leading-snug">{set.title[language] || set.title.fr}</h2>
-        <p className="text-[11px] font-semibold text-[#8D174B] mt-1">
-          {[set.concoursLabel, set.examYear ? String(set.examYear) : '', duration ? (fr ? `durée ${duration}` : `المدة ${duration}`) : '']
-            .filter(Boolean)
-            .join(' • ')}
-        </p>
+        <h2 dir="auto" className="text-lg sm:text-xl font-extrabold text-[#242126] leading-snug mb-3">{set.title[language] || set.title.fr}</h2>
+        <ConcoursRef set={set} language={language} variant="header" />
+        {duration && <p className="text-[11px] font-semibold text-[#8D174B]">{fr ? `Durée de l'épreuve : ${duration}` : `مدة الاختبار: ${duration}`}</p>}
       </header>
 
       {(!!set.sourceImages?.length || isStaff) && (
@@ -85,7 +83,7 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
           {!!set.sourceImages?.length && (
             <AnnaleImages images={set.sourceImages} language={language} sourceUrl={set.sourceUrl} sourceNote={set.sourceNote} />
           )}
-          {isStaff && <AnnalePhotosAdmin setId={set.id} slug={set.slug} images={set.sourceImages || []} onChange={onImages} />}
+          {isStaff && <AnnalePhotosAdmin setId={set.id} slug={set.slug} images={set.sourceImages || []} onChange={onImages} sourceUrl={set.sourceUrl} />}
         </div>
       )}
 

@@ -2,11 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BookOpen, Camera, ChevronDown, ExternalLink, FolderOpen, ImageOff, ImagePlus, Loader2, ShieldCheck } from 'lucide-react';
 import { AdminQcmSet, QcmFolder, fetchQcmFolders, fetchQcmSetsForAdmin, setFolderCover, uploadFolderCover } from '../data/qcmApi';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
+import { OrgLogo } from './OrgLogo';
 
 // Réglages équipe : chiffres des annales, photos du sujet original de chaque
 // série, et image d'en-tête de chaque dossier concours (page Préparation).
 
-const FolderCover: React.FC<{ folder: QcmFolder; onChange: (url: string | null) => void }> = ({ folder, onChange }) => {
+type Org = { name: string; logo: string | null };
+
+const FolderCover: React.FC<{ folder: QcmFolder; orgs: Org[]; onChange: (url: string | null) => void }> = ({ folder, orgs, onChange }) => {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -26,6 +29,16 @@ const FolderCover: React.FC<{ folder: QcmFolder; onChange: (url: string | null) 
     <div className="relative h-32 sm:h-36 rounded-t-3xl overflow-hidden bg-gradient-to-br from-[#8D174B] to-[#C73578]">
       {folder.coverImage ? (
         <img src={folder.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover animate-fade-in" />
+      ) : orgs.length ? (
+        // Par défaut : logo officiel de l'organisme (celui affecté à ses concours).
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-[#FFFDFE] to-[#FAF0F5] flex items-center justify-center gap-4 pb-10 px-4">
+          {orgs.slice(0, 3).map((o) => (
+            <OrgLogo key={o.name} src={o.logo} name={o.name} size="sm" />
+          ))}
+          <span className="absolute top-2 end-3 px-2 py-0.5 rounded bg-white/90 border border-[#F1E5EC] text-[10px] font-bold text-[#6E6773]">
+            Par défaut : logo de l'organisme
+          </span>
+        </div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-white/60 text-xs font-bold gap-1.5">
           <ImageOff className="w-4 h-4" /> Pas d'image d'en-tête
@@ -83,6 +96,14 @@ const SetRow: React.FC<{ set: AdminQcmSet; onImages: (images: string[]) => void 
       <button type="button" onClick={() => setOpen((o) => !o)} className="w-full text-start p-3 flex items-center gap-3 cursor-pointer">
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-bold text-[#242126] leading-snug">{set.title}</p>
+          {set.concoursLabel && (
+            <p className="text-[11px] text-[#6E6773] flex items-center gap-1.5 mt-0.5">
+              <span className="w-5 h-5 shrink-0 rounded bg-white border border-[#F1E5EC] p-0.5 flex">
+                <OrgLogo src={set.orgLogo} name={set.orgName || set.concoursLabel} size="xs" />
+              </span>
+              <span className="truncate">{set.concoursLabel}</span>
+            </p>
+          )}
           <div className="flex flex-wrap gap-1.5 mt-1 text-[10px]">
             <span className={`px-1.5 py-0.5 rounded font-bold ${set.kind === 'sujet' ? 'bg-sky-50 text-sky-900' : 'bg-gray-100 text-gray-700'}`}>
               {set.kind === 'sujet' ? 'Sujet écrit' : 'QCM'}
@@ -109,12 +130,7 @@ const SetRow: React.FC<{ set: AdminQcmSet; onImages: (images: string[]) => void 
       )}
       {open && (
         <div className="px-3 pb-3 space-y-2 animate-fade-in">
-          {set.sourceUrl && n > 0 && (
-            <a href={set.sourceUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[11px] font-bold text-[#8D174B] hover:underline">
-              <ExternalLink className="w-3.5 h-3.5" /> Page source
-            </a>
-          )}
-          <AnnalePhotosAdmin setId={set.id} slug={set.slug} images={set.sourceImages} onChange={onImages} compact />
+          <AnnalePhotosAdmin setId={set.id} slug={set.slug} images={set.sourceImages} onChange={onImages} compact sourceUrl={set.sourceUrl} />
         </div>
       )}
     </div>
@@ -198,7 +214,10 @@ export const AnnalesSettings: React.FC = () => {
               style={{ animationDelay: `${i * 80}ms` }}
             >
               {folder ? (
-                <FolderCover folder={folder} onChange={(url) => setFolders((all) => all!.map((f) => (f.slug === folder.slug ? { ...f, coverImage: url } : f)))} />
+                <FolderCover
+                  folder={folder}
+                  orgs={[...new Map(gs.filter((s) => s.orgName).map((s) => [s.orgName!, { name: s.orgName!, logo: s.orgLogo }])).values()]}
+                  onChange={(url) => setFolders((all) => all!.map((f) => (f.slug === folder.slug ? { ...f, coverImage: url } : f)))} />
               ) : (
                 <div className="p-4 flex items-center gap-2 text-sm font-extrabold text-[#242126]">
                   <FolderOpen className="w-4 h-4 text-[#8D174B]" /> Séries sans dossier
