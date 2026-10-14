@@ -46,6 +46,20 @@ const KIND_ORDER: Record<string, number> = { annales: 0, sujet: 1, entrainement:
 // Clé d'URL d'un support : son slug en base.
 const urlKey = (set: QcmSet) => (set.serverGraded ? set.slug : set.id);
 
+// Supports d'un dossier regroupés par thème (ordre d'apparition des thèmes, sans thème en dernier),
+// et triés dans chaque thème : annales corrigées, puis sujets écrits, puis entraînements.
+function themeGroups(sets: QcmSet[]): { theme: string | null; sets: QcmSet[] }[] {
+  const byKind = [...sets].sort((x, y) => KIND_ORDER[x.kind || 'entrainement'] - KIND_ORDER[y.kind || 'entrainement']);
+  if (!sets.some((x) => x.theme)) return [{ theme: null, sets: byKind }];
+  const order: (string | null)[] = [];
+  for (const x of [...sets].sort((a, b) => (a.themePosition ?? 999) - (b.themePosition ?? 999))) {
+    const t = x.theme || null;
+    if (!order.includes(t)) order.push(t);
+  }
+  order.sort((a, b) => (a === null ? 1 : 0) - (b === null ? 1 : 0));
+  return order.map((t) => ({ theme: t ?? 'Autres supports', sets: byKind.filter((x) => (x.theme || null) === t) }));
+}
+
 export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, folderSlug = null, setSlug = null, onNavigate }) => {
   const t = translations[language];
   const isRTL = language === 'ar';
@@ -304,51 +318,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
       ? allSets.filter((x) => !x.folderSlug || !folders.some((f) => f.slug === x.folderSlug))
       : setsOf(selectedFolder);
     const st = statsOf(sets);
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
-        <button
-          onClick={() => navigate(null, null)}
-          className="mb-4 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF4F7] text-[#8D174B] border border-[#8D174B]/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95"
-        >
-          <PrevIcon className="w-4 h-4" />
-          {fr ? 'Tous les concours' : 'كل المباريات'}
-        </button>
-
-        {folder?.coverImage ? (
-          <div className="relative h-36 sm:h-48 rounded-3xl overflow-hidden mb-3 animate-fade-in">
-            <img src={folder.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
-          </div>
-        ) : (
-          <OrgLogosBand orgs={setOrgs(sets)} className="h-32 sm:h-40 rounded-3xl border border-[#F1E5EC] mb-3 animate-fade-in" />
-        )}
-        <div className="bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#F1E5EC] p-5 sm:p-6 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0">
-              <FolderOpen className="w-6 h-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-[#8D174B]">{folder ? folder.title[language] || folder.title.fr : (fr ? 'Autres supports' : 'دعامات أخرى')}</h2>
-              {folder?.organization && <p className="text-xs text-[#6E6773]">{folder.organization}</p>}
-              {folder?.description.fr && <p className="text-xs text-[#6E6773] mt-1">{folder.description[language] || folder.description.fr}</p>}
-              <div className="mt-3 max-w-sm">
-                {progressBar(st.pct)}
-                <p className="text-[11px] text-[#6E6773] mt-1">
-                  {fr ? `Progression du dossier : ${st.seen}/${st.total} questions vues (${st.pct} %)` : `تقدم الملف: ${st.seen}/${st.total} (${st.pct}٪)`}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {sets.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-3xl border border-[#F1E5EC] p-6">
-            <BookOpen className="w-10 h-10 text-[#6E6773]/30 mx-auto mb-2" />
-            <p className="text-xs text-[#6E6773]">{fr ? 'Aucun support pour ce concours pour l’instant.' : 'لا توجد دعامات لهذه المباراة حالياً.'}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[...sets].sort((x, y) => KIND_ORDER[x.kind || 'entrainement'] - KIND_ORDER[y.kind || 'entrainement']).map((set, i) => {
+    const renderSetCard = (set: QcmSet, i: number) => {
               if (set.kind === 'sujet') {
                 return (
                   <div
@@ -451,7 +421,65 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                   </div>
                 </div>
               );
-            })}
+    };
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
+        <button
+          onClick={() => navigate(null, null)}
+          className="mb-4 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF4F7] text-[#8D174B] border border-[#8D174B]/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95"
+        >
+          <PrevIcon className="w-4 h-4" />
+          {fr ? 'Tous les concours' : 'كل المباريات'}
+        </button>
+
+        {folder?.coverImage ? (
+          <div className="relative h-36 sm:h-48 rounded-3xl overflow-hidden mb-3 animate-fade-in">
+            <img src={folder.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
+          </div>
+        ) : (
+          <OrgLogosBand orgs={setOrgs(sets)} className="h-32 sm:h-40 rounded-3xl border border-[#F1E5EC] mb-3 animate-fade-in" />
+        )}
+        <div className="bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#F1E5EC] p-5 sm:p-6 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0">
+              <FolderOpen className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#8D174B]">{folder ? folder.title[language] || folder.title.fr : (fr ? 'Autres supports' : 'دعامات أخرى')}</h2>
+              {folder?.organization && <p className="text-xs text-[#6E6773]">{folder.organization}</p>}
+              {folder?.description.fr && <p className="text-xs text-[#6E6773] mt-1">{folder.description[language] || folder.description.fr}</p>}
+              <div className="mt-3 max-w-sm">
+                {progressBar(st.pct)}
+                <p className="text-[11px] text-[#6E6773] mt-1">
+                  {fr ? `Progression du dossier : ${st.seen}/${st.total} questions vues (${st.pct} %)` : `تقدم الملف: ${st.seen}/${st.total} (${st.pct}٪)`}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {sets.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-3xl border border-[#F1E5EC] p-6">
+            <BookOpen className="w-10 h-10 text-[#6E6773]/30 mx-auto mb-2" />
+            <p className="text-xs text-[#6E6773]">{fr ? 'Aucun support pour ce concours pour l’instant.' : 'لا توجد دعامات لهذه المباراة حالياً.'}</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {themeGroups(sets).map((g, gi) => (
+              <section key={g.theme || '__all'} className="animate-fade-in" style={{ animationDelay: `${gi * 80}ms` }}>
+                {g.theme && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#8D174B] to-[#C73578]" />
+                    <h3 className="text-sm sm:text-base font-extrabold text-[#242126]">{g.theme}</h3>
+                    <span className="text-[11px] font-bold text-[#8D174B] bg-[#FDF2F7] border border-[#8D174B]/15 px-2 py-0.5 rounded-full">{g.sets.length}</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {g.sets.map((set, i) => renderSetCard(set, i))}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </div>

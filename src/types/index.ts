@@ -174,6 +174,9 @@ export interface QcmSet {
   /** « Cochez la ou les réponses justes » : plusieurs cases par question. Une réponse
    * est alors la liste des options cochées jointe par « | » (voir answerIds). */
   multiAnswer?: boolean;
+  /** Thème de classement dans le dossier (ex. « Électricité », « Eau et assainissement »). */
+  theme?: string | null;
+  themePosition?: number | null;
 }
 
 export interface CommunityComment {
