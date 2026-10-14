@@ -171,6 +171,9 @@ export interface QcmSet {
   folderSlug?: string | null;
   // Correction calculée par le serveur (les bonnes réponses ne sont pas dans le chargement).
   serverGraded?: boolean;
+  /** « Cochez la ou les réponses justes » : plusieurs cases par question. Une réponse
+   * est alors la liste des options cochées jointe par « | » (voir answerIds). */
+  multiAnswer?: boolean;
 }
 
 export interface CommunityComment {

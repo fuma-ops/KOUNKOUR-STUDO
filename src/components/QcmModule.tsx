@@ -6,7 +6,7 @@ import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
-import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, seenCount, submitQcm } from '../data/qcmApi';
+import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm } from '../data/qcmApi';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
   ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy, FileText
@@ -159,7 +159,14 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
   const handleSelectOption = (questionId: string, optionId: string) => {
     if (isSubmitted) return;
     setUserAnswers((prev) => {
-      const next = { ...prev, [questionId]: optionId };
+      const next = { ...prev };
+      if (selectedSet?.multiAnswer) {
+        // Plusieurs réponses justes possibles : chaque case se coche / se décoche.
+        const ids = answerIds(prev[questionId]);
+        const picked = ids.includes(optionId) ? ids.filter((x) => x !== optionId) : [...ids, optionId];
+        if (picked.length) next[questionId] = joinAnswer(picked);
+        else delete next[questionId];
+      } else next[questionId] = optionId;
       if (selectedSet) writeDraft(selectedSet.id, next);
       return next;
     });
@@ -585,6 +592,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
               const userChoice = userAnswers[q.id];
               const corr = correctionOf(q);
               const isCorrect = !!corr.correctOptionId && userChoice === corr.correctOptionId;
+              const chosen = answerIds(userChoice);
+              const rightIds = answerIds(corr.correctOptionId);
 
               return (
                 <div key={q.id} dir={contentDir(selectedSet)} className="bg-white border border-[#F1E5EC] rounded-2xl p-5 shadow-xs">
@@ -610,8 +619,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
 
                   <div className="space-y-2 mb-4">
                     {q.options.map((opt) => {
-                      const isUserChoice = userChoice === opt.id;
-                      const isRealCorrect = opt.id === corr.correctOptionId;
+                      const isUserChoice = chosen.includes(opt.id);
+                      const isRealCorrect = rightIds.includes(opt.id);
 
                       let style = 'bg-[#F8F2F5] text-[#242126] border-transparent';
                       if (isRealCorrect) {
@@ -623,7 +632,10 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                       return (
                         <div key={opt.id} className={`p-3 rounded-xl border text-xs flex items-center justify-between ${style}`}>
                           <span>{opt.text[language]}</span>
-                          {isRealCorrect && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
+                          {isRealCorrect && selectedSet.multiAnswer && !isUserChoice && (
+                            <span className="text-[10px] font-bold text-emerald-700 shrink-0">{language === 'fr' ? 'à cocher' : 'كان يجب التأشير'}</span>
+                          )}
+                          {isRealCorrect && (!selectedSet.multiAnswer || isUserChoice) && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
                           {isUserChoice && !isRealCorrect && <XCircle className="w-4 h-4 text-rose-600 shrink-0" />}
                         </div>
                       );
@@ -663,10 +675,18 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
             </h3>
           </div>
 
+          {selectedSet.multiAnswer && (
+            <p className="-mt-3 mb-4 text-[11px] font-semibold text-[#8D174B] bg-[#FDF2F7] border border-[#8D174B]/15 rounded-lg px-3 py-2">
+              {language === 'fr'
+                ? 'Cochez la ou les réponses justes : la question est juste seulement si toutes les bonnes cases sont cochées, et aucune fausse.'
+                : 'أشّر على الجواب أو الأجوبة الصحيحة: يُحتسب السؤال صحيحا فقط إذا أشّرت على كل الأجوبة الصحيحة دون أي جواب خاطئ.'}
+            </p>
+          )}
+
           {/* Options */}
           <div className="space-y-3 mb-8" dir={contentDir(selectedSet)}>
             {currentQ.options.map((opt) => {
-              const isSelected = userAnswers[currentQ.id] === opt.id;
+              const isSelected = answerIds(userAnswers[currentQ.id]).includes(opt.id);
               return (
                 <button
                   key={opt.id}
@@ -678,10 +698,10 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                   }`}
                 >
                   <span>{opt.text[language]}</span>
-                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                  <div className={`w-5 h-5 ${selectedSet.multiAnswer ? 'rounded-md' : 'rounded-full'} border flex items-center justify-center shrink-0 ${
                     isSelected ? 'border-[#8D174B] bg-[#8D174B] text-white' : 'border-[#F1E5EC]'
                   }`}>
-                    {isSelected && <span className="w-2 h-2 rounded-full bg-white"></span>}
+                    {isSelected && (selectedSet.multiAnswer ? <CheckCircle className="w-3.5 h-3.5" /> : <span className="w-2 h-2 rounded-full bg-white"></span>)}
                   </div>
                 </button>
               );
