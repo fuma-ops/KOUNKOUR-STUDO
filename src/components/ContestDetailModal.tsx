@@ -194,10 +194,18 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                 </div>
 
                 <span className="px-3.5 py-1 rounded-full bg-white text-[#8D174B] text-xs font-black shadow-md shrink-0">
-                  {contest.status === 'closing_soon' 
+                  {contest.status === 'closing_soon'
                     ? (language === 'fr' ? '● Bientôt clôturé' : '● قريب الإغلاق')
                     : contest.status === 'in_progress'
-                    ? (contest.stage === 'oral' ? '● Convoqués Oral' : '● Convoqués Écrit')
+                    ? (contest.stage === 'oral'
+                        ? (language === 'fr' ? '● Convoqués Oral' : '● المدعوون للشفوي')
+                        : (language === 'fr' ? '● Convoqués Écrit' : '● المدعوون للكتابي'))
+                    : contest.status === 'results'
+                    ? (language === 'fr' ? '● Résultats publiés' : '● النتائج منشورة')
+                    : contest.status === 'closed'
+                    ? (language === 'fr' ? '● Clôturé' : '● مغلقة')
+                    : contest.status === 'upcoming'
+                    ? (language === 'fr' ? '● Prochainement' : '● قريباً')
                     : (language === 'fr' ? '● Ouvert' : '● مفتوح')}
                 </span>
               </div>

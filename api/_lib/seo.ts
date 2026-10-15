@@ -424,7 +424,7 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
   const stageLine = c.stage
     ? lang === 'ar'
       ? `${STAGE_PREFIX[c.stage].ar} منشورة (PDF رسمي). `
-      : `${STAGE_PREFIX[c.stage].fr} publiée${c.stage === 'resultat' ? 's' : ''} : PDF officiel. `
+      : `${STAGE_PREFIX[c.stage].fr} ${c.stage === 'resultat' ? 'publiés' : 'publiée'} : PDF officiel. `
     : '';
   if (summary) description = truncate(stageLine + summary, 158);
   else {

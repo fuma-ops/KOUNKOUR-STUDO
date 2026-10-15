@@ -70,7 +70,7 @@ check('suivi : titre « Résultats : … »', done.title.startsWith('Résultats 
 check('suivi : lien officiel des résultats dans la page', done.body.includes(EPU) && done.body.includes('Suivi du concours'));
 check('suivi : lien hors emploi-public.ma ignoré', !done.body.includes('exemple.org'));
 check('suivi : plus de JobPosting une fois les résultats publiés', !JSON.stringify(done.jsonLd).includes('JobPosting'));
-check('suivi : statut « Résultats publiés »', done.body.includes('Résultats publiés'));
+check('suivi : statut « Résultats publiés »', done.body.includes('Résultats publiés') && done.description.startsWith('Résultats publiés : PDF officiel'));
 const oralP = renderContest('fr', contest({ stage: 'oral' }), [], BASE, TODAY);
 check('suivi : titre convoqués à l’oral', oralP.title.startsWith('Liste des convoqués à l’oral : ') && oralP.description.startsWith('Liste des convoqués à l’oral publiée'));
 const ar = renderContest('ar', contest({ summary_fr: 'Résumé FR' }), [], BASE, TODAY);
