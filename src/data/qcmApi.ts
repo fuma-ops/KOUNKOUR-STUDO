@@ -8,15 +8,16 @@ export interface QcmFolder {
   description: { fr: string; ar: string };
   position: number;
   coverImage?: string | null; // image d'en-tête du dossier (choisie par l'équipe)
+  oldSlugs?: string[]; // anciennes adresses du dossier (liens partagés avant le renommage)
 }
 
 // Repli si la base est injoignable (mêmes dossiers que dans Supabase).
 export const FALLBACK_FOLDERS: QcmFolder[] = [
-  { slug: 'dgsn-gardiens-de-la-paix', title: { fr: 'Gardiens de la paix', ar: 'حراس الأمن' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Gardiens de la paix.', ar: 'نماذج وتمارين لمباراة حراس الأمن.' }, position: 10 },
-  { slug: 'dgsn-inspecteurs-de-police', title: { fr: 'Inspecteurs de police', ar: 'مفتشو الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Inspecteurs de police.', ar: 'نماذج وتمارين لمباراة مفتشي الشرطة.' }, position: 20 },
-  { slug: 'dgsn-officiers-de-police', title: { fr: 'Officiers de police', ar: 'ضباط الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Officiers de police.', ar: 'نماذج وتمارين لمباراة ضباط الشرطة.' }, position: 30 },
-  { slug: 'dgsn-commissaires-de-police', title: { fr: 'Commissaires de police', ar: 'عمداء الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Commissaires de police.', ar: 'نماذج وتمارين لمباراة عمداء الشرطة.' }, position: 40 },
-  { slug: 'dgsn-concours-non-precise', title: { fr: 'DGSN — sujets à identifier', ar: 'الأمن الوطني — مواضيع غير محددة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Sujets réels de la DGSN dont le concours exact n’est pas indiqué sur la copie.', ar: 'مواضيع حقيقية للأمن الوطني لم يُحدَّد نوع مباراتها.' }, position: 90 },
+  { slug: 'concours-dgsn-gardien-de-la-paix', oldSlugs: ['dgsn-gardiens-de-la-paix'], title: { fr: 'Gardiens de la paix', ar: 'حراس الأمن' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Gardiens de la paix.', ar: 'نماذج وتمارين لمباراة حراس الأمن.' }, position: 10 },
+  { slug: 'concours-dgsn-inspecteur-de-police', oldSlugs: ['dgsn-inspecteurs-de-police'], title: { fr: 'Inspecteurs de police', ar: 'مفتشو الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Inspecteurs de police.', ar: 'نماذج وتمارين لمباراة مفتشي الشرطة.' }, position: 20 },
+  { slug: 'concours-dgsn-officier-de-police', oldSlugs: ['dgsn-officiers-de-police'], title: { fr: 'Officiers de police', ar: 'ضباط الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Officiers de police.', ar: 'نماذج وتمارين لمباراة ضباط الشرطة.' }, position: 30 },
+  { slug: 'concours-dgsn-commissaire-de-police', oldSlugs: ['dgsn-commissaires-de-police'], title: { fr: 'Commissaires de police', ar: 'عمداء الشرطة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Annales et entraînement pour le concours des Commissaires de police.', ar: 'نماذج وتمارين لمباراة عمداء الشرطة.' }, position: 40 },
+  { slug: 'concours-dgsn-qcm-culture-generale', oldSlugs: ['dgsn-concours-non-precise'], title: { fr: 'DGSN — sujets à identifier', ar: 'الأمن الوطني — مواضيع غير محددة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Sujets réels de la DGSN dont le concours exact n’est pas indiqué sur la copie.', ar: 'مواضيع حقيقية للأمن الوطني لم يُحدَّد نوع مباراتها.' }, position: 90 },
 ];
 
 export async function fetchQcmFolders(): Promise<QcmFolder[]> {
@@ -31,6 +32,7 @@ export async function fetchQcmFolders(): Promise<QcmFolder[]> {
     description: { fr: f.description_fr || '', ar: f.description_ar || f.description_fr || '' },
     position: f.position,
     coverImage: f.cover_image || null,
+    oldSlugs: f.old_slugs || [],
   }));
 }
 
@@ -47,7 +49,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, corrige, duration_minutes, difficulty, position, multi_answer, theme, administrations(name_fr, logo_url), qcm_questions(id, position, source_number, question, options)')
+    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, corrige, old_slugs, duration_minutes, difficulty, position, multi_answer, theme, administrations(name_fr, logo_url), qcm_questions(id, position, source_number, question, options)')
     .eq('status', 'published')
     .order('position', { ascending: true });
   if (error || !data) return [];
@@ -91,6 +93,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
         sourceUrl: s.source_url || null,
         statement: s.statement || null,
         corrige: s.corrige || null,
+        oldSlugs: s.old_slugs || [],
         folderSlug: s.folder_slug,
         serverGraded: true,
         multiAnswer: !!s.multi_answer,

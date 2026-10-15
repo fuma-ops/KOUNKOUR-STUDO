@@ -163,12 +163,23 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
     }
     const target = allSets.find((x) => urlKey(x) === setSlug || x.id === setSlug);
     if (!target) {
-      navigate(selectedFolder, null);
+      // Ancienne adresse (avant les liens avec mots-clés) : on bascule vers la nouvelle.
+      const moved = allSets.find((x) => x.oldSlugs?.includes(setSlug));
+      navigate(moved ? moved.folderSlug || selectedFolder : selectedFolder, moved ? urlKey(moved) : null);
       return;
     }
     if (selectedSet?.id !== target.id) initQuiz(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSlug, loadingSets]);
+
+  // Dossier renommé : l'ancienne adresse ouvre le dossier sous sa nouvelle adresse.
+  useEffect(() => {
+    if (loadingSets || !selectedFolder || setSlug || selectedFolder === '__autres') return;
+    if (folders.some((f) => f.slug === selectedFolder)) return;
+    const moved = folders.find((f) => f.oldSlugs?.includes(selectedFolder));
+    if (moved) navigate(moved.slug, null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFolder, setSlug, loadingSets, folders]);
 
   const handleSelectOption = (questionId: string, optionId: string) => {
     if (isSubmitted) return;

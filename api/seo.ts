@@ -36,7 +36,7 @@ const SUPABASE_ANON_KEY =
 const CONTEST_COLS =
   'id,slug,title_fr,title_ar,title_original,status,summary_fr,summary_ar,diploma_fr,positions,region_fr,deadline_date,exam_date,apply_url,source_url,source_org,publication_date,published_at,verified_at,updated_at,grade_fr,reference,administration_id,administrations(name_fr,name_ar),contest_positions(position,province,category,diploma,specialty,count,note)';
 const SET_COLS =
-  'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,statement,corrige,position,qcm_questions(id,position,source_number,question,options)';
+  'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,statement,corrige,position,old_slugs,qcm_questions(id,position,source_number,question,options)';
 
 const CANONICAL_ORIGIN = 'https://kounkour.com';
 const OLD_HOSTS = ['kounkour-studo.vercel.app', 'www.kounkour.com'];
@@ -49,7 +49,7 @@ async function contests(): Promise<ContestRow[]> {
   return (data || []) as unknown as ContestRow[];
 }
 async function folders(): Promise<FolderRow[]> {
-  const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image').eq('status', 'published').order('position');
+  const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image,old_slugs').eq('status', 'published').order('position');
   if (error) throw new Error(error.message);
   return (data || []) as FolderRow[];
 }
@@ -80,6 +80,11 @@ function header(req: any, name: string): string {
   return Array.isArray(v) ? v[0] : v || '';
 }
 
+// Ancienne adresse d'un dossier ou d'un QCM (slugs renommés avec les mots-clés recherchés).
+function redirectTo(lang: Lang, path: string): Page {
+  return { status: 301, lang, title: '', description: '', path, indexable: false, body: '', redirect: path };
+}
+
 export async function buildPage(pathname: string, lang: Lang, base: string): Promise<Page> {
   const r = parsePath(pathname);
   const today = todayMorocco();
@@ -104,13 +109,19 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
     case 'folder': {
       const [f, s, c] = await Promise.all([folders(), sets(), contests()]);
       const folder = f.find((x) => x.slug === r.slug);
-      if (!folder) return renderNotFound(lang, pathname);
+      if (!folder) {
+        const moved = f.find((x) => x.old_slugs?.includes(r.slug));
+        return moved ? redirectTo(lang, `/preparation/${encodeURIComponent(moved.slug)}`) : renderNotFound(lang, pathname);
+      }
       return renderFolder(lang, folder, s.filter((x) => x.folder_slug === folder.slug), base, contestsForFolder(folder.slug, c, today), today);
     }
     case 'qcm': {
       const [f, s] = await Promise.all([folders(), sets()]);
       const set = s.find((x) => x.slug === r.slug);
-      if (!set) return renderNotFound(lang, pathname);
+      if (!set) {
+        const moved = s.find((x) => x.old_slugs?.includes(r.slug));
+        return moved ? redirectTo(lang, `/preparation/qcm/${encodeURIComponent(moved.slug)}`) : renderNotFound(lang, pathname);
+      }
       return renderQcm(lang, set, f.find((x) => x.slug === set.folder_slug) || null, base);
     }
     case 'community':
@@ -166,6 +177,12 @@ export default async function handler(req: any, res: any) {
     }
 
     const [page, tpl] = await Promise.all([buildPage(pathname, lang, base), template(origin)]);
+    if (page.redirect) {
+      res.setHeader('Location', `${base}${page.redirect}${lang === 'ar' ? '?lang=ar' : ''}`);
+      res.setHeader('Cache-Control', 'public, s-maxage=86400');
+      res.status(301).send('');
+      return;
+    }
     const html = renderDocument(tpl || fallbackTemplate(), page, base);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', tpl ? 'public, s-maxage=600, stale-while-revalidate=86400' : 'public, s-maxage=60');

@@ -35,7 +35,7 @@ const contest = (over: Partial<ContestRow>): ContestRow => ({
 // Routes
 check('route /concours/<slug>', JSON.stringify(parsePath('/concours/abc')) === JSON.stringify({ name: 'contest', slug: 'abc' }));
 check('route /preparation/qcm/<slug>', parsePath('/preparation/qcm/x').name === 'qcm');
-check('route /preparation/<dossier>', parsePath('/preparation/dgsn-gardiens-de-la-paix').name === 'folder');
+check('route /preparation/<dossier>', parsePath('/preparation/concours-dgsn-gardien-de-la-paix').name === 'folder');
 check('route inconnue', parsePath('/nimporte/quoi/ici').name === 'notfound');
 check('aller-retour slug encodé', routePath(parsePath('/concours/%C3%A9t%C3%A9')) === '/concours/%C3%A9t%C3%A9');
 

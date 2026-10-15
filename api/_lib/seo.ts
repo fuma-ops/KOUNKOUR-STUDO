@@ -45,6 +45,7 @@ export interface FolderRow {
   description_fr: string | null;
   description_ar: string | null;
   cover_image?: string | null;
+  old_slugs?: string[] | null; // anciennes adresses, redirigées (301) vers le slug actuel
 }
 
 export interface QcmSetRow {
@@ -63,6 +64,7 @@ export interface QcmSetRow {
   statement?: string | null; // sujet écrit (kind = 'sujet') : texte transcrit
   corrige?: string | null; // corrigé proposé par l'équipe KounKour (pas un corrigé officiel)
   qcm_questions?: { id: string; position: number; source_number: number | null; question: string; options: string[] }[];
+  old_slugs?: string[] | null; // anciennes adresses, redirigées (301) vers le slug actuel
 }
 
 export interface Page {
@@ -76,6 +78,7 @@ export interface Page {
   jsonLd?: object[];
   image?: string | null; // image de partage (URL absolue) ; sinon image du site
   body: string;
+  redirect?: string; // chemin cible d'une redirection permanente (ancienne adresse)
 }
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
@@ -481,8 +484,10 @@ export const hasContent = (s: QcmSetRow) => qCount(s) > 0 || (isSujet(s) && !!s.
 // Titre d'un sujet corrigé : le nom est raccourci pour que « sujet et corrigé » reste toujours visible.
 const withCorrige = (name: string, lang: Lang) => {
   const base = name.replace(/ : sujet complet$/, '');
-  return lang === 'ar' ? `${truncate(base, 44)}: الموضوع والتصحيح` : `${truncate(base, 42)} : sujet et corrigé`;
+  return lang === 'ar' ? `${truncate(base, 44)}: الموضوع والتصحيح` : `${truncate(withConcours(base, lang), 50)} : sujet et corrigé`;
 };
+// « Concours … » en tête du titre : c'est le premier mot tapé par les candidats sur Google.
+const withConcours = (name: string, lang: Lang) => (lang === 'fr' && !/^concours/i.test(name) ? `Concours ${name}` : name);
 const kindLabel = (s: QcmSetRow, t: (typeof L)[Lang]) => (isSujet(s) ? t.writtenExam : s.kind === 'annales' ? t.realExam : t.training);
 
 // Texte d'un sujet écrit : « ## » / « ### » = titres, ligne vide = paragraphe.
@@ -546,7 +551,7 @@ export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: 
   return {
     status: 200,
     lang,
-    title: `${truncate(lang === 'ar' ? `${name}: نماذج حقيقية` : `${name} : annales et QCM corrigés`, 62)} | KounKour`,
+    title: `${truncate(lang === 'ar' ? `${name}: نماذج حقيقية` : `${withConcours(name, lang)} : annales et QCM corrigés`, 62)} | KounKour`,
     description: desc || truncate(h1, 158),
     path: `/preparation/${encodeURIComponent(f.slug)}`,
     // Un dossier sans annale réelle n'a pas de contenu utile : non indexé (§15).
@@ -586,7 +591,7 @@ export function renderQcm(lang: Lang, s: QcmSetRow, folder: FolderRow | null, ba
     status: 200,
     lang,
     // Un sujet avec corrigé KounKour l'annonce dès le titre (« sujet et corrigé » est la recherche des candidats).
-    title: `${s.corrige && isSujet(s) ? withCorrige(name, lang) : truncate(name, 62)} | KounKour`,
+    title: `${s.corrige && isSujet(s) ? withCorrige(name, lang) : truncate(withConcours(name, lang), 70)} | KounKour`,
     description: truncate(desc || `${name} — ${meta.join(' · ')}`, 158),
     path: `/preparation/qcm/${encodeURIComponent(s.slug)}`,
     indexable: hasContent(s),

@@ -157,6 +157,7 @@ export interface QcmSet {
   statement?: string | null; // sujet écrit : texte transcrit (kind = 'sujet')
   /** Corrigé d'un sujet écrit, proposé par l'équipe KounKour (pas un corrigé officiel). */
   corrige?: string | null;
+  oldSlugs?: string[]; // anciennes adresses (renommage des liens avec mots-clés)
   /** Langue du contenu (une annale arabe s'affiche de droite à gauche). */
   contentLanguage?: 'fr' | 'ar';
   concoursLabel?: string | null;
