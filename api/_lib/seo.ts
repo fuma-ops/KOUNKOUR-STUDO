@@ -659,7 +659,6 @@ export function headTags(p: Page, base: string): string {
     `<meta property="og:type" content="${p.ogType || 'website'}" />`,
     `<meta property="og:url" content="${esc(self)}" />`,
     `<meta property="og:locale" content="${p.lang === 'ar' ? 'ar_MA' : 'fr_MA'}" />`,
-    `<meta property="og:site_name" content="KounKour" />`,
     `<meta property="og:image" content="${esc(p.image && /^https:\/\//.test(p.image) ? p.image : base + OG_IMAGE)}" />`,
     p.image && /^https:\/\//.test(p.image) ? '' : `<meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" />`,
     `<meta name="twitter:card" content="summary_large_image" />`
