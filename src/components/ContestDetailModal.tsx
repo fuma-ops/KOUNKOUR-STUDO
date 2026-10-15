@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { PdfViewerModal } from './PdfViewerModal';
 import { ContestComments } from './ContestComments';
+import { ContestPrepLinks } from './ContestPrepLinks';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
 import { OrgLogo } from './OrgLogo';
@@ -26,6 +27,7 @@ interface ContestDetailModalProps {
   onOpenCommunityTopic?: (contestId: string) => void;
   onOpenSalarySimulator?: (contest: Contest) => void;
   onRequestLogin?: () => void;
+  onOpenPrepFolder?: (folderSlug: string) => void;
 }
 
 // Identifiant du concours SUR emploi-public.ma (pour l'arrêté et les listes officielles).
@@ -46,6 +48,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
   onOpenCommunityTopic,
   onOpenSalarySimulator,
   onRequestLogin,
+  onOpenPrepFolder,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'apply' | 'exams' | 'docs'>('info');
   const [commentCount, setCommentCount] = useState(0);
@@ -720,6 +723,13 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Se préparer : annales et corrigés du même métier */}
+            <ContestPrepLinks
+              contest={contest}
+              language={language}
+              onOpenFolder={onOpenPrepFolder ? (slug) => { onClose(); onOpenPrepFolder(slug); } : undefined}
+            />
 
             {/* Commentaires des candidats : toujours visibles sous le concours */}
             <ContestComments

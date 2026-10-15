@@ -5,6 +5,7 @@
 // absent n'est jamais inventé, il est simplement omis.
 
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
+import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 
 export type Lang = 'fr' | 'ar';
 
@@ -330,10 +331,35 @@ const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').t
 // rapprochés par le nom exact de l'organisme, jamais par supposition.
 export function prepFoldersFor(c: ContestRow, folders: FolderRow[], sets: QcmSetRow[]): FolderRow[] {
   const admin = norm(`${c.administrations?.name_fr || ''} ${c.source_org || ''}`);
-  return folders.filter((f) => {
-    const key = norm((f.organization || '').split('—').pop() || '');
-    return key.length >= 6 && admin.includes(key) && sets.some((s) => s.folder_slug === f.slug && hasContent(s));
+  // Métier et grade du concours (règles partagées avec l'application), puis organisme.
+  const byJob = prepFolderSlugsFor({
+    title: c.title_fr,
+    grade: c.grade_fr,
+    admin: `${c.administrations?.name_fr || ''} ${c.source_org || ''}`,
+    specialty: (c.contest_positions || []).map((p) => p.specialty).filter(Boolean).join(' '),
   });
+  const withContent = (f: FolderRow) => sets.some((s) => s.folder_slug === f.slug && hasContent(s));
+  const byOrg = folders.filter((f) => {
+    const key = norm((f.organization || '').split('—').pop() || '');
+    return key.length >= 6 && admin.includes(key);
+  });
+  const picked = [...byJob.map((slug) => folders.find((f) => f.slug === slug)).filter((f): f is FolderRow => !!f), ...byOrg];
+  return picked.filter((f, i) => withContent(f) && picked.findIndex((x) => x.slug === f.slug) === i).slice(0, 3);
+}
+
+// Concours ouverts reliés à un dossier de préparation (liens internes depuis la page du dossier).
+export function contestsForFolder(slug: string, contests: ContestRow[], today: string): ContestRow[] {
+  return contests
+    .filter((c) => (c.status === 'publie' || c.status === 'mis_a_jour') && (!c.deadline_date || c.deadline_date >= today))
+    .filter((c) =>
+      prepFolderSlugsFor({
+        title: c.title_fr,
+        grade: c.grade_fr,
+        admin: `${c.administrations?.name_fr || ''} ${c.source_org || ''}`,
+        specialty: (c.contest_positions || []).map((p) => p.specialty).filter(Boolean).join(' '),
+      }).includes(slug)
+    )
+    .slice(0, 12);
 }
 
 // Détail des postes lu dans l'arrêté, par province (contenu utile pour la recherche).
@@ -499,7 +525,7 @@ export function renderPrep(lang: Lang, folders: FolderRow[], sets: QcmSetRow[]):
   return { status: 200, lang, title: lang === 'ar' ? 'التحضير للمباريات: نماذج حقيقية | كونكور' : 'Préparation concours Maroc : annales réelles et QCM | KounKour', description: truncate(desc, 158), path: '/preparation', indexable: true, body };
 }
 
-export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: string): Page {
+export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: string, openContests: ContestRow[] = [], today = ''): Page {
   const t = L[lang];
   const name = folderTitle(f, lang);
   const h1 = lang === 'ar' ? `${name}: نماذج حقيقية وأسئلة للتحضير` : `${name} : annales et QCM pour préparer le concours`;
@@ -511,7 +537,11 @@ export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: 
   const body = frame(
     lang,
     [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { text: name }],
-    `<h1>${esc(h1)}</h1>${f.organization ? `<p class="muted">${esc(f.organization)}</p>` : ''}${fdesc ? `<p>${esc(fdesc)}</p>` : ''}<h2>${esc(t.supports)}</h2>${sets.length ? `<ul>${sets.map((s) => setLi(s, lang)).join('')}</ul>` : `<p>${esc(t.noSupports)}</p>`}`
+    `<h1>${esc(h1)}</h1>${f.organization ? `<p class="muted">${esc(f.organization)}</p>` : ''}${fdesc ? `<p>${esc(fdesc)}</p>` : ''}<h2>${esc(t.supports)}</h2>${sets.length ? `<ul>${sets.map((s) => setLi(s, lang)).join('')}</ul>` : `<p>${esc(t.noSupports)}</p>`}${
+      openContests.length
+        ? `<h2>${esc(t.openNow)} (${openContests.length})</h2><ul>${openContests.map((c) => contestLi(c, lang, today)).join('')}</ul>`
+        : ''
+    }`
   );
   return {
     status: 200,

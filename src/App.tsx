@@ -727,6 +727,12 @@ export default function App() {
           setIsSalaryModalOpen(true);
         }}
         onRequestLogin={() => setAuthOpen(true)}
+        onOpenPrepFolder={(slug) => {
+          setSelectedContest(null);
+          setPendingContestSlug(null);
+          setQcmRoute({ folder: slug, set: null });
+          setActiveTab('preparation');
+        }}
       />
 
       {/* Official Salary Simulator Modal */}

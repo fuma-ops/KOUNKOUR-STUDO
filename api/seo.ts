@@ -12,6 +12,7 @@ import {
   QcmSetRow,
   fallbackTemplate,
   prepFoldersFor,
+  contestsForFolder,
   renderCommunity,
   renderContest,
   renderContests,
@@ -101,10 +102,10 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
       return renderPrep(lang, f, s);
     }
     case 'folder': {
-      const [f, s] = await Promise.all([folders(), sets()]);
+      const [f, s, c] = await Promise.all([folders(), sets(), contests()]);
       const folder = f.find((x) => x.slug === r.slug);
       if (!folder) return renderNotFound(lang, pathname);
-      return renderFolder(lang, folder, s.filter((x) => x.folder_slug === folder.slug), base);
+      return renderFolder(lang, folder, s.filter((x) => x.folder_slug === folder.slug), base, contestsForFolder(folder.slug, c, today), today);
     }
     case 'qcm': {
       const [f, s] = await Promise.all([folders(), sets()]);
