@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import scrapeLiveHandler from './api/radar/scrape-live.ts';
 import enrichHandler from './api/radar/enrich.ts';
 import logoHandler from './api/logo.ts';
+import pdfHandler from './api/pdf.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,6 +45,15 @@ app.get('/api/logo', async (req, res) => {
     await logoHandler(req, res);
   } catch (err: any) {
     res.status(500).send(err?.message || 'Erreur logo');
+  }
+});
+
+// Relais PDF des documents officiels (même fonction que sur Vercel).
+app.get('/api/pdf', async (req, res) => {
+  try {
+    await pdfHandler(req, res);
+  } catch (err: any) {
+    res.status(500).send(err?.message || 'Erreur PDF');
   }
 });
 
