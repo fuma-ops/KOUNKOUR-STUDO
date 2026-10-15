@@ -60,6 +60,7 @@ export interface QcmSetRow {
   exam_year: number | null;
   source_note: string | null;
   statement?: string | null; // sujet écrit (kind = 'sujet') : texte transcrit
+  corrige?: string | null; // corrigé proposé par l'équipe KounKour (pas un corrigé officiel)
   qcm_questions?: { id: string; position: number; source_number: number | null; question: string; options: string[] }[];
 }
 
@@ -147,6 +148,8 @@ const L = {
     questions: 'questions',
     realExam: 'Annales réelles',
     writtenExam: 'Sujet d’examen écrit',
+    corrige: 'Corrigé proposé par l’équipe KounKour',
+    corrigeNote: 'Ce n’est pas un corrigé officiel : il a été rédigé par les administrateurs KounKour. Les points que la copie publiée ne permet pas de trancher sont signalés.',
     training: 'Entraînement',
     answersAfter: 'Les réponses et la correction s’affichent après avoir répondu au QCM.',
     start: 'Faire ce QCM',
@@ -188,6 +191,8 @@ const L = {
     questions: 'سؤال',
     realExam: 'نماذج حقيقية',
     writtenExam: 'موضوع امتحان كتابي',
+    corrige: 'تصحيح مقترح من فريق KounKour',
+    corrigeNote: 'ليس تصحيحاً رسمياً: حرره مشرفو KounKour.',
     training: 'تدريب',
     answersAfter: 'تظهر الأجوبة والتصحيح بعد الإجابة على الاختبار.',
     start: 'إجراء هذا الاختبار',
@@ -447,6 +452,11 @@ const qCount = (s: QcmSetRow) => s.qcm_questions?.length ?? 0;
 const isSujet = (s: QcmSetRow) => s.kind === 'sujet';
 // Contenu publiable : un QCM avec questions, ou un sujet écrit transcrit.
 export const hasContent = (s: QcmSetRow) => qCount(s) > 0 || (isSujet(s) && !!s.statement?.trim());
+// Titre d'un sujet corrigé : le nom est raccourci pour que « sujet et corrigé » reste toujours visible.
+const withCorrige = (name: string, lang: Lang) => {
+  const base = name.replace(/ : sujet complet$/, '');
+  return lang === 'ar' ? `${truncate(base, 44)}: الموضوع والتصحيح` : `${truncate(base, 42)} : sujet et corrigé`;
+};
 const kindLabel = (s: QcmSetRow, t: (typeof L)[Lang]) => (isSujet(s) ? t.writtenExam : s.kind === 'annales' ? t.realExam : t.training);
 
 // Texte d'un sujet écrit : « ## » / « ### » = titres, ligne vide = paragraphe.
@@ -534,14 +544,19 @@ export function renderQcm(lang: Lang, s: QcmSetRow, folder: FolderRow | null, ba
     [...crumbs, { text: name }],
     `<h1>${esc(name)}</h1><p class="muted">${esc(meta.join(' · '))}</p>${desc ? `<p>${esc(desc)}</p>` : ''}${s.source_note ? `<p class="muted">${esc(s.source_note)}</p>` : ''}${
       isSujet(s)
-        ? `<div lang="${cl}">${statementHtml(s.statement || "")}</div>`
+        ? `<div lang="${cl}">${statementHtml(s.statement || "")}</div>${
+            s.corrige
+              ? `<h2>${esc(t.corrige)}</h2><p class="muted">${esc(t.corrigeNote)}</p><div lang="${cl}">${statementHtml(s.corrige)}</div>`
+              : ''
+          }`
         : `<p><strong>${esc(t.answersAfter)}</strong></p><ol lang="${cl}" dir="${cl === 'ar' ? 'rtl' : 'ltr'}">${list}</ol>`
     }`
   );
   return {
     status: 200,
     lang,
-    title: `${truncate(name, 62)} | KounKour`,
+    // Un sujet avec corrigé KounKour l'annonce dès le titre (« sujet et corrigé » est la recherche des candidats).
+    title: `${s.corrige && isSujet(s) ? withCorrige(name, lang) : truncate(name, 62)} | KounKour`,
     description: truncate(desc || `${name} — ${meta.join(' · ')}`, 158),
     path: `/preparation/qcm/${encodeURIComponent(s.slug)}`,
     indexable: hasContent(s),
@@ -591,6 +606,9 @@ export function headTags(p: Page, base: string): string {
     p.description ? `<meta name="description" content="${esc(p.description)}" />` : '',
     `<meta name="robots" content="${p.indexable ? 'index,follow' : 'noindex,follow'}" />`,
   ];
+  // Vérification de propriété (Google Search Console, Bing Webmaster Tools) : codes fournis par le propriétaire.
+  if (process.env.GOOGLE_SITE_VERIFICATION) tags.push(`<meta name="google-site-verification" content="${esc(process.env.GOOGLE_SITE_VERIFICATION)}" />`);
+  if (process.env.BING_SITE_VERIFICATION) tags.push(`<meta name="msvalidate.01" content="${esc(process.env.BING_SITE_VERIFICATION)}" />`);
   if (p.indexable) {
     tags.push(
       `<link rel="canonical" href="${esc(self)}" />`,
