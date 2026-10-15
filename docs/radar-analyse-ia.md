@@ -37,6 +37,16 @@ cahier §13.5. Claude publie ensuite et rend compte de ce qui a été mis en lig
      l'arrêté et le joint dans Admin → Radar & revue → « Arrêtés à joindre »
      (document `url = ajout-admin://…`, image recompressée en JPEG ≤ 3 Mo).
      L'annonce passe alors en `a_analyser`. Aucun contournement de blocage.
+   - Dans Admin → « À traiter », l'admin a aussi, sur chaque annonce :
+     - **Rejeter** : `analysis_status = 'rejete'`, `review_notes` daté
+       (« Rejeté par l'admin depuis « À traiter » … »). Rien à faire pour Claude.
+     - **Écrire à Claude** : consigne libre enregistrée dans
+       `analysis.consigne_admin = {texte, date}` ; l'annonce passe en
+       `a_analyser`. À l'analyse suivante, Claude lit la consigne et l'applique
+       (publier, rejeter, vérifier une date…) en respectant les règles
+       ci-dessous (jamais inventer : une consigne ne remplace pas une source
+       officielle pour les champs à extraire). Si la consigne ne suffit pas,
+       l'annonce revient en `a_verifier` avec un `a_traiter` qui dit pourquoi.
 3. **« go » du propriétaire** → Claude applique la procédure ci-dessous.
 
 ## Procédure Claude (à suivre à la lettre)
