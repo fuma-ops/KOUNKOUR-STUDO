@@ -51,7 +51,7 @@ export default async function handler(req: any, res: any) {
       res.status(500).json({ ok: false, error: e1?.message || 'clés VAPID absentes (table push_config)' });
       return;
     }
-    webpush.setVapidDetails(cfg.subject || 'https://kounkour-studo.vercel.app', cfg.public, cfg.private);
+    webpush.setVapidDetails(cfg.subject || 'https://kounkour.com', cfg.public, cfg.private);
   }
 
   const report: any[] = [];

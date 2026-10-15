@@ -6,7 +6,7 @@
 import { checkEligibility, type EligibilityResult } from '../../src/utils/smartMatch.ts';
 import type { CandidateProfile, Contest } from '../../src/types/index.ts';
 
-export const SITE_URL = (process.env.SITE_URL || 'https://kounkour-studo.vercel.app').replace(/\/$/, '');
+export const SITE_URL = (process.env.SITE_URL || 'https://kounkour.com').replace(/\/$/, '');
 
 const DEGREE_BY_YEARS: Record<number, string> = { 8: 'Doctorat', 5: 'Master', 3: 'Licence', 2: 'Bac+2', 1: 'Technicien', 0: 'Bac', [-1]: 'CQP', [-2]: 'Lycee', [-3]: 'College' };
 

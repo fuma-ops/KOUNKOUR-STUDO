@@ -37,6 +37,9 @@ const CONTEST_COLS =
 const SET_COLS =
   'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,statement,corrige,position,qcm_questions(id,position,source_number,question,options)';
 
+const CANONICAL_ORIGIN = 'https://kounkour.com';
+const OLD_HOSTS = ['kounkour-studo.vercel.app', 'www.kounkour.com'];
+
 const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
 async function contests(): Promise<ContestRow[]> {
@@ -126,13 +129,25 @@ export default async function handler(req: any, res: any) {
   const host = header(req, 'x-forwarded-host') || header(req, 'host');
   const proto = header(req, 'x-forwarded-proto') || 'https';
   const origin = `${proto}://${host}`;
-  // SITE_URL (domaine définitif) fixe les liens canoniques ; sinon le domaine appelé.
-  const base = (process.env.SITE_URL || origin).replace(/\/+$/, '');
+  // Domaine définitif : kounkour.com (ou SITE_URL). Il fixe les liens canoniques, le sitemap et robots.txt.
+  const base = (process.env.SITE_URL || CANONICAL_ORIGIN).replace(/\/+$/, '');
 
   const url = new URL(req.url || '/', 'http://x');
   let pathname = url.pathname;
   if (pathname.startsWith('/api/')) pathname = String(req.query?.path || url.searchParams.get('path') || '/');
   const lang: Lang = (req.query?.lang || url.searchParams.get('lang')) === 'ar' ? 'ar' : 'fr';
+
+  // L'ancienne adresse de production renvoie définitivement vers le domaine (pas de contenu en double pour Google).
+  // Les aperçus Vercel (autres sous-domaines) restent accessibles.
+  if (OLD_HOSTS.includes(host)) {
+    const qs = new URLSearchParams(url.search);
+    qs.delete('path'); // paramètre interne de la réécriture Vercel
+    const q = qs.toString();
+    res.setHeader('Location', `${base}${pathname}${q ? `?${q}` : ''}`);
+    res.setHeader('Cache-Control', 'public, s-maxage=86400');
+    res.status(308).send('');
+    return;
+  }
 
   try {
     if (pathname === '/robots.txt') {
