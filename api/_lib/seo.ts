@@ -35,6 +35,8 @@ export interface ContestRow {
   administration_id: string | null;
   administrations?: { name_fr: string | null; name_ar: string | null } | null;
   contest_positions?: { position: number; province: string | null; category: string | null; diploma: string | null; specialty: string | null; count: number | null; note: string | null }[];
+  stage?: 'ecrit' | 'oral' | 'resultat' | null; // étape publiée après la clôture (emploi-public.ma)
+  contest_documents?: { doc_type: string; title_fr: string | null; title_ar: string | null; url: string; position: number | null }[];
 }
 
 export interface FolderRow {
@@ -207,9 +209,9 @@ const L = {
 
 export type ContestState = 'open' | 'closed' | 'cancelled' | 'results' | 'published';
 
-export function contestState(c: Pick<ContestRow, 'status' | 'deadline_date'>, today: string): ContestState {
+export function contestState(c: Pick<ContestRow, 'status' | 'deadline_date'> & { stage?: ContestRow['stage'] }, today: string): ContestState {
   if (c.status === 'annule') return 'cancelled';
-  if (c.status === 'resultats_publies') return 'results';
+  if (c.status === 'resultats_publies' || c.stage === 'resultat') return 'results';
   if (c.status === 'cloture') return 'closed';
   if (c.deadline_date) return c.deadline_date < today ? 'closed' : 'open';
   return 'published';
@@ -375,6 +377,19 @@ function postsTable(c: ContestRow, lang: Lang): string {
     .join('')}</tbody></table>`;
 }
 
+// Étape publiée après la clôture : en tête du titre, c'est ce que les candidats cherchent
+// (« résultat concours … », « liste des convoqués … »).
+const STAGE_PREFIX: Record<'ecrit' | 'oral' | 'resultat', Record<Lang, string>> = {
+  ecrit: { fr: 'Liste des convoqués à l’écrit', ar: 'لائحة المدعوين للكتابي' },
+  oral: { fr: 'Liste des convoqués à l’oral', ar: 'لائحة المدعوين للشفوي' },
+  resultat: { fr: 'Résultats', ar: 'النتائج' },
+};
+const STAGE_DOCS: Record<string, Record<Lang, string>> = {
+  convoques_ecrit: { fr: 'Liste des candidats convoqués à l’examen écrit (PDF officiel)', ar: 'لائحة المترشحين المدعوين للاختبار الكتابي (PDF رسمي)' },
+  convoques_oral: { fr: 'Liste des candidats convoqués à l’entretien oral (PDF officiel)', ar: 'لائحة المترشحين المدعوين للاختبار الشفوي (PDF رسمي)' },
+  resultats: { fr: 'Résultats du concours (PDF officiel)', ar: 'نتائج المباراة (PDF رسمي)' },
+};
+
 export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], base: string, today: string, prepFolders: FolderRow[] = []): Page {
   const t = L[lang];
   const st = contestState(c, today);
@@ -384,7 +399,12 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
   const short = shortContestTitle(c, lang);
   // Titre : intitulé + année ; l'administration seulement si elle tient en entier.
   const withYear = `${short}${year && !short.includes(year) ? ` ${year}` : ''}`;
-  const pageTitle = admin && !short.toLowerCase().includes(admin.toLowerCase()) && `${withYear} – ${admin}`.length <= 62 ? `${withYear} – ${admin}` : withYear;
+  const stagePrefix = c.stage ? `${STAGE_PREFIX[c.stage][lang]} : ` : '';
+  const pageTitle =
+    stagePrefix + (admin && !short.toLowerCase().includes(admin.toLowerCase()) && `${stagePrefix}${withYear} – ${admin}`.length <= 62 ? `${withYear} – ${admin}` : withYear);
+  const stageDocs = [...(c.contest_documents || [])]
+    .filter((d) => STAGE_DOCS[d.doc_type] && /^https:\/\/www\.emploi-public\.ma\//.test(d.url))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const summary = lang === 'ar' ? c.summary_ar || c.summary_fr : c.summary_fr;
   const summaryIsFallback = lang === 'ar' && !c.summary_ar && !!c.summary_fr;
 
@@ -401,7 +421,12 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
   if (c.exam_date) facts.push([t.examDate, fmtDate(c.exam_date, lang)]);
 
   let description: string;
-  if (summary) description = truncate(summary, 158);
+  const stageLine = c.stage
+    ? lang === 'ar'
+      ? `${STAGE_PREFIX[c.stage].ar} منشورة (PDF رسمي). `
+      : `${STAGE_PREFIX[c.stage].fr} publiée${c.stage === 'resultat' ? 's' : ''} : PDF officiel. `
+    : '';
+  if (summary) description = truncate(stageLine + summary, 158);
   else {
     const bits = [
       `${short}${admin ? ` – ${admin}` : ''}.`,
@@ -409,7 +434,7 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
       c.deadline_date ? `${t.deadline} : ${fmtDate(c.deadline_date, lang)}.` : '',
       lang === 'ar' ? 'الشروط والرابط الرسمي.' : 'Conditions, diplôme exigé et lien officiel.',
     ];
-    description = truncate(bits.filter(Boolean).join(' '), 158);
+    description = truncate(stageLine + bits.filter(Boolean).join(' '), 158);
   }
 
   const officialLinks = [
@@ -422,6 +447,11 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
     [{ href: '/', text: t.home }, { href: '/concours', text: t.contests }, { text: short }],
     `<h1>${esc(title)}</h1>` +
       `<dl>${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` +
+      (stageDocs.length
+        ? `<h2>${lang === 'ar' ? 'تتبع المباراة' : 'Suivi du concours'}</h2><ul>${stageDocs
+            .map((d) => `<li><a href="${esc(d.url)}" rel="nofollow noopener" target="_blank">${esc(STAGE_DOCS[d.doc_type][lang])}</a></li>`)
+            .join('')}</ul>`
+        : '') +
       postsTable(c, lang) +
       (summary ? `<h2>${lang === 'ar' ? 'ملخص' : 'Résumé'}</h2><p${summaryIsFallback ? ' lang="fr" dir="ltr"' : ''}>${esc(summary)}</p>` : '') +
       `<h2>${esc(t.source)}</h2>` +
@@ -447,7 +477,8 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
   // (titre, description, date de publication, recruteur, lieu) et n'est pas annulée.
   const datePosted = c.publication_date || (c.published_at || '').slice(0, 10);
   const hiring = c.administrations?.name_fr || c.source_org;
-  if (st !== 'cancelled' && c.summary_fr && datePosted && hiring && c.region_fr && c.title_fr) {
+  // Concours en cours d'épreuves ou terminé (liste publiée) : plus une offre, pas de JobPosting.
+  if (st !== 'cancelled' && !c.stage && c.summary_fr && datePosted && hiring && c.region_fr && c.title_fr) {
     jsonLd.push({
       '@context': 'https://schema.org',
       '@type': 'JobPosting',

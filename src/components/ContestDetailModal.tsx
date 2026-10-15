@@ -11,6 +11,7 @@ import {
 import { PdfViewerModal } from './PdfViewerModal';
 import { ContestComments } from './ContestComments';
 import { ContestPrepLinks } from './ContestPrepLinks';
+import { ContestStageTracker } from './ContestStageTracker';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
 import { OrgLogo } from './OrgLogo';
@@ -212,6 +213,9 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
           {/* 2. THE 3 CORE INFORMATION BLOCKS (SECTION 10: DIPLÔME • SPÉCIALITÉ • POSTES) */}
           {/* ========================================================================= */}
           <div className="p-4 sm:p-6 space-y-5 bg-[#FAF7F9]/60">
+            {/* Suivi après la clôture : convoqués écrit / oral, résultats (listes officielles) */}
+            <ContestStageTracker contest={contest} language={language} />
+
             {/* Smart Match : verdict expliqué critère par critère */}
             {eligibility && isProfileReady(profile) && (
               <div className={`p-3.5 rounded-2xl border text-xs space-y-2 ${

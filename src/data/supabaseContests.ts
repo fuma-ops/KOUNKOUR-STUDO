@@ -28,8 +28,10 @@ function formatFr(iso: string | null): string {
 }
 
 // Statut éditorial DB → statut d'affichage studo (dérivé de la date limite).
-function mapStatus(dbStatus: string, deadlineISO: string | null): ContestStatus {
-  if (dbStatus === 'resultats_publies') return 'results';
+function mapStatus(dbStatus: string, deadlineISO: string | null, stage?: string | null): ContestStatus {
+  if (dbStatus === 'resultats_publies' || stage === 'resultat') return 'results';
+  // Clos, avec une liste de convoqués publiée : concours en cours (écrit ou oral).
+  if ((stage === 'ecrit' || stage === 'oral') && dbStatus !== 'annule' && (!deadlineISO || daysFromISO(deadlineISO) <= 0)) return 'in_progress';
   if (dbStatus === 'annule' || dbStatus === 'cloture' || dbStatus === 'archive') return 'closed';
   // publie / mis_a_jour : dépend de la date limite.
   if (!deadlineISO) return 'open';
@@ -90,7 +92,7 @@ function mapRow(row: any): Contest {
       officialWebsite: admin.official_site || '',
     },
     type: BILING_TYPE,
-    status: mapStatus(row.status, row.deadline_date),
+    status: mapStatus(row.status, row.deadline_date, row.stage),
     postsCount: typeof row.positions === 'number' ? row.positions : 0,
     posts: [...(row.contest_positions || [])]
       .sort((a: any, b: any) => a.position - b.position)
@@ -125,7 +127,18 @@ function mapRow(row: any): Contest {
     },
     // Épreuves : jamais déduites. Vides tant qu'elles ne sont pas lues dans l'arrêté.
     exams: { written: [], oral: [] },
-    documents: [],
+    // Listes officielles publiées après la clôture (convoqués, résultats) : emploi-public.ma.
+    documents: [...(row.contest_documents || [])]
+      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+      .map((d: any, i: number) => ({
+        id: `${row.id}-doc-${i}`,
+        title: { fr: d.title_fr || '', ar: d.title_ar || d.title_fr || '' },
+        fileType: 'PDF',
+        date: formatFr(d.created_at ? String(d.created_at).slice(0, 10) : null),
+        url: d.url,
+        docType: d.doc_type,
+      })),
+    stage: row.stage || undefined,
     isDemo: false,
   } as Contest;
 }
@@ -138,7 +151,7 @@ export async function fetchPublishedContests(): Promise<Contest[] | null> {
     const { data, error } = await supabase
       .from('contests')
       .select(
-        '*, administrations ( name_fr, name_ar, category, official_site, logo_url ), contest_criteria ( criterion_type, value_fr, value_ar ), contest_positions ( position, province, category, diploma, specialty, count, note )'
+        '*, administrations ( name_fr, name_ar, category, official_site, logo_url ), contest_criteria ( criterion_type, value_fr, value_ar ), contest_positions ( position, province, category, diploma, specialty, count, note ), contest_documents ( doc_type, title_fr, title_ar, url, position, created_at )'
       )
       // Statuts publics uniquement : un admin connecté ne doit pas voir sur le site
       // les brouillons ou concours archivés (lisibles par lui via les RLS staff).

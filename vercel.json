@@ -15,6 +15,9 @@
     },
     "api/alerts/daily.ts": {
       "maxDuration": 60
+    },
+    "api/radar/track-stages.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

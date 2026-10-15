@@ -16,7 +16,8 @@
     "build:vercel": "vite build && node scripts/postbuild-vercel.mjs",
     "test:seo": "tsx scripts/test-seo.ts",
     "seo:indexnow": "tsx scripts/indexnow.ts",
-    "test:announcement": "tsx scripts/test-announcement.ts"
+    "test:announcement": "tsx scripts/test-announcement.ts",
+    "test:stages": "tsx scripts/test-stages.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

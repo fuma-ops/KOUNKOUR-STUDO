@@ -14,7 +14,7 @@ export interface ContestDocument {
   fileSize?: string;
   date: string;
   url: string;
-  docType?: 'arrete' | 'convoques_ecrit' | 'convoques_oral' | 'admis_definitifs' | 'liste_attente';
+  docType?: 'arrete' | 'convoques_ecrit' | 'convoques_oral' | 'resultats' | 'admis_definitifs' | 'liste_attente';
   candidatesCount?: number;
 }
 

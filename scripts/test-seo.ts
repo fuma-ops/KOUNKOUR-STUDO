@@ -61,6 +61,18 @@ check('champ absent non affiché', !doc.includes('Région / lieu'));
 const full = renderContest('fr', contest({ summary_fr: 'Recrutement de 3 ingénieurs.', region_fr: 'Rabat-Salé-Kénitra' }), [], BASE, TODAY);
 check('JobPosting si annonce complète', JSON.stringify(full.jsonLd).includes('"JobPosting"'));
 check('pas de JobPosting si annulé', !JSON.stringify(renderContest('fr', contest({ status: 'annule', summary_fr: 'x', region_fr: 'y' }), [], BASE, TODAY).jsonLd).includes('JobPosting'));
+const EPU = 'https://www.emploi-public.ma/fr/concours/download/list_resultats/163393e4-8773-494e-ba2d-ad108262c366';
+const done = renderContest('fr', contest({ summary_fr: 'x', region_fr: 'y', stage: 'resultat', contest_documents: [
+  { doc_type: 'resultats', title_fr: 'Résultats du concours', title_ar: null, url: EPU, position: 30 },
+  { doc_type: 'resultats', title_fr: 'Lien étranger', title_ar: null, url: 'https://exemple.org/x.pdf', position: 31 },
+] }), [], BASE, TODAY);
+check('suivi : titre « Résultats : … »', done.title.startsWith('Résultats : '));
+check('suivi : lien officiel des résultats dans la page', done.body.includes(EPU) && done.body.includes('Suivi du concours'));
+check('suivi : lien hors emploi-public.ma ignoré', !done.body.includes('exemple.org'));
+check('suivi : plus de JobPosting une fois les résultats publiés', !JSON.stringify(done.jsonLd).includes('JobPosting'));
+check('suivi : statut « Résultats publiés »', done.body.includes('Résultats publiés'));
+const oralP = renderContest('fr', contest({ stage: 'oral' }), [], BASE, TODAY);
+check('suivi : titre convoqués à l’oral', oralP.title.startsWith('Liste des convoqués à l’oral : ') && oralP.description.startsWith('Liste des convoqués à l’oral publiée'));
 const ar = renderContest('ar', contest({ summary_fr: 'Résumé FR' }), [], BASE, TODAY);
 check('version arabe : titre arabe + résumé FR étiqueté', ar.body.includes('مباراة توظيف مهندس دولة') && ar.body.includes('lang="fr" dir="ltr"'));
 const xss = renderContest('fr', contest({ title_fr: '<script>alert(1)</script>' }), [], BASE, TODAY);
