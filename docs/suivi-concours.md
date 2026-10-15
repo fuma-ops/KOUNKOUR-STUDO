@@ -24,6 +24,10 @@ L'étape n'est retenue que si la liste officielle est présente. Aux résultats,
    - notifications push aux candidats qui ont le concours en favori (`contest_stage_subscribers`),
      une seule fois par liste (`alert_log.kind` = `convoques_ecrit` / `convoques_oral` / `resultats`).
 
+> État au 15/10/2026 : l'ajout de la phase *stages* dans `radar_daily_tick` attend une
+> approbation dans Supabase. En attendant, l'analyse du matin (08:45) appelle elle-même
+> `/api/radar/track-stages` jusqu'à `remaining = 0`.
+
 Aperçu sans rien enregistrer : `GET /api/radar/track-stages?key=…&dry=1`.
 
 ## Affichage
