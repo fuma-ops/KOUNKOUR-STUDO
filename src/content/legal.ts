@@ -3,7 +3,7 @@
 // (api/_lib/seo.ts) pour que Google et la console Google OAuth lisent le texte.
 //
 // Adresse de contact : à renseigner dès qu'elle existe (aucune valeur inventée).
-// Tant qu'elle est vide, les pages indiquent qu'elle sera publiée prochainement.
+// Tant qu'elle est vide, les pages renvoient simplement vers l'équipe KounKour.
 export const LEGAL_INFO = {
   contactEmail: '', // adresse pour exercer les droits (accès, rectification, suppression)
   updatedAt: '2026-10-12',
@@ -24,7 +24,7 @@ export interface LegalDoc {
 export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
   const email = LEGAL_INFO.contactEmail;
   const contact =
-    email || (lang === 'ar' ? 'عنوان التواصل (سيُنشر قريبا في هذه الصفحة)' : 'l\'adresse de contact (publiée prochainement sur cette page)');
+    email || (lang === 'ar' ? 'التواصل مع فريق KounKour' : 'l\'équipe KounKour');
   const contactSection: LegalSection[] = email ? [{ title: lang === 'ar' ? 'التواصل' : 'Contact', paragraphs: [email] }] : [];
   const date = LEGAL_INFO.updatedAt.split('-').reverse().join('/');
 

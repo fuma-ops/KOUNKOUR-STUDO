@@ -27,11 +27,8 @@ export const OfficialDisclaimer: React.FC<OfficialDisclaimerProps> = ({ language
           <AlertCircle className="w-5 h-5" />
         </div>
         <div>
-          <h4 className="text-xs font-bold text-[#8D174B] uppercase tracking-wider mb-1 flex items-center gap-2">
-            <span>{t.officialDisclaimerTitle}</span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
-              {t.demoNotice}
-            </span>
+          <h4 className="text-xs font-bold text-[#8D174B] uppercase tracking-wider mb-1">
+            {t.officialDisclaimerTitle}
           </h4>
           <p className="text-xs text-[#6E6773] leading-relaxed">
             {t.officialDisclaimerText}

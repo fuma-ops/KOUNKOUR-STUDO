@@ -10,8 +10,6 @@ export const translations = {
     searchButton: 'Rechercher',
     officialDisclaimerTitle: 'Avertissement officiel',
     officialDisclaimerText: 'Ce résumé simplifié est fourni à titre indicatif. L’annonce officielle originale et les textes publiés par l’administration recruteuse prévalent en tout temps.',
-    demoNotice: 'ENVIRONNEMENT DÉMONSTRATION • DONNÉES DE TEST',
-    demoNoticeSub: 'Conformément au cahier des charges, toutes les fiches présentées ici sont étiquetées comme données de démonstration.',
     nav: {
       home: 'Accueil',
       contests: 'Concours',
@@ -183,8 +181,6 @@ export const translations = {
     searchButton: 'بحث',
     officialDisclaimerTitle: 'تنبيه رسمي',
     officialDisclaimerText: 'هذا الملخص المبسط يُقدم للاستئناس فقط. الإعلان الرسمي الأصلي والنصوص المنشورة من قبل الإدارة المنظمة هي المرجع القانوني الملزم في كل وقت.',
-    demoNotice: 'بيئة تجريبية توضيحية • معطيات للاختبار',
-    demoNoticeSub: 'وفقاً لدفتر التحملات، تُصنف جميع البطاقات المعروضة هنا كبيانات تجريبية إيضاحية.',
     nav: {
       home: 'الرئيسية',
       contests: 'المباريات',

@@ -632,7 +632,7 @@ export function renderNotFound(lang: Lang, path: string): Page {
 
 // ─── Document complet ────────────────────────────────────────────────────────
 
-const OG_IMAGE = '/images/morocco_hero.jpg';
+const OG_IMAGE = '/images/og-kounkour.jpg'; // 1200 × 630, logo + promesse du site (aperçu Facebook / WhatsApp)
 
 export function headTags(p: Page, base: string): string {
   const self = base + withLangPath(p.path, p.lang);
@@ -659,7 +659,9 @@ export function headTags(p: Page, base: string): string {
     `<meta property="og:type" content="${p.ogType || 'website'}" />`,
     `<meta property="og:url" content="${esc(self)}" />`,
     `<meta property="og:locale" content="${p.lang === 'ar' ? 'ar_MA' : 'fr_MA'}" />`,
+    `<meta property="og:site_name" content="KounKour" />`,
     `<meta property="og:image" content="${esc(p.image && /^https:\/\//.test(p.image) ? p.image : base + OG_IMAGE)}" />`,
+    p.image && /^https:\/\//.test(p.image) ? '' : `<meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" />`,
     `<meta name="twitter:card" content="summary_large_image" />`
   );
   for (const ld of p.jsonLd || []) {

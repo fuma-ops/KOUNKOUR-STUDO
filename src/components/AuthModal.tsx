@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Mail, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { X, Mail, Lock, LogIn, UserPlus, Loader2, KeyRound } from 'lucide-react';
 import { Language } from '../types';
 import { getSupabase, isGoogleAuthEnabled, SITE_ORIGIN } from '../lib/supabase';
 
@@ -9,10 +9,25 @@ interface AuthModalProps {
   language: Language;
 }
 
+// Messages d'erreur Supabase (en anglais) traduits pour le candidat.
+export function authErrorMessage(message: string, language: Language): string {
+  const fr = language === 'fr';
+  const m = message.toLowerCase();
+  if (m.includes('invalid login credentials')) return fr ? 'E-mail ou mot de passe incorrect.' : 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+  if (m.includes('email not confirmed')) return fr ? 'Adresse e-mail pas encore confirmée : ouvrez le lien reçu par e-mail.' : 'لم يتم تأكيد البريد الإلكتروني بعد: افتح الرابط المرسل إليك.';
+  if (m.includes('already registered') || m.includes('already been registered')) return fr ? 'Un compte existe déjà avec cet e-mail. Connectez-vous.' : 'يوجد حساب بهذا البريد. سجّل الدخول.';
+  if (m.includes('rate limit') || m.includes('too many') || m.includes('security purposes')) return fr ? 'Trop de tentatives. Réessayez dans quelques minutes.' : 'محاولات كثيرة. أعد المحاولة بعد دقائق.';
+  if (m.includes('password') && (m.includes('at least') || m.includes('short') || m.includes('weak'))) return fr ? 'Mot de passe trop court (6 caractères minimum).' : 'كلمة المرور قصيرة جداً (6 أحرف على الأقل).';
+  if (m.includes('same') && m.includes('password')) return fr ? 'Choisissez un mot de passe différent de l’ancien.' : 'اختر كلمة مرور مختلفة عن القديمة.';
+  if (m.includes('invalid') && m.includes('email')) return fr ? 'Adresse e-mail invalide.' : 'بريد إلكتروني غير صالح.';
+  if (m.includes('fetch') || m.includes('network')) return fr ? 'Connexion internet indisponible. Réessayez.' : 'تعذر الاتصال بالإنترنت. أعد المحاولة.';
+  return fr ? 'Une erreur est survenue. Réessayez.' : 'حدث خطأ. أعد المحاولة.';
+}
+
 // Connexion / inscription réelles via Supabase Auth. La sécurité des données
 // repose sur les RLS côté base ; ce composant ne fait qu'authentifier.
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language }) => {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,17 +51,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
   const t = {
     title: mode === 'signin'
       ? (language === 'fr' ? 'Connexion' : 'تسجيل الدخول')
-      : (language === 'fr' ? 'Créer un compte' : 'إنشاء حساب'),
+      : mode === 'reset'
+        ? (language === 'fr' ? 'Mot de passe oublié' : 'نسيت كلمة المرور')
+        : (language === 'fr' ? 'Créer un compte' : 'إنشاء حساب'),
     email: language === 'fr' ? 'Adresse e-mail' : 'البريد الإلكتروني',
     password: language === 'fr' ? 'Mot de passe' : 'كلمة المرور',
     submit: mode === 'signin'
       ? (language === 'fr' ? 'Se connecter' : 'دخول')
-      : (language === 'fr' ? "S'inscrire" : 'تسجيل'),
+      : mode === 'reset'
+        ? (language === 'fr' ? 'Recevoir le lien' : 'إرسال الرابط')
+        : (language === 'fr' ? "S'inscrire" : 'تسجيل'),
+    forgot: language === 'fr' ? 'Mot de passe oublié ?' : 'نسيت كلمة المرور؟',
+    resetHint: language === 'fr'
+      ? 'Saisissez votre e-mail : nous vous envoyons un lien pour choisir un nouveau mot de passe.'
+      : 'أدخل بريدك الإلكتروني وسنرسل لك رابطاً لاختيار كلمة مرور جديدة.',
+    resetSent: language === 'fr'
+      ? 'Si un compte existe avec cet e-mail, un lien de réinitialisation vient d’être envoyé. Pensez à vérifier les spams.'
+      : 'إذا كان هناك حساب بهذا البريد، فقد أرسلنا رابط إعادة التعيين. تحقق أيضاً من الرسائل غير المرغوب فيها.',
+    backToSignin: language === 'fr' ? 'Retour à la connexion' : 'العودة لتسجيل الدخول',
     google: language === 'fr' ? 'Continuer avec Google' : 'المتابعة عبر Google',
     toSignup: language === 'fr' ? "Pas de compte ? S'inscrire" : 'ليس لديك حساب؟ سجّل',
     toSignin: language === 'fr' ? 'Déjà un compte ? Se connecter' : 'لديك حساب؟ دخول',
     checkEmail: language === 'fr'
-      ? 'Compte créé. Vérifiez votre e-mail pour confirmer, puis connectez-vous.'
+      ? 'Compte créé. Ouvrez le lien reçu par e-mail pour le confirmer (pensez aux spams), puis connectez-vous.'
       : 'تم إنشاء الحساب. تحقق من بريدك للتأكيد ثم سجّل الدخول.',
     unavailable: language === 'fr'
       ? 'Service d’authentification indisponible.'
@@ -66,15 +93,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
     try {
       if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) setError(error.message);
+        if (error) setError(authErrorMessage(error.message, language));
         else onClose();
+      } else if (mode === 'reset') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: SITE_ORIGIN ? `${SITE_ORIGIN}/profil` : undefined,
+        });
+        if (error) setError(authErrorMessage(error.message, language));
+        else setInfo(t.resetSent);
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: SITE_ORIGIN || undefined },
         });
-        if (error) setError(error.message);
+        if (error) setError(authErrorMessage(error.message, language));
+        // Sans confirmation d'e-mail, Supabase ouvre directement la session.
+        else if (data.session) onClose();
         else setInfo(t.checkEmail);
       }
     } finally {
@@ -93,7 +128,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
       provider: 'google',
       options: { redirectTo: SITE_ORIGIN || undefined },
     });
-    if (error) setError(error.message);
+    if (error) setError(authErrorMessage(error.message, language));
   }
 
   return (
@@ -117,7 +152,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
           </button>
         </div>
 
-        {googleOn && (
+        {googleOn && mode !== 'reset' && (
           <>
             <button
               onClick={handleGoogle}
@@ -140,6 +175,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
           </>
         )}
 
+        {mode === 'reset' && <p className="mb-3 text-xs leading-relaxed text-[#6E6773]">{t.resetHint}</p>}
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="flex items-center gap-2 rounded-xl border border-[#F1E5EC] px-3 focus-within:border-[#8D174B]">
             <Mail className="h-4 w-4 text-[#8D174B]" />
@@ -152,6 +188,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
               className="w-full bg-transparent py-2.5 text-sm text-[#242126] focus:outline-none"
             />
           </div>
+          {mode !== 'reset' && (
           <div className="flex items-center gap-2 rounded-xl border border-[#F1E5EC] px-3 focus-within:border-[#8D174B]">
             <Lock className="h-4 w-4 text-[#8D174B]" />
             <input
@@ -164,6 +201,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
               className="w-full bg-transparent py-2.5 text-sm text-[#242126] focus:outline-none"
             />
           </div>
+          )}
+          {mode === 'signin' && (
+            <div className="text-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('reset');
+                  setError(null);
+                  setInfo(null);
+                }}
+                className="text-[11px] font-semibold text-[#6E6773] hover:text-[#8D174B] hover:underline"
+              >
+                {t.forgot}
+              </button>
+            </div>
+          )}
 
           {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
           {info && <p className="text-xs font-semibold text-emerald-700">{info}</p>}
@@ -173,7 +226,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
             disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#8D174B] py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#70113B] disabled:opacity-60"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === 'signin' ? <LogIn className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === 'signin' ? <LogIn className="h-4 w-4" /> : mode === 'reset' ? <KeyRound className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
             <span>{t.submit}</span>
           </button>
         </form>
@@ -186,7 +239,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
           }}
           className="mt-4 w-full text-center text-xs font-semibold text-[#8D174B] hover:underline"
         >
-          {mode === 'signin' ? t.toSignup : t.toSignin}
+          {mode === 'signin' ? t.toSignup : mode === 'reset' ? t.backToSignin : t.toSignin}
         </button>
 
         <p className="mt-3 text-center text-[10px] leading-relaxed text-[#9A93A0]">
@@ -200,6 +253,81 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, language 
           </a>
           .
         </p>
+      </div>
+    </div>
+  );
+};
+
+// Retour du lien « mot de passe oublié » : Supabase ouvre une session de récupération
+// (événement PASSWORD_RECOVERY) ; le candidat choisit ici son nouveau mot de passe.
+// Lien de récupération (flux implicite) : lu dès le chargement du module, avant que
+// le client Supabase ne consomme le fragment #…type=recovery de l'adresse.
+const RECOVERY_AT_LOAD = typeof window !== 'undefined' && /type=recovery/.test(window.location.hash);
+
+export const PasswordRecoveryModal: React.FC<{ language: Language }> = ({ language }) => {
+  const fr = language === 'fr';
+  const [open, setOpen] = useState(RECOVERY_AT_LOAD);
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setOpen(true);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+  if (!open) return null;
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const supabase = getSupabase();
+    if (!supabase) return;
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) setError(authErrorMessage(error.message, language));
+    else setDone(true);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4" dir={fr ? 'ltr' : 'rtl'}>
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-scale-in">
+        <h2 className="mb-2 text-lg font-extrabold text-[#242126]">{fr ? 'Nouveau mot de passe' : 'كلمة مرور جديدة'}</h2>
+        {done ? (
+          <>
+            <p className="mb-4 text-sm font-semibold text-emerald-700">
+              {fr ? 'Mot de passe modifié. Vous êtes connecté.' : 'تم تغيير كلمة المرور. أنت متصل الآن.'}
+            </p>
+            <button onClick={() => setOpen(false)} className="w-full rounded-xl bg-[#8D174B] py-2.5 text-sm font-bold text-white hover:bg-[#70113B] active:scale-95 transition-all">
+              {fr ? 'Continuer' : 'متابعة'}
+            </button>
+          </>
+        ) : (
+          <form onSubmit={save} className="space-y-3">
+            <div className="flex items-center gap-2 rounded-xl border border-[#F1E5EC] px-3 focus-within:border-[#8D174B]">
+              <Lock className="h-4 w-4 text-[#8D174B]" />
+              <input
+                type="password"
+                required
+                minLength={6}
+                autoFocus
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={fr ? 'Nouveau mot de passe (6 caractères min.)' : 'كلمة المرور الجديدة (6 أحرف على الأقل)'}
+                className="w-full bg-transparent py-2.5 text-sm text-[#242126] focus:outline-none"
+              />
+            </div>
+            {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
+            <button type="submit" disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#8D174B] py-2.5 text-sm font-bold text-white hover:bg-[#70113B] disabled:opacity-60 active:scale-95 transition-all">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              <span>{fr ? 'Enregistrer' : 'حفظ'}</span>
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

@@ -6,7 +6,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Language, Contest, ContestStatus } from './types';
 import { translations } from './i18n/translations';
-import { mockContests } from './data/mockContests';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HeroBanner } from './components/HeroBanner';
@@ -27,7 +26,7 @@ import { OfficialDisclaimer } from './components/OfficialDisclaimer';
 import { getAllActiveContests, loadImportedContests, getDeletedContestIds, deleteContestFromSystem, sanitizeContestFields } from './utils/radarStorage';
 import { fetchPublishedContests } from './data/supabaseContests';
 import { useSession } from './lib/useSession';
-import { AuthModal } from './components/AuthModal';
+import { AuthModal, PasswordRecoveryModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { LegalPage } from './components/LegalPage';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
@@ -36,7 +35,7 @@ import { getContestDiscussionCounts } from './data/communityApi';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
   ArrowRight, ArrowLeft, Bookmark, CheckCircle2, Calendar, Radio,
-  UserCheck, Check, Edit3, Target
+  UserCheck, Check, Edit3, Target, ShieldCheck
 } from 'lucide-react';
 
 export default function App() {
@@ -407,6 +406,7 @@ export default function App() {
             </button>
           </div>
           <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} language={language} />
+      <PasswordRecoveryModal language={language} />
         </div>
       );
     }
@@ -429,15 +429,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] flex flex-col justify-between text-[#242126]">
-      {/* Bandeau bêta : les concours viennent des sources officielles ; l'arrêté fait foi. */}
-      <div className="bg-[#8D174B] text-white py-1 px-4 text-center text-[11px] font-semibold flex items-center justify-center gap-2">
-        <span className="px-1.5 py-0.2 rounded bg-amber-400 text-[#242126] font-bold text-[9px] uppercase">
-          BÊTA
-        </span>
+      {/* Bandeau de confiance : les concours viennent des sources officielles ; l'arrêté fait foi. */}
+      <div className="bg-[#8D174B] text-white py-1 px-4 text-center text-[11px] font-semibold flex items-center justify-center gap-1.5">
+        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
         <span>
-          {language === 'fr'
-            ? 'Version bêta — Concours issus des sources officielles · seul l’arrêté officiel fait foi'
-            : 'نسخة تجريبية — مباريات من المصادر الرسمية · القرار الرسمي هو المرجع'}
+          {language === 'fr' ? (
+            <>
+              <span className="sm:hidden">Sources officielles · seul l’arrêté fait foi</span>
+              <span className="hidden sm:inline">Concours issus des sources officielles · seul l’arrêté officiel fait foi</span>
+            </>
+          ) : (
+            'مباريات من المصادر الرسمية · القرار الرسمي هو المرجع'
+          )}
         </span>
       </div>
 
@@ -530,8 +533,8 @@ export default function App() {
                     <Target className="w-3.5 h-3.5" />
                     <span>
                       {language === 'fr' 
-                        ? `🎯 Pour mon profil (${eligibleContests.length})`
-                        : `🎯 ملائم لملفي (${eligibleContests.length})`}
+                        ? `Pour mon profil (${eligibleContests.length})`
+                        : `ملائم لملفي (${eligibleContests.length})`}
                     </span>
                   </button>
 
@@ -752,6 +755,7 @@ export default function App() {
 
       {/* Modal d'authentification (Supabase) */}
       <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} language={language} />
+      <PasswordRecoveryModal language={language} />
 
       {/* Persistent Mobile Bottom Navigation */}
       <BottomNav

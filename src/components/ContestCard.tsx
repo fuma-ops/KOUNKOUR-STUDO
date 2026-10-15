@@ -35,7 +35,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-            {t.status.open}
+            {language === 'fr' ? 'Ouvert' : t.status.open}
           </span>
         );
       case 'closing_soon':
@@ -64,7 +64,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({
       case 'closed':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
-            {t.status.closed}
+            {language === 'fr' ? 'Clôturé' : t.status.closed}
           </span>
         );
       default:
@@ -213,7 +213,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({
 
             <div className="flex items-center gap-1 font-medium text-[#242126]">
               <Users className="w-3.5 h-3.5 text-[#8D174B]" />
-              <span>{contest.postsCount} {t.contests.posts}</span>
+              <span>{contest.postsCount} {contest.postsCount > 1 ? t.contests.posts : t.contests.postSingle}</span>
             </div>
 
             <div className="flex items-center gap-1">

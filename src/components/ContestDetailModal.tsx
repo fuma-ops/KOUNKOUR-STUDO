@@ -266,7 +266,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                   <span className="text-[10px] uppercase font-extrabold text-gray-400 block tracking-wider">
                     {language === 'fr' ? 'Diplôme requis' : 'الدبلوم المطلوب'}
                   </span>
-                  <strong className="text-sm sm:text-base font-black text-[#8D174B] truncate block">
+                  <strong className="text-sm sm:text-base font-black text-[#8D174B] line-clamp-2 break-words block" title={contest.degreeLevel || undefined}>
                     {contest.degreeLevel || (language === 'fr' ? 'Selon arrêté' : 'حسب القرار')}
                   </strong>
                 </div>
@@ -283,7 +283,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                   </span>
                   <div className="text-xs sm:text-sm font-black text-[#242126] leading-snug whitespace-normal break-words mt-0.5">
                     {contest.specialtiesList && contest.specialtiesList.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="flex flex-wrap gap-1 mt-1 max-h-24 overflow-y-auto pe-1">
                         {contest.specialtiesList.map((sp, idx) => (
                           <span key={idx} className="inline-block px-2 py-0.5 rounded-lg bg-[#FAF0F5] text-[#8D174B] text-[11px] font-bold border border-[#8D174B]/15 whitespace-normal break-words">
                             {sp}
@@ -309,7 +309,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                     {language === 'fr' ? 'Nombre de postes' : 'عدد المناصب'}
                   </span>
                   <strong className="text-sm sm:text-base font-black text-emerald-800 truncate block">
-                    {contest.postsCount > 0 ? `${contest.postsCount} ${language === 'fr' ? 'postes' : 'منصب'}` : (language === 'fr' ? 'À vérifier' : 'غير محدد')}
+                    {contest.postsCount > 0 ? `${contest.postsCount} ${language === 'fr' ? (contest.postsCount > 1 ? 'postes' : 'poste') : 'منصب'}` : (language === 'fr' ? 'À vérifier' : 'غير محدد')}
                   </strong>
                 </div>
               </div>

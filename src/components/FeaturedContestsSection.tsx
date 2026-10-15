@@ -148,7 +148,7 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
               {language === 'fr' ? 'Préparation' : 'الاستعداد'}
             </h3>
             <p className="text-xs text-[#6E6773] mt-0.5 font-medium">
-              {language === 'fr' ? 'QCM, annales et résumés officiels' : 'اختبارات QCM، نماذج سابقة ومراجع'}
+              {language === 'fr' ? 'QCM et annales réelles avec corrigés' : 'اختبارات QCM ونماذج حقيقية مع التصحيح'}
             </p>
           </div>
         </div>
@@ -243,7 +243,7 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
                   {/* Floating Top Badges: Posts count on left, Status on right */}
                   <div className="relative z-20 flex items-center justify-between">
                     <span className="px-2.5 py-0.5 rounded-full bg-[#8D174B] text-white text-[10px] font-extrabold shadow-xs">
-                      {contest.postsCount} {t.contests.posts}
+                      {contest.postsCount} {contest.postsCount > 1 ? t.contests.posts : t.contests.postSingle}
                     </span>
 
                     <span className="px-2.5 py-0.5 rounded-full bg-white/95 backdrop-blur-xs text-emerald-800 text-[10px] font-extrabold shadow-xs border border-emerald-100 flex items-center gap-1">
@@ -300,7 +300,7 @@ export const FeaturedContestsSection: React.FC<FeaturedContestsSectionProps> = (
                       {/* Posts count */}
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200">
                         <Users className="w-3 h-3 text-emerald-700" />
-                        <span>{contest.postsCount} {t.contests.posts}</span>
+                        <span>{contest.postsCount} {contest.postsCount > 1 ? t.contests.posts : t.contests.postSingle}</span>
                       </span>
 
                       {/* Region / Location */}
