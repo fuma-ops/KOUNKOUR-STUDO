@@ -344,7 +344,11 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                       )}
                     </div>
                     <div className="pt-3 border-t border-[#F1E5EC] flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-[#6E6773]">{fr ? 'Énoncé complet, sans corrigé officiel' : 'نص كامل، بدون تصحيح رسمي'}</span>
+                      <span className="text-[11px] text-[#6E6773]">
+                        {set.corrige
+                          ? fr ? 'Énoncé complet + corrigé KounKour' : 'نص كامل + تصحيح KounKour'
+                          : fr ? 'Énoncé complet, sans corrigé officiel' : 'نص كامل، بدون تصحيح رسمي'}
+                      </span>
                       <button
                         onClick={() => handleStartSet(set)}
                         className="px-4 py-2 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
@@ -374,7 +378,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                           {fr ? 'Annales réelles' : 'نماذج حقيقية'}
                         </span>
                       ) : (
-                        <span className="font-semibold text-[#6E6773] bg-gray-100 px-2.5 py-1 rounded-md">{fr ? 'Entraînement' : 'تدريب'}</span>
+                        <span className="font-semibold text-[#6E6773] bg-gray-100 px-2.5 py-1 rounded-md">{fr ? 'Entraînement KounKour' : 'تدريب KounKour'}</span>
                       )}
                       <div className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
