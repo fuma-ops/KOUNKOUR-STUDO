@@ -17,7 +17,8 @@
     "test:seo": "tsx scripts/test-seo.ts",
     "seo:indexnow": "tsx scripts/indexnow.ts",
     "test:announcement": "tsx scripts/test-announcement.ts",
-    "test:stages": "tsx scripts/test-stages.ts"
+    "test:stages": "tsx scripts/test-stages.ts",
+    "test:layout": "tsx scripts/test-layout.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

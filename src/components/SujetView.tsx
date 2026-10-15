@@ -4,37 +4,112 @@ import type { Language, QcmSet } from '../types';
 import { AnnaleImages } from './AnnaleImages';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { ConcoursRef } from './ConcoursRef';
+import { layoutStatement } from '../utils/statementLayout';
 
-// Texte d'un sujet écrit transcrit : « ## » / « ### » = titres, ligne vide = paragraphe.
-// Chaque bloc prend la direction de sa langue (sujets bilingues arabe / français).
+// Texte d'un sujet écrit ou d'un corrigé (texte brut en base), mis en forme pour la lecture
+// sur téléphone par src/utils/statementLayout.ts : questions numérotées, calculs ligne par
+// ligne avec le résultat en valeur, libellés en gras, remarques encadrées. Le contenu n'est
+// jamais modifié. Chaque ligne prend la direction de sa langue (sujets arabe / français).
+const inline = (t: string) =>
+  t.split(/(Non tranché|\[…\]|\[\.\.\.\])/g).map((part, i) =>
+    /^(Non tranché|\[…\]|\[\.\.\.\])$/.test(part) ? (
+      <span key={i} className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[0.85em] font-bold whitespace-nowrap">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+
+const Label: React.FC<{ text?: string }> = ({ text }) =>
+  text ? <span className="font-extrabold text-[#242126]">{text} : </span> : null;
+
 export const SujetStatement: React.FC<{ text: string }> = ({ text }) => (
-  <div className="space-y-3">
-    {text.split(/\n\s*\n/).map((block, i) => {
-      const lines = block.trim().split('\n');
-      const h = /^(#{2,3})\s+(.*)$/.exec(lines[0]);
-      const body = (h ? lines.slice(1) : lines).join('\n').trim();
+  <div className="space-y-4 text-[15px] leading-[1.65] text-[#36303A] [font-variant-numeric:lining-nums_tabular-nums]">
+    {layoutStatement(text).map((block, i) => {
+      let inQuestion = false;
       return (
-        <div key={i} className="animate-fade-in" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
-          {h &&
-            (h[1] === '##' ? (
-              <h3 dir="auto" className="text-sm sm:text-base font-extrabold text-[#8D174B] mt-4 mb-1.5 pb-1 border-b border-[#F1E5EC]">
-                {h[2]}
-              </h3>
-            ) : (
-              <h4 dir="auto" className="text-[13px] sm:text-sm font-extrabold text-[#242126] mt-3 mb-1">
-                {h[2]}
-              </h4>
-            ))}
-          {body && (
-            // Une ligne = une direction : les sujets mêlent arabe et français dans un même bloc.
-            <div className="text-[13px] sm:text-sm text-[#36303A] leading-relaxed">
-              {body.split('\n').map((line, j) => (
-                <p key={j} dir="auto" className="whitespace-pre-wrap">
-                  {line}
-                </p>
-              ))}
-            </div>
-          )}
+        <div key={i} className="space-y-2 animate-fade-in" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
+          {block.map((seg, j) => {
+            const indent = inQuestion ? 'sm:ps-9' : '';
+            switch (seg.kind) {
+              case 'h2':
+                inQuestion = false;
+                return (
+                  <h3 key={j} dir="auto" className="text-base sm:text-lg font-extrabold text-[#8D174B] mt-5 mb-1 pb-1.5 border-b-2 border-[#F1E5EC]">
+                    {seg.text}
+                  </h3>
+                );
+              case 'h3':
+                inQuestion = false;
+                return (
+                  <h4 key={j} dir="auto" className="text-[15px] font-extrabold text-[#242126] mt-4">
+                    {seg.text}
+                  </h4>
+                );
+              case 'question':
+                inQuestion = true;
+                return (
+                  <div key={j} className="flex items-start gap-2.5 pt-3 first:pt-0">
+                    <span className="w-6.5 h-6.5 min-w-[26px] min-h-[26px] rounded-full bg-[#8D174B] text-white text-xs font-black flex items-center justify-center mt-0.5">
+                      {seg.num}
+                    </span>
+                    {seg.title && (
+                      <span dir="auto" className="font-extrabold text-[#242126] leading-snug pt-0.5">
+                        {seg.title}
+                      </span>
+                    )}
+                  </div>
+                );
+              case 'calc':
+                return (
+                  <div key={j} className={indent}>
+                    <div dir="ltr" className="rounded-xl bg-[#FAF7F9] border border-[#F1E5EC] border-s-4 border-s-[#8D174B]/40 px-3 py-2 overflow-x-auto">
+                      {seg.label && <div className="text-[12px] font-extrabold text-[#6E6773] font-sans mb-0.5">{seg.label}</div>}
+                      <span className="font-mono text-[14px] leading-relaxed text-[#242126] whitespace-pre-wrap break-words">{seg.before}</span>
+                      {seg.result && (
+                        <strong className="font-mono text-[14px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 whitespace-nowrap">
+                          {seg.result}
+                        </strong>
+                      )}
+                    </div>
+                  </div>
+                );
+              case 'note':
+                return (
+                  <div key={j} className={indent}>
+                    <p dir="auto" className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[14px] text-amber-950">
+                      <span className="font-extrabold">{seg.label} : </span>
+                      {inline(seg.text)}
+                    </p>
+                  </div>
+                );
+              case 'answer':
+                return (
+                  <p key={j} dir="ltr" className={`${indent} flex items-start gap-2 py-0.5`}>
+                    <span className="font-mono text-[13px] font-bold text-[#6E6773] min-w-[2.6rem] pt-0.5">{seg.num}</span>
+                    <span className="px-2 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 font-black text-[14px] whitespace-nowrap">
+                      {seg.letters}
+                    </span>
+                    {seg.text && <span className="min-w-0">{inline(seg.text)}</span>}
+                  </p>
+                );
+              case 'bullet':
+                return (
+                  <p key={j} dir="auto" className={`${indent} flex gap-2`}>
+                    <span className="text-[#8D174B] font-black shrink-0">•</span>
+                    <span>{inline(seg.text)}</span>
+                  </p>
+                );
+              default:
+                return (
+                  <p key={j} dir="auto" className={`${indent} whitespace-pre-wrap`}>
+                    <Label text={seg.label} />
+                    {inline(seg.text)}
+                  </p>
+                );
+            }
+          })}
         </div>
       );
     })}
