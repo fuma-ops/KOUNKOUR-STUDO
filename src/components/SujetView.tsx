@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, FileText, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, ArrowRight, BookOpenCheck, ExternalLink, FileText, Info } from 'lucide-react';
 import type { Language, QcmSet } from '../types';
 import { AnnaleImages } from './AnnaleImages';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
@@ -52,6 +52,7 @@ interface Props {
 // Écran d'un sujet d'examen écrit (pas de QCM) : sujet transcrit + photos de la copie originale.
 export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onImages }) => {
   const fr = language === 'fr';
+  const [showCorrige, setShowCorrige] = useState(false);
   const PrevIcon = fr ? ArrowLeft : ArrowRight;
   const duration = set.durationMinutes
     ? set.durationMinutes % 60 === 0
@@ -91,12 +92,51 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
         <SujetStatement text={set.statement || ''} />
       </article>
 
+      {set.corrige && (
+        <section className="mt-4">
+          {!showCorrige ? (
+            <button
+              onClick={() => setShowCorrige(true)}
+              className="w-full py-3 px-4 rounded-2xl bg-[#8D174B] hover:bg-[#70113B] text-white shadow-sm active:scale-95 transition-all animate-card-breathe"
+            >
+              <span className="flex items-center justify-center gap-2 text-sm font-extrabold">
+                <BookOpenCheck className="w-4 h-4 shrink-0" />
+                {fr ? 'Voir le corrigé proposé' : 'عرض التصحيح المقترح'}
+              </span>
+              <span className="block text-[11px] font-semibold text-white/80 mt-0.5">
+                {fr ? 'Traitez d’abord le sujet, puis comparez' : 'عالج الموضوع أولاً ثم قارن'}
+              </span>
+            </button>
+          ) : (
+            <article className="bg-white border-2 border-emerald-200 rounded-3xl p-5 sm:p-6 shadow-xs animate-scale-in">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
+                  <BookOpenCheck className="w-3.5 h-3.5" />
+                  {fr ? 'Corrigé proposé par l’équipe KounKour' : 'تصحيح مقترح من فريق KounKour'}
+                </span>
+                <button onClick={() => setShowCorrige(false)} className="text-[11px] font-bold text-[#8D174B] hover:underline">
+                  {fr ? 'Masquer' : 'إخفاء'}
+                </button>
+              </div>
+              <p className="text-[11px] text-[#6E6773] mb-3">
+                {fr
+                  ? 'Ce n’est pas un corrigé officiel : il a été rédigé par les administrateurs KounKour. Les points que la copie ne permet pas de trancher sont signalés.'
+                  : 'ليس تصحيحاً رسمياً: حرره مشرفو KounKour.'}
+              </p>
+              <SujetStatement text={set.corrige} />
+            </article>
+          )}
+        </section>
+      )}
+
       <div className="mt-4 rounded-2xl bg-[#FAF7F9] border border-[#F1E5EC] p-4 text-[11px] text-[#6E6773] space-y-2">
         <p className="flex items-start gap-1.5">
           <Info className="w-3.5 h-3.5 text-[#8D174B] shrink-0 mt-0.5" />
           <span>
             {fr
-              ? 'Sujet transcrit mot pour mot depuis la copie publiée. Aucun corrigé officiel : entraînez-vous dans les conditions de l’examen.'
+              ? set.corrige
+                ? 'Sujet transcrit mot pour mot depuis la copie publiée. Aucun corrigé officiel : le corrigé ci-dessus est proposé par l’équipe KounKour. Traitez d’abord le sujet dans les conditions de l’examen.'
+                : 'Sujet transcrit mot pour mot depuis la copie publiée. Aucun corrigé officiel : entraînez-vous dans les conditions de l’examen.'
               : 'موضوع منقول حرفياً من النسخة المنشورة. لا يوجد تصحيح رسمي: تدرب في ظروف الامتحان.'}
           </span>
         </p>

@@ -47,7 +47,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
   if (!sb) return [];
   const { data, error } = await sb
     .from('qcm_sets')
-    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, duration_minutes, difficulty, position, multi_answer, theme, administrations(name_fr, logo_url), qcm_questions(id, position, source_number, question, options)')
+    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, corrige, duration_minutes, difficulty, position, multi_answer, theme, administrations(name_fr, logo_url), qcm_questions(id, position, source_number, question, options)')
     .eq('status', 'published')
     .order('position', { ascending: true });
   if (error || !data) return [];
@@ -90,6 +90,7 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
         sourceImages: s.source_images || [],
         sourceUrl: s.source_url || null,
         statement: s.statement || null,
+        corrige: s.corrige || null,
         folderSlug: s.folder_slug,
         serverGraded: true,
         multiAnswer: !!s.multi_answer,

@@ -155,6 +155,8 @@ export interface QcmSet {
   /** « annales » = vrai sujet transcrit ; « entrainement » = questions KounKour. */
   kind?: 'annales' | 'entrainement' | 'sujet';
   statement?: string | null; // sujet écrit : texte transcrit (kind = 'sujet')
+  /** Corrigé d'un sujet écrit, proposé par l'équipe KounKour (pas un corrigé officiel). */
+  corrige?: string | null;
   /** Langue du contenu (une annale arabe s'affiche de droite à gauche). */
   contentLanguage?: 'fr' | 'ar';
   concoursLabel?: string | null;
