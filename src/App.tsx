@@ -32,6 +32,7 @@ import { LegalPage } from './components/LegalPage';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { buildMatchFeed } from './utils/matchFeed';
 import { getContestDiscussionCounts } from './data/communityApi';
+import { trackPageView } from './lib/visits';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
   ArrowRight, ArrowLeft, Bookmark, CheckCircle2, Calendar, Radio,
@@ -258,6 +259,10 @@ export default function App() {
     if (firstSync.current || samePage) window.history.replaceState(null, '', currentPath);
     else window.history.pushState(null, '', currentPath);
     firstSync.current = false;
+  }, [currentPath]);
+  // Une page vue par adresse affichée (compteur du tableau de bord admin).
+  useEffect(() => {
+    trackPageView(currentPath);
   }, [currentPath]);
   useEffect(() => {
     const onPop = () => {

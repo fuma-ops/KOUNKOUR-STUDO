@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Language } from '../types';
 import { getSupabase } from '../lib/supabase';
+import { AdminVisits } from './AdminVisits';
 import {
   Users, Award, Radio, MessagesSquare, GraduationCap, RefreshCw, AlertTriangle, ShieldCheck, Clock, ArrowRight, ArrowLeft, Info,
 } from 'lucide-react';
@@ -192,6 +193,8 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
       {header}
 
+      <AdminVisits language={language} />
+
       {/* Scan automatique du jour */}
       {robot && (
         <div className="bg-white rounded-3xl border border-[#F1E5EC] p-4 sm:p-5 shadow-xs mb-4 animate-fade-in">
@@ -257,9 +260,9 @@ export const AdminOverview: React.FC<Props> = ({ language, section = 'all', onGo
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3">{usersBlock}</div>
         <div className="lg:col-span-2 bg-white rounded-3xl border border-[#F1E5EC] p-4 sm:p-5 shadow-xs lg:sticky lg:top-4 self-start">
-          <h2 className="text-sm font-extrabold text-[#242126] mb-2 flex items-center gap-2"><Info className="w-4 h-4 text-[#8D174B]" />{fr ? 'Pas encore mesuré' : 'غير مقاس بعد'}</h2>
+          <h2 className="text-sm font-extrabold text-[#242126] mb-2 flex items-center gap-2"><Info className="w-4 h-4 text-[#8D174B]" />{fr ? 'Limites de mesure' : 'حدود القياس'}</h2>
           <ul className="text-xs text-[#5A5360] space-y-2 list-disc ps-4">
-            <li>{fr ? 'Visites et pages vues : aucun outil d’analytics n’est installé.' : 'الزيارات: لا توجد أداة إحصاء.'}</li>
+            <li>{fr ? 'Visites antérieures au 20/10/2026 : non mesurées (le comptage commence à cette date). Détail complet aussi dans Vercel → Analytics.' : 'الزيارات قبل 20/10/2026 غير محتسبة.'}</li>
             <li>{fr ? 'Journal d’audit des actions admin (cahier §12) : pas encore en place.' : 'سجل العمليات الإدارية: غير متوفر بعد.'}</li>
             <li>{fr ? 'Progression des visiteurs non connectés : gardée sur leur appareil, non comptée ici.' : 'تقدم الزوار غير المسجلين لا يُحتسب هنا.'}</li>
           </ul>
