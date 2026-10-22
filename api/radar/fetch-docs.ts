@@ -23,6 +23,21 @@ const SUPABASE_ANON_KEY =
 // Les arrêtés scannés dépassent souvent 3 Mo (SRM, ORMVA : 3,5 à 8 Mo) ; sans eux,
 // ni spécialités ni diplôme, donc pas de match profil. Plafond relevé à 15 Mo.
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // au-delà : lien conservé, fichier non stocké
+// Quota Supabase (500 Mo en offre gratuite) : les copies d'arrêtés en base64 ont rempli
+// le disque le 22/10/2026 (1 Go). Les arrêtés des sites officiels restent téléchargeables :
+// on garde seulement lien, taille et empreinte (sha256). Seuls les fichiers des autres
+// sites (dreamjob…), qui peuvent disparaître, sont gardés, et uniquement s'ils sont petits.
+const OFFICIAL_HOSTS = /(^|\.)(emploi-public\.ma|gov\.ma|ac\.ma)$/i;
+const MAX_STORED_BYTES = 1024 * 1024;
+function storedCopy(url: string, bytes: Buffer): string | null {
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  return OFFICIAL_HOSTS.test(host) || bytes.length > MAX_STORED_BYTES ? null : bytes.toString('base64');
+}
 const MAX_FILES = 6;
 const MAX_LIMIT = 4;
 const TIME_BUDGET_MS = 40000; // la fonction est limitée à 60 s
@@ -152,7 +167,7 @@ export default async function handler(req: any, res: any) {
         } else {
           await supabase
             .from('radar_documents')
-            .update({ mime: d.mime, size_bytes: d.bytes.length, sha256: createHash('sha256').update(d.bytes).digest('hex'), content_b64: d.bytes.toString('base64'), fetch_error: null })
+            .update({ mime: d.mime, size_bytes: d.bytes.length, sha256: createHash('sha256').update(d.bytes).digest('hex'), content_b64: storedCopy(doc.url, d.bytes), fetch_error: null })
             .eq('id', doc.id);
           done.push({ url: doc.url, bytes: d.bytes.length });
         }
@@ -236,7 +251,7 @@ export default async function handler(req: any, res: any) {
       const media = [...extracted.media, ...extraMedia.filter((x) => !extracted.media.some((y) => y.url === x.url))];
       report.pageChars = text.length;
       const docs: any[] = [
-        { candidate_id: c.id, url: c.source_url, kind: 'page', mime: 'text/plain', size_bytes: text.length, sha256: createHash('sha256').update(text).digest('hex'), text_content: text, fetch_error: null, raw_html: report.method === 'page' ? html.slice(0, 400000) : null },
+        { candidate_id: c.id, url: c.source_url, kind: 'page', mime: 'text/plain', size_bytes: text.length, sha256: createHash('sha256').update(text).digest('hex'), text_content: text.slice(0, 60000), fetch_error: null, raw_html: null },
       ];
       for (const m of media.slice(0, DREAMJOB_HOST.test(host) ? DREAMJOB_MAX_FILES : MAX_FILES)) {
         let src = m.url;
@@ -256,7 +271,7 @@ export default async function handler(req: any, res: any) {
             mime: d.mime,
             size_bytes: d.bytes.length,
             sha256: createHash('sha256').update(d.bytes).digest('hex'),
-            content_b64: d.bytes.toString('base64'),
+            content_b64: storedCopy(src, d.bytes),
             fetch_error: null,
           });
           report.files++;
