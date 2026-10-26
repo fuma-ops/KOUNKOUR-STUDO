@@ -3,10 +3,8 @@
 // emploi-public de l'organisme). Le paramètre v= de logo_url change à chaque
 // remplacement : on peut donc mettre le fichier en cache longtemps.
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './_lib/supabaseEnv.ts';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://zcxkxqsqzwtdnrupxlah.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 
 const MIMES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 

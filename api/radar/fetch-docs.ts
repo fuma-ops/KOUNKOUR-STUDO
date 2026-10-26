@@ -15,10 +15,8 @@ import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import { BROWSER_HEADERS } from '../_lib/parsers.ts';
 import { AnnouncementMedia, extractAnnouncement, extractFromWordpressFeed, wpMediaToList, wpPostToHtml } from '../_lib/announcement.ts';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../_lib/supabaseEnv.ts';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://zcxkxqsqzwtdnrupxlah.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 
 // Les arrêtés scannés dépassent souvent 3 Mo (SRM, ORMVA : 3,5 à 8 Mo) ; sans eux,
 // ni spécialités ni diplôme, donc pas de match profil. Plafond relevé à 15 Mo.

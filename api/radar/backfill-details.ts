@@ -26,15 +26,8 @@ import {
   parseEmploiPublicDetail,
   parseFrDateISO,
 } from '../_lib/parsers.ts';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../_lib/supabaseEnv.ts';
 
-const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL ||
-  process.env.SUPABASE_URL ||
-  'https://zcxkxqsqzwtdnrupxlah.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 
 const DREAMJOB_SOURCE_ID = '33333333-3333-4333-8333-333333333333';
 const PARALLEL = 3;

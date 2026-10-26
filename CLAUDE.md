@@ -4,7 +4,7 @@
   répondre à « qu'est-ce qui reste ? » ou d'ajouter une fonctionnalité.
 - **Ne jamais inventer de données** (concours, chiffres, diplômes, comptes,
   statistiques). Un champ inconnu reste vide / « à vérifier ».
-- Vérifier soi-même dans Supabase (projet `zcxkxqsqzwtdnrupxlah`) au lieu de
+- Vérifier soi-même dans Supabase (projet `aqnxeiylhgxfvhbkftbx` « kounkour-v2 » depuis le 26/10/2026 ; l’ancien `zcxkxqsqzwtdnrupxlah` est hors service) au lieu de
   demander au propriétaire de copier-coller.
 - Quand le propriétaire écrit **« go »** pour les annonces Radar : appliquer
   `docs/radar-analyse-ia.md`.

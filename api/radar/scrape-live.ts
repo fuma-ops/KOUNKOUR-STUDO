@@ -23,19 +23,12 @@ import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import { findPossibleDuplicate, parseEmploiPublicDetail, parseFrDateISO, toCandidateRow } from '../_lib/parsers.ts';
 import type { DuplicateRef } from '../_lib/parsers.ts';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../_lib/supabaseEnv.ts';
 
 // Ré-export pour les tests (scripts/).
 export { findPossibleDuplicate, parseFrDateISO };
 export type { DuplicateRef };
 
-const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL ||
-  process.env.SUPABASE_URL ||
-  'https://zcxkxqsqzwtdnrupxlah.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 
 // Identifiants des sources dans la table radar_sources.
 const EMPLOI_PUBLIC_SOURCE_ID = '11111111-1111-4111-8111-111111111111';

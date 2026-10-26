@@ -15,10 +15,8 @@
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 import { planFor, renderPush, toContest, type ContestRow, type Subscriber } from '../_lib/alerts.ts';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../_lib/supabaseEnv.ts';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://zcxkxqsqzwtdnrupxlah.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 const TIME_BUDGET_MS = 50000;
 
 export default async function handler(req: any, res: any) {

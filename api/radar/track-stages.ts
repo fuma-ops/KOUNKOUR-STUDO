@@ -15,10 +15,8 @@ import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 import { BROWSER_HEADERS } from '../_lib/parsers.ts';
 import { epContestId, parseEpStages, renderStagePush, type StageEvent } from '../_lib/stages.ts';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../_lib/supabaseEnv.ts';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://zcxkxqsqzwtdnrupxlah.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
 const SITE_URL = (process.env.SITE_URL || 'https://kounkour.com').replace(/\/$/, '');
 const TIME_BUDGET_MS = 42000; // fonction limitée à 60 s
 const CONCURRENCY = 5;

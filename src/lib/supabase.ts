@@ -4,10 +4,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 // sécurité repose sur les RLS côté base, pas sur le secret de cette clé).
 // Repli en dur pour que le site fonctionne sans config Vercel ; surchargeable
 // par variables d'environnement VITE_ si besoin.
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || 'https://zcxkxqsqzwtdnrupxlah.supabase.co';
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_YfuzhtBBjs7CM1YxjphZzQ__r3Q3VZM';
+// L'ancien projet (zcxkxqsqzwtdnrupxlah) est hors service depuis le 22/10/2026 : une
+// variable VITE_ qui pointe encore dessus est ignorée.
+const ENV_URL: string = import.meta.env.VITE_SUPABASE_URL || '';
+const USE_ENV = Boolean(ENV_URL && import.meta.env.VITE_SUPABASE_ANON_KEY && !ENV_URL.includes('zcxkxqsqzwtdnrupxlah'));
+const SUPABASE_URL = USE_ENV ? ENV_URL : 'https://aqnxeiylhgxfvhbkftbx.supabase.co';
+const SUPABASE_ANON_KEY: string = USE_ENV ? import.meta.env.VITE_SUPABASE_ANON_KEY : 'sb_publishable_4tlFDcDCPj4lfV92NARBLg_VdBLPInr';
 
 let client: SupabaseClient | null = null;
 
