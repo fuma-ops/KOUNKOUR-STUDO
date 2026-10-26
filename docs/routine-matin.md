@@ -45,9 +45,7 @@ du disque du 22/10/2026 ne peut plus se reproduire.
    - import : `annales <fichier>` (format `annales_import`), corrigés de sujets : `corrige <fichier>`.
    - **sujet écrit d'entraînement** (exercices rédigés par KounKour) : `kind = entrainement`, énoncé dans
      `statement`, aucune question ; le site l'affiche « Sujet d'entraînement KounKour (pas un sujet réel) ».
-     Corrigé via `corrige` (migration `20261026_sujets_entrainement.sql`).
-   - rattrapage : tant que `corrige docs/prep/srm-sujets-entrainement-corriges.json` renvoie `"ok": false`,
-     le relancer chaque matin (il passe dès que la migration ci-dessus est appliquée).
+     Corrigé via `corrige` (migration `20261026_sujets_entrainement.sql`, appliquée le 26/10).
 7. `logos` : logo officiel des nouveaux organismes, uniquement par **nom exact** sur les cartes
    emploi-public (`<img … alt="Nom de l'organisme">`). Ne jamais prendre une image de la fiche
    (ce sont les concours similaires) ; sans correspondance exacte, pas de logo.
