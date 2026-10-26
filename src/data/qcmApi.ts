@@ -9,6 +9,7 @@ export interface QcmFolder {
   position: number;
   coverImage?: string | null; // image d'en-tête du dossier (choisie par l'équipe)
   oldSlugs?: string[]; // anciennes adresses du dossier (liens partagés avant le renommage)
+  matchTerms?: string[]; // mots-clés qui relient le dossier aux concours (dossiers créés par la routine)
 }
 
 // Repli si la base est injoignable (mêmes dossiers que dans Supabase).
@@ -33,6 +34,7 @@ export async function fetchQcmFolders(): Promise<QcmFolder[]> {
     position: f.position,
     coverImage: f.cover_image || null,
     oldSlugs: f.old_slugs || [],
+    matchTerms: f.match_terms || [],
   }));
 }
 

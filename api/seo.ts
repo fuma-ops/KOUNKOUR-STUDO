@@ -47,7 +47,7 @@ async function contests(): Promise<ContestRow[]> {
   return (data || []) as unknown as ContestRow[];
 }
 async function folders(): Promise<FolderRow[]> {
-  const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image,old_slugs').eq('status', 'published').order('position');
+  const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image,old_slugs,match_terms').eq('status', 'published').order('position');
   if (error) throw new Error(error.message);
   return (data || []) as FolderRow[];
 }
@@ -111,7 +111,7 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
         const moved = f.find((x) => x.old_slugs?.includes(r.slug));
         return moved ? redirectTo(lang, `/preparation/${encodeURIComponent(moved.slug)}`) : renderNotFound(lang, pathname);
       }
-      return renderFolder(lang, folder, s.filter((x) => x.folder_slug === folder.slug), base, contestsForFolder(folder.slug, c, today), today);
+      return renderFolder(lang, folder, s.filter((x) => x.folder_slug === folder.slug), base, contestsForFolder(folder.slug, c, today, f), today);
     }
     case 'qcm': {
       const [f, s] = await Promise.all([folders(), sets()]);

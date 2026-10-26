@@ -29,7 +29,7 @@ export const ContestPrepLinks: React.FC<{ contest: Contest; language: Language; 
     grade: contest.grade_fr || contest.grade || '',
     admin: contest.administration?.name?.fr || '',
     specialty: [contest.specialty?.fr, ...(contest.specialtiesList || []), ...(contest.posts || []).map((p) => p.specialty || '')].filter(Boolean).join(' '),
-  });
+  }, folders);
   const matched = slugs.map((s) => folders.find((f) => f.slug === s)).filter((f): f is QcmFolder => !!f);
   if (!matched.length || !onOpenFolder) return null;
   const Arrow = fr ? ArrowRight : ArrowLeft;

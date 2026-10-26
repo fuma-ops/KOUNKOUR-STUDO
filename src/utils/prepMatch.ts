@@ -35,12 +35,24 @@ const RULES: { slug: string; test: (t: string, admin: string) => boolean }[] = [
   { slug: 'concours-ingenieur-etat-1er-grade', test: (t) => /ingenieur d'etat|ingenieur(s)? (de )?(1er|premier) grade|ingenieurs? d'etat/.test(t) },
 ];
 
-export function prepFolderSlugsFor(c: PrepMatchInput): string[] {
+// Dossiers créés par la routine du matin (qcm_folders.match_terms) : un mot-clé présent
+// dans l'intitulé, le grade, la spécialité ou l'organisme suffit à relier le concours.
+export interface PrepFolderTerms {
+  slug: string;
+  matchTerms?: string[] | null;
+}
+
+export function prepFolderSlugsFor(c: PrepMatchInput, folders: PrepFolderTerms[] = []): string[] {
   const t = norm([c.title, c.grade, c.specialty].filter(Boolean).join(' '));
   const a = norm(c.admin || '');
-  // Enseignants-chercheurs : aucune annale correspondante dans la Préparation.
-  if (/maitres? de conferences|professeur|enseignant-chercheur|enseignants-chercheurs/.test(t)) return [];
   const out: string[] = [];
-  for (const r of RULES) if (r.test(t, a) && !out.includes(r.slug)) out.push(r.slug);
+  // Enseignants-chercheurs : pas de dossier par métier (seulement un dossier dédié, s'il existe).
+  if (!/maitres? de conferences|professeur|enseignant-chercheur|enseignants-chercheurs/.test(t))
+    for (const r of RULES) if (r.test(t, a) && !out.includes(r.slug)) out.push(r.slug);
+  const hay = ` ${t} ${a} `.replace(/[^a-z0-9']+/g, ' ');
+  for (const f of folders) {
+    const terms = (f.matchTerms || []).map((x) => norm(x).replace(/[^a-z0-9']+/g, ' ').trim()).filter((x) => x.length >= 4);
+    if (terms.some((x) => hay.includes(` ${x} `)) && !out.includes(f.slug)) out.push(f.slug);
+  }
   return out.slice(0, 3);
 }

@@ -48,6 +48,7 @@ export interface FolderRow {
   description_ar: string | null;
   cover_image?: string | null;
   old_slugs?: string[] | null; // anciennes adresses, redirigées (301) vers le slug actuel
+  match_terms?: string[] | null; // mots-clés de rattachement (dossiers créés par la routine)
 }
 
 export interface QcmSetRow {
@@ -342,7 +343,7 @@ export function prepFoldersFor(c: ContestRow, folders: FolderRow[], sets: QcmSet
     grade: c.grade_fr,
     admin: `${c.administrations?.name_fr || ''} ${c.source_org || ''}`,
     specialty: (c.contest_positions || []).map((p) => p.specialty).filter(Boolean).join(' '),
-  });
+  }, folders.map((f) => ({ slug: f.slug, matchTerms: f.match_terms })));
   const withContent = (f: FolderRow) => sets.some((s) => s.folder_slug === f.slug && hasContent(s));
   const byOrg = folders.filter((f) => {
     const key = norm((f.organization || '').split('—').pop() || '');
@@ -353,7 +354,8 @@ export function prepFoldersFor(c: ContestRow, folders: FolderRow[], sets: QcmSet
 }
 
 // Concours ouverts reliés à un dossier de préparation (liens internes depuis la page du dossier).
-export function contestsForFolder(slug: string, contests: ContestRow[], today: string): ContestRow[] {
+export function contestsForFolder(slug: string, contests: ContestRow[], today: string, folders: FolderRow[] = []): ContestRow[] {
+  const terms = folders.map((f) => ({ slug: f.slug, matchTerms: f.match_terms }));
   return contests
     .filter((c) => (c.status === 'publie' || c.status === 'mis_a_jour') && (!c.deadline_date || c.deadline_date >= today))
     .filter((c) =>
@@ -362,7 +364,7 @@ export function contestsForFolder(slug: string, contests: ContestRow[], today: s
         grade: c.grade_fr,
         admin: `${c.administrations?.name_fr || ''} ${c.source_org || ''}`,
         specialty: (c.contest_positions || []).map((p) => p.specialty).filter(Boolean).join(' '),
-      }).includes(slug)
+      }, terms).includes(slug)
     )
     .slice(0, 12);
 }
