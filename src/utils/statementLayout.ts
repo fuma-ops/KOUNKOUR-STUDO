@@ -7,6 +7,10 @@
 //   ligne avec = ou ≈ → calcul (police à chiffres nets, résultat final mis en valeur)
 //   Remarque / Attention / Non tranché / Méthode → encadré
 //   « - … »           → puce
+//   « A. … » / « b) … » → choix de QCM (lettre en pastille)
+//   « 1. Réponse : B. … » → réponse de corrigé (lettre mise en valeur)
+//   « a | b | c »     → tableau
+//   1er bloc d'un sujet (organisme, intitulé) → en-tête
 
 export type Seg =
   | { kind: 'h2' | 'h3'; text: string }
@@ -15,9 +19,13 @@ export type Seg =
   | { kind: 'text'; label?: string; text: string }
   | { kind: 'note'; label: string; text: string }
   | { kind: 'bullet'; text: string }
-  | { kind: 'answer'; num: string; letters: string; text: string };
+  | { kind: 'answer'; num: string; letters: string; text: string; src?: string }
+  | { kind: 'option'; letter: string; text: string }
+  | { kind: 'table'; rows: string[][] }
+  | { kind: 'header'; lines: string[] };
 
 const ARABIC = /[\u0600-\u06FF]/;
+export const isArabic = (t: string) => ARABIC.test(t);
 const NOTE = /^(remarque|attention|non tranché|méthode|methode|contrôle|controle|vérification|verification|rappel|astuce)\b/i;
 
 // Découpe une ligne trop dense : phrases (« . » suivi d'une majuscule) puis suites de calculs « a = … ; b = … ».
@@ -37,8 +45,16 @@ function labelOf(s: string): { label?: string; rest: string } {
   return { label: m[1], rest: m[2] };
 }
 
-function calcOrText(s: string): Seg {
+function calcOrText(s: string, statement = false): Seg {
   const { label, rest } = labelOf(s);
+  // Dans un énoncé, une donnée (« Z2 = 1270 mNGM ») n'est pas un résultat : seule une formule courte
+  // passe en bloc de calcul, sans valeur mise en avant.
+  if (statement) {
+    const words = rest.replace(/[^A-Za-zÀ-ÿ\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2).length;
+    return /[=≈]/.test(rest) && !ARABIC.test(rest) && rest.length <= 90 && words <= 2
+      ? { kind: 'calc', label, before: rest, result: '' }
+      : { kind: 'text', label, text: rest };
+  }
   // Une phrase d'introduction (« Données … : ») reste du texte, même si elle contient « = ».
   // Une longue phrase explicative qui contient une formule reste du texte : seuls les calculs courts passent en mode calcul.
   if (!ARABIC.test(rest) && /[=≈]/.test(rest) && !/:\s*$/.test(rest) && rest.length <= 140) {
@@ -53,17 +69,75 @@ function calcOrText(s: string): Seg {
   return { kind: 'text', label, text: rest };
 }
 
-export function layoutStatement(text: string): Seg[][] {
+// Ligne de tableau : au moins deux « | » (ou « libellé : a | b »).
+const tableCells = (line: string): string[] | null => {
+  if ((line.match(/\|/g) || []).length < 2) return null;
+  const cells = line.split('|').map((c) => c.trim());
+  const m = /^(.{2,40}?)\s:\s(.+)$/.exec(cells[0]);
+  return m ? [m[1], m[2], ...cells.slice(1)] : cells;
+};
+const OPTION = /^(?:\(([a-eA-E])\)|([a-eA-E])\s?[.)])\s+(.+)$/;
+// « 1. Réponse : B. Explication (source) » / « 3. Réponses : A et C — … »
+const REPLY = /^(\d{1,3})\s?[.)-]\s+R[ée]ponses?\s*:\s*([A-Ea-e](?:\s*(?:,|et)\s*[A-Ea-e])*)\b\s*[.,:;—–-]?\s*(.*)$/;
+
+// header : texte d'un énoncé (en-tête du sujet, données sans résultat mis en valeur) ; sinon corrigé.
+export function layoutStatement(text: string, opts: { header?: boolean } = {}): Seg[][] {
   return text
     .split(/\n\s*\n/)
-    .map((block) => {
+    .map((block, bi) => {
       const out: Seg[] = [];
-      for (const raw of block.trim().split('\n')) {
-        const line = raw.trim();
-        if (!line) continue;
+      const lines = block.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+      // En-tête du sujet : premier bloc court, sans titre ni question (organisme, intitulé, session).
+      if (opts.header && bi === 0 && lines.length <= 5 && lines.every((l) => !/^(#|[-•]\s|\d{1,2}\s?[.)-]\s)/.test(l) && !OPTION.test(l) && !tableCells(l))) {
+        return [{ kind: 'header', lines } as Seg];
+      }
+      for (const line of lines) {
         const h = /^(#{2,3})\s+(.*)$/.exec(line);
         if (h) {
           out.push({ kind: h[1] === '##' ? 'h2' : 'h3', text: h[2] });
+          continue;
+        }
+        const cells = tableCells(line);
+        if (cells) {
+          const last = out[out.length - 1];
+          if (last?.kind === 'table') last.rows.push(cells);
+          else out.push({ kind: 'table', rows: [cells] });
+          continue;
+        }
+        if (ARABIC.test(line)) {
+          // Arabe : « س3: الجواب 2) … » (corrigé), « 12) … » / « س1 : … » (question), « 1. … » / « 1- … » (choix).
+          const ar = /^س\s?(\d{1,3})\s*:\s*الجواب\s*(\d(?:\s*(?:و|،|,)\s*\d)*)\)?\s*(.*)$/.exec(line);
+          if (ar) {
+            let t = ar[3].trim();
+            const src = /\s*\(([^()]{2,60})\)\.?$/.exec(t);
+            if (src) t = t.slice(0, src.index).trim();
+            out.push({ kind: 'answer', num: ar[1], letters: ar[2].replace(/\s+/g, ' '), text: t, src: src?.[1] });
+            continue;
+          }
+          const aq = /^(?:س\s?(\d{1,3})\s*:|(\d{1,3})\s?\)\s*-?)\s*(.+)$/.exec(line);
+          if (aq) {
+            out.push({ kind: 'question', num: aq[1] || aq[2], title: aq[3] });
+            continue;
+          }
+          const ao = /^(\d{1,2})\s?[.-]\s*(.+)$/.exec(line);
+          if (ao) {
+            const prev = out[out.length - 1];
+            if (prev && (prev.kind === 'question' || prev.kind === 'option')) out.push({ kind: 'option', letter: ao[1], text: ao[2] });
+            else out.push({ kind: 'question', num: ao[1], title: ao[2] });
+            continue;
+          }
+        }
+        const reply = ARABIC.test(line) ? null : REPLY.exec(line);
+        if (reply) {
+          let t = reply[3].trim();
+          const src = /\s*\(([^()]{2,60}(?:\([^()]*\))?[^()]{0,30})\)\.?$/.exec(t);
+          if (src) t = t.slice(0, src.index).trim();
+          out.push({ kind: 'answer', num: reply[1], letters: reply[2].toUpperCase().replace(/\s+/g, ' ').replace('ET', 'et'), text: t, src: src?.[1] });
+          continue;
+        }
+        const opt = ARABIC.test(line) ? null : OPTION.exec(line);
+        if (opt) {
+          out.push({ kind: 'option', letter: (opt[1] || opt[2]).toUpperCase(), text: opt[3] });
           continue;
         }
         if (/^[-•]\s+/.test(line)) {
@@ -91,6 +165,10 @@ export function layoutStatement(text: string): Seg[][] {
           if (cut && !/[=≈]/.test(cut[1]) && cut[1].trim().split(/\s+/).length <= 9) {
             out.push({ kind: 'question', num: q[1], title: cut[1].trim() });
             rest = body.slice(cut[0].length).trim();
+          } else if (!/[=≈]/.test(body) && body.length <= 240) {
+            // Énoncé de question sans calcul : tout l'intitulé est le titre de la carte.
+            out.push({ kind: 'question', num: q[1], title: body });
+            rest = '';
           } else {
             out.push({ kind: 'question', num: q[1], title: '' });
             rest = body;
@@ -102,7 +180,7 @@ export function layoutStatement(text: string): Seg[][] {
           if (n) {
             const { label, rest: r } = labelOf(s);
             out.push({ kind: 'note', label: label || n[1], text: label ? r : s.slice(n[0].length).replace(/^\s*:?\s*/, '') });
-          } else out.push(calcOrText(s));
+          } else out.push(calcOrText(s, opts.header));
         }
       }
       return out;

@@ -4,7 +4,7 @@ import type { Language, QcmSet } from '../types';
 import { AnnaleImages } from './AnnaleImages';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { ConcoursRef } from './ConcoursRef';
-import { layoutStatement } from '../utils/statementLayout';
+import { isArabic, layoutStatement } from '../utils/statementLayout';
 
 // Texte d'un sujet écrit ou d'un corrigé (texte brut en base), mis en forme pour la lecture
 // sur téléphone par src/utils/statementLayout.ts : questions numérotées, calculs ligne par
@@ -24,92 +24,209 @@ const inline = (t: string) =>
 const Label: React.FC<{ text?: string }> = ({ text }) =>
   text ? <span className="font-extrabold text-[#242126]">{text} : </span> : null;
 
-export const SujetStatement: React.FC<{ text: string }> = ({ text }) => (
-  <div className="space-y-4 text-[15px] leading-[1.65] text-[#36303A] [font-variant-numeric:lining-nums_tabular-nums]">
-    {layoutStatement(text).map((block, i) => {
-      let inQuestion = false;
+type Seg = ReturnType<typeof layoutStatement>[number][number];
+// « 10 697 000 » ne doit jamais être coupé en fin de ligne : espace fine insécable entre les groupes de chiffres.
+const nb = (t: string) => t.replace(/(\d) (?=\d{3}(?!\d))/g, '$1\u202F');
+// Une carte = une question et tout ce qui la suit (choix, calculs, tableaux) jusqu'à la suivante.
+type Item = { kind: 'seg'; seg: Seg } | { kind: 'card'; head: Extract<Seg, { kind: 'question' }>; body: Seg[] } | { kind: 'answers'; rows: Extract<Seg, { kind: 'answer' }>[] };
+
+function group(blocks: Seg[][]): Item[] {
+  const items: Item[] = [];
+  let card: Extract<Item, { kind: 'card' }> | null = null;
+  blocks.forEach((block) => {
+    block.forEach((seg, j) => {
+      if (seg.kind === 'question') {
+        card = { kind: 'card', head: seg, body: [] };
+        items.push(card);
+      } else if (seg.kind === 'answer') {
+        card = null;
+        const last = items[items.length - 1];
+        if (last?.kind === 'answers') last.rows.push(seg);
+        else items.push({ kind: 'answers', rows: [seg] });
+      } else if (seg.kind === 'h2' || seg.kind === 'h3' || seg.kind === 'header') {
+        card = null;
+        items.push({ kind: 'seg', seg });
+      } else if (card && (j > 0 || seg.kind === 'option' || seg.kind === 'table' || seg.kind === 'calc')) {
+        // Un paragraphe isolé après une ligne vide ouvre une nouvelle partie : il sort de la carte.
+        card.body.push(seg);
+      } else {
+        card = null;
+        items.push({ kind: 'seg', seg });
+      }
+    });
+  });
+  return items;
+}
+
+const Table: React.FC<{ rows: string[][] }> = ({ rows }) => (
+  <div className="overflow-x-auto rounded-xl border border-[#E9DCE4]">
+    <table className="min-w-full text-[13px] border-collapse">
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i} className={i === 0 ? 'bg-[#8D174B]/[0.07]' : i % 2 ? 'bg-white' : 'bg-[#FAF7F9]'}>
+            {r.map((c, k) => (
+              <td key={k} dir="auto" className={`px-2.5 py-1.5 border-b border-[#F1E5EC] whitespace-nowrap ${i === 0 || k === 0 ? 'font-bold text-[#242126]' : 'text-[#36303A]'} ${c === '…' ? 'text-[#B5A9B1]' : ''}`}>
+                {c}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+const Options: React.FC<{ opts: Extract<Seg, { kind: 'option' }>[] }> = ({ opts }) => {
+  const short = opts.every((o) => o.text.length <= 48);
+  return (
+    <div dir={opts.some((o) => isArabic(o.text)) ? 'rtl' : undefined} className={`grid gap-2 ${short ? 'sm:grid-cols-2' : ''}`}>
+      {opts.map((o, i) => (
+        <div key={i} className="flex items-start gap-2.5 rounded-xl border border-[#EADCE5] bg-[#FDFAFC] px-3 py-2 hover:border-[#8D174B]/40 hover:shadow-xs transition-all">
+          <span className="w-6 h-6 min-w-[24px] rounded-full border-2 border-[#8D174B] text-[#8D174B] text-[12px] font-black flex items-center justify-center mt-px">{o.letter}</span>
+          <span dir="auto" className="text-[14.5px] leading-snug text-[#242126] pt-0.5">{inline(o.text)}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+function SegView({ seg }: { seg: Seg }) {
+  switch (seg.kind) {
+    case 'header':
       return (
-        <div key={i} className="space-y-2 animate-fade-in" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
-          {block.map((seg, j) => {
-            const indent = inQuestion ? 'sm:ps-9' : '';
-            switch (seg.kind) {
-              case 'h2':
-                inQuestion = false;
-                return (
-                  <h3 key={j} dir="auto" className="text-base sm:text-lg font-extrabold text-[#8D174B] mt-5 mb-1 pb-1.5 border-b-2 border-[#F1E5EC]">
-                    {seg.text}
-                  </h3>
-                );
-              case 'h3':
-                inQuestion = false;
-                return (
-                  <h4 key={j} dir="auto" className="text-[15px] font-extrabold text-[#242126] mt-4">
-                    {seg.text}
-                  </h4>
-                );
-              case 'question':
-                inQuestion = true;
-                return (
-                  <div key={j} className="flex items-start gap-2.5 pt-3 first:pt-0">
-                    <span className="w-6.5 h-6.5 min-w-[26px] min-h-[26px] rounded-full bg-[#8D174B] text-white text-xs font-black flex items-center justify-center mt-0.5">
-                      {seg.num}
-                    </span>
-                    {seg.title && (
-                      <span dir="auto" className="font-extrabold text-[#242126] leading-snug pt-0.5">
-                        {seg.title}
-                      </span>
-                    )}
-                  </div>
-                );
-              case 'calc':
-                return (
-                  <div key={j} className={indent}>
-                    <div dir="ltr" className="rounded-xl bg-[#FAF7F9] border border-[#F1E5EC] border-s-4 border-s-[#8D174B]/40 px-3 py-2 overflow-x-auto">
-                      {seg.label && <div className="text-[12px] font-extrabold text-[#6E6773] font-sans mb-0.5">{seg.label}</div>}
-                      <span className="font-mono text-[14px] leading-relaxed text-[#242126] whitespace-pre-wrap break-words">{seg.before}</span>
-                      {seg.result && (
-                        <strong className="font-mono text-[14px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 whitespace-nowrap">
-                          {seg.result}
-                        </strong>
-                      )}
-                    </div>
-                  </div>
-                );
-              case 'note':
-                return (
-                  <div key={j} className={indent}>
-                    <p dir="auto" className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[14px] text-amber-950">
-                      <span className="font-extrabold">{seg.label} : </span>
-                      {inline(seg.text)}
-                    </p>
-                  </div>
-                );
-              case 'answer':
-                return (
-                  <p key={j} dir="ltr" className={`${indent} flex items-start gap-2 py-0.5`}>
-                    <span className="font-mono text-[13px] font-bold text-[#6E6773] min-w-[2.6rem] pt-0.5">{seg.num}</span>
-                    <span className="px-2 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 font-black text-[14px] whitespace-nowrap">
-                      {seg.letters}
-                    </span>
-                    {seg.text && <span className="min-w-0">{inline(seg.text)}</span>}
+        <div className="text-center rounded-2xl bg-gradient-to-br from-[#FDF2F7] to-white border border-[#F1E5EC] px-4 py-4 space-y-1">
+          {seg.lines.map((l, i) => (
+            <p key={i} dir="auto" className={i === 0 ? 'text-[15px] font-extrabold text-[#8D174B]' : i === 1 ? 'text-[15px] font-bold text-[#242126]' : 'text-[12.5px] text-[#6E6773] italic'}>
+              {l}
+            </p>
+          ))}
+        </div>
+      );
+    case 'h2': {
+      const pts = /\s*\((\d+(?:[,.]\d+)?\s*pts?|\d+(?:[,.]\d+)?\s*points?)\)\s*$/i.exec(seg.text);
+      const title = pts ? seg.text.slice(0, pts.index) : seg.text;
+      return (
+        <h3 dir="auto" className="mt-6 flex flex-wrap items-center gap-2 rounded-2xl bg-[#8D174B] text-white px-4 py-2.5 text-[15px] sm:text-base font-extrabold shadow-sm">
+          <span className="flex-1 min-w-0">{title}</span>
+          {pts && <span className="shrink-0 rounded-lg bg-white/20 px-2 py-0.5 text-[12px] font-bold">{pts[1]}</span>}
+        </h3>
+      );
+    }
+    case 'h3':
+      return (
+        <h4 dir="auto" className="mt-4 text-[15px] font-extrabold text-[#8D174B] border-s-4 border-[#8D174B] ps-2.5">
+          {seg.text}
+        </h4>
+      );
+    case 'calc':
+      return (
+        <div dir="ltr" className="rounded-xl bg-[#FAF7F9] border border-[#F1E5EC] border-s-4 border-s-[#8D174B]/40 px-3 py-2 overflow-x-auto">
+          {seg.label && <div className="text-[12px] font-extrabold text-[#6E6773] font-sans mb-0.5">{seg.label}</div>}
+          <span className="text-[14.5px] leading-relaxed text-[#242126] whitespace-pre-wrap">{nb(seg.before)}</span>
+          {seg.result && (
+            <strong className="text-[14.5px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 whitespace-nowrap">{nb(seg.result)}</strong>
+          )}
+        </div>
+      );
+    case 'note':
+      return (
+        <p dir="auto" className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[14px] text-amber-950">
+          <span className="font-extrabold">{seg.label} : </span>
+          {inline(seg.text)}
+        </p>
+      );
+    case 'table':
+      return <Table rows={seg.rows} />;
+    case 'option':
+      return <Options opts={[seg]} />;
+    case 'answer':
+      return null;
+    case 'bullet':
+      return (
+        <p dir="auto" className="flex gap-2">
+          <span className="text-[#8D174B] font-black shrink-0">•</span>
+          <span>{inline(seg.text)}</span>
+        </p>
+      );
+    case 'question':
+      return null;
+    default:
+      return (
+        <p dir="auto" className="whitespace-pre-wrap">
+          <Label text={seg.label} />
+          {inline(seg.text)}
+        </p>
+      );
+  }
+}
+
+// Suite de segments : les choix consécutifs sont regroupés dans une même grille.
+const Segs: React.FC<{ segs: Seg[] }> = ({ segs }) => {
+  const out: React.ReactNode[] = [];
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    if (seg.kind === 'option') {
+      const opts: Extract<Seg, { kind: 'option' }>[] = [];
+      while (i < segs.length && segs[i].kind === 'option') opts.push(segs[i++] as Extract<Seg, { kind: 'option' }>);
+      i--;
+      out.push(<Options key={i} opts={opts} />);
+    } else out.push(<SegView key={i} seg={seg} />);
+  }
+  return <>{out}</>;
+};
+
+export const SujetStatement: React.FC<{ text: string; header?: boolean }> = ({ text, header }) => (
+  <div className="space-y-3.5 text-[15px] leading-[1.65] text-[#36303A] [font-variant-numeric:lining-nums_tabular-nums]">
+    {group(layoutStatement(text, { header })).map((item, i) => {
+      const anim = { animationDelay: `${Math.min(i, 10) * 40}ms` };
+      if (item.kind === 'card') {
+        return (
+          <section key={i} dir={isArabic(item.head.title) ? 'rtl' : undefined} className="rounded-2xl border border-[#EADCE5] bg-white shadow-xs p-3 sm:p-4 space-y-2.5 animate-fade-in" style={anim}>
+            {item.head.title ? (
+              <>
+                <div className="flex items-start gap-2.5">
+                  <span className="min-w-[28px] h-7 px-1.5 rounded-full bg-[#8D174B] text-white text-[13px] font-black flex items-center justify-center shrink-0">{item.head.num}</span>
+                  <p dir="auto" className={`text-[#242126] text-[15px] leading-snug pt-0.5 ${item.head.title.length > 110 ? 'font-semibold' : 'font-bold'}`}>
+                    {inline(item.head.title)}
                   </p>
-                );
-              case 'bullet':
-                return (
-                  <p key={j} dir="auto" className={`${indent} flex gap-2`}>
-                    <span className="text-[#8D174B] font-black shrink-0">•</span>
-                    <span>{inline(seg.text)}</span>
-                  </p>
-                );
-              default:
-                return (
-                  <p key={j} dir="auto" className={`${indent} whitespace-pre-wrap`}>
-                    <Label text={seg.label} />
-                    {inline(seg.text)}
-                  </p>
-                );
-            }
-          })}
+                </div>
+                {item.body.length > 0 && (
+                  <div className="space-y-2 sm:ps-[38px]">
+                    <Segs segs={item.body} />
+                  </div>
+                )}
+              </>
+            ) : (
+              // Question sans intitulé (ligne de corrigé, calcul) : le numéro reste à côté du contenu.
+              <div className="flex items-start gap-2.5">
+                <span className="min-w-[28px] h-7 px-1.5 rounded-full bg-[#8D174B] text-white text-[13px] font-black flex items-center justify-center shrink-0 mt-1">{item.head.num}</span>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Segs segs={item.body} />
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      }
+      if (item.kind === 'answers') {
+        return (
+          <section key={i} className="rounded-2xl border border-emerald-200 bg-white shadow-xs divide-y divide-emerald-100 animate-fade-in" style={anim}>
+            {item.rows.map((a, k) => (
+              <div key={k} dir={isArabic(a.text) ? 'rtl' : undefined} className="flex items-start gap-2.5 px-3.5 py-2.5">
+                <span className="min-w-[2.4rem] font-mono text-[13px] font-bold text-[#6E6773] pt-1">{a.num}</span>
+                <span className="px-2 py-0.5 rounded-lg bg-emerald-600 text-white font-black text-[14px] whitespace-nowrap shrink-0">{a.letters}</span>
+                <div className="min-w-0 pt-0.5">
+                  {a.text && <span dir="auto" className="text-[14.5px] text-[#242126]">{inline(a.text)}</span>}
+                  {a.src && <span className="ms-1.5 inline-block rounded-md bg-[#F4EEF2] px-1.5 text-[11px] font-semibold text-[#6E6773]">{a.src}</span>}
+                </div>
+              </div>
+            ))}
+          </section>
+        );
+      }
+      return (
+        <div key={i} className="animate-fade-in" style={anim}>
+          <SegView seg={item.seg} />
         </div>
       );
     })}
@@ -165,8 +282,8 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
         </div>
       )}
 
-      <article className="bg-white border border-[#F1E5EC] rounded-3xl p-5 sm:p-6 shadow-xs">
-        <SujetStatement text={set.statement || ''} />
+      <article className="bg-[#FCF8FA] border border-[#F1E5EC] rounded-3xl p-3.5 sm:p-6 shadow-xs">
+        <SujetStatement text={set.statement || ''} header />
       </article>
 
       {set.corrige && (
@@ -210,7 +327,11 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
         <p className="flex items-start gap-1.5">
           <Info className="w-3.5 h-3.5 text-[#8D174B] shrink-0 mt-0.5" />
           <span>
-            {fr
+            {set.kind !== 'sujet'
+              ? fr
+                ? 'Sujet d’entraînement rédigé par l’équipe KounKour, ce n’est pas un sujet de concours réel. Traitez-le dans les conditions de l’examen, puis comparez avec le corrigé.'
+                : 'موضوع تدريبي من إعداد فريق KounKour، وليس موضوع مباراة حقيقياً.'
+              : fr
               ? set.corrige
                 ? 'Sujet transcrit mot pour mot depuis la copie publiée. Aucun corrigé officiel : le corrigé ci-dessus est proposé par l’équipe KounKour. Traitez d’abord le sujet dans les conditions de l’examen.'
                 : 'Sujet transcrit mot pour mot depuis la copie publiée. Aucun corrigé officiel : entraînez-vous dans les conditions de l’examen.'
