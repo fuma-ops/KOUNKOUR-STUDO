@@ -147,7 +147,9 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
       <header className="bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#F1E5EC] p-5 mb-4">
         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-md mb-2">
           <FileText className="w-3.5 h-3.5" />
-          {fr ? 'Sujet d’examen écrit (réel)' : 'موضوع امتحان كتابي (حقيقي)'}
+          {set.kind === 'sujet'
+            ? fr ? 'Sujet d’examen écrit (réel)' : 'موضوع امتحان كتابي (حقيقي)'
+            : fr ? 'Sujet d’entraînement rédigé par KounKour (pas un sujet réel)' : 'موضوع تدريبي من إعداد KounKour (ليس موضوعاً حقيقياً)'}
         </span>
         <h2 dir="auto" className="text-lg sm:text-xl font-extrabold text-[#242126] leading-snug mb-3">{set.title[language] || set.title.fr}</h2>
         <ConcoursRef set={set} language={language} variant="header" />

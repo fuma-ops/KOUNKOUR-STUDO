@@ -6,7 +6,7 @@ import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
-import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm } from '../data/qcmApi';
+import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet } from '../data/qcmApi';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
   ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy, FileText
@@ -128,7 +128,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
   // Timer effect when a set is active and not submitted
   useEffect(() => {
     let interval: any = null;
-    if (selectedSet && selectedSet.kind !== 'sujet' && !isSubmitted) {
+    if (selectedSet && !isWrittenSet(selectedSet) && !isSubmitted) {
       interval = setInterval(() => {
         setTimerSeconds((prev) => prev + 1);
       }, 1000);
@@ -330,7 +330,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
       : setsOf(selectedFolder);
     const st = statsOf(sets);
     const renderSetCard = (set: QcmSet, i: number) => {
-              if (set.kind === 'sujet') {
+              if (isWrittenSet(set)) {
                 return (
                   <div
                     key={set.id}
@@ -341,7 +341,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                       <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3 gap-2">
                         <span className="font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-md flex items-center gap-1">
                           <FileText className="w-3.5 h-3.5" />
-                          {fr ? 'Sujet écrit réel' : 'موضوع كتابي حقيقي'}
+                          {set.kind === 'sujet' ? (fr ? 'Sujet écrit réel' : 'موضوع كتابي حقيقي') : fr ? 'Sujet d’entraînement KounKour' : 'موضوع تدريبي من KounKour'}
                         </span>
                         {set.examYear && <span className="font-bold text-[#8D174B]">{set.examYear}</span>}
                       </div>
@@ -503,7 +503,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
 
   if (!selectedSet) return null;
 
-  if (selectedSet.kind === 'sujet') {
+  if (isWrittenSet(selectedSet)) {
     return (
       <SujetView
         set={selectedSet}

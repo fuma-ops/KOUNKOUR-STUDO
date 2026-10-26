@@ -104,8 +104,13 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
       } as QcmSet;
     })
     // Un sujet écrit n'a pas de QCM : il est gardé s'il a un texte.
-    .filter((s) => s.questions.length > 0 || (s.kind === 'sujet' && !!s.statement));
+    .filter((s) => s.questions.length > 0 || isWrittenSet(s));
 }
+
+/** Sujet écrit (énoncé à traiter, sans QCM) : réel (kind « sujet ») ou d'entraînement
+ * rédigé par KounKour (kind « entrainement » avec un énoncé et aucune question). */
+export const isWrittenSet = (s: Pick<QcmSet, 'kind' | 'statement' | 'questions'>) =>
+  s.kind === 'sujet' || (s.kind === 'entrainement' && !s.questions.length && !!s.statement);
 
 export interface QcmCorrection {
   /** Bonne(s) réponse(s) : un id d'option, ou plusieurs joints par « | » (QCM à plusieurs réponses). */

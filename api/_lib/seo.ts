@@ -155,6 +155,7 @@ const L = {
     questions: 'questions',
     realExam: 'Annales réelles',
     writtenExam: 'Sujet d’examen écrit',
+    writtenTraining: 'Sujet d’entraînement rédigé par KounKour (pas un sujet réel)',
     corrige: 'Corrigé proposé par l’équipe KounKour',
     corrigeNote: 'Ce n’est pas un corrigé officiel : il a été rédigé par les administrateurs KounKour. Les points que la copie publiée ne permet pas de trancher sont signalés.',
     training: 'Entraînement',
@@ -198,6 +199,7 @@ const L = {
     questions: 'سؤال',
     realExam: 'نماذج حقيقية',
     writtenExam: 'موضوع امتحان كتابي',
+    writtenTraining: 'موضوع تدريبي من إعداد KounKour (ليس موضوعاً حقيقياً)',
     corrige: 'تصحيح مقترح من فريق KounKour',
     corrigeNote: 'ليس تصحيحاً رسمياً: حرره مشرفو KounKour.',
     training: 'تدريب',
@@ -511,7 +513,8 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
 const folderTitle = (f: FolderRow, lang: Lang) => (lang === 'ar' ? f.title_ar || f.title_fr : f.title_fr);
 const setTitle = (s: QcmSetRow, lang: Lang) => (lang === 'ar' ? s.title_ar || s.title_fr : s.title_fr);
 const qCount = (s: QcmSetRow) => s.qcm_questions?.length ?? 0;
-const isSujet = (s: QcmSetRow) => s.kind === 'sujet';
+// Sujet écrit : réel (kind « sujet ») ou d'entraînement KounKour (énoncé sans questions).
+const isSujet = (s: QcmSetRow) => s.kind === 'sujet' || (s.kind === 'entrainement' && qCount(s) === 0 && !!s.statement?.trim());
 // Contenu publiable : un QCM avec questions, ou un sujet écrit transcrit.
 export const hasContent = (s: QcmSetRow) => qCount(s) > 0 || (isSujet(s) && !!s.statement?.trim());
 // Titre d'un sujet corrigé : le nom est raccourci pour que « sujet et corrigé » reste toujours visible.
@@ -521,7 +524,8 @@ const withCorrige = (name: string, lang: Lang) => {
 };
 // « Concours … » en tête du titre : c'est le premier mot tapé par les candidats sur Google.
 const withConcours = (name: string, lang: Lang) => (lang === 'fr' && !/^concours/i.test(name) ? `Concours ${name}` : name);
-const kindLabel = (s: QcmSetRow, t: (typeof L)[Lang]) => (isSujet(s) ? t.writtenExam : s.kind === 'annales' ? t.realExam : t.training);
+const kindLabel = (s: QcmSetRow, t: (typeof L)[Lang]) =>
+  s.kind === 'sujet' ? t.writtenExam : s.kind === 'annales' ? t.realExam : isSujet(s) ? t.writtenTraining : t.training;
 
 // Texte d'un sujet écrit : « ## » / « ### » = titres, ligne vide = paragraphe.
 function statementHtml(text: string): string {

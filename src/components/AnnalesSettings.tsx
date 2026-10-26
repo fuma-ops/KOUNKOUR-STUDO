@@ -105,8 +105,8 @@ const SetRow: React.FC<{ set: AdminQcmSet; onImages: (images: string[]) => void 
             </p>
           )}
           <div className="flex flex-wrap gap-1.5 mt-1 text-[10px]">
-            <span className={`px-1.5 py-0.5 rounded font-bold ${set.kind === 'sujet' ? 'bg-sky-50 text-sky-900' : 'bg-gray-100 text-gray-700'}`}>
-              {set.kind === 'sujet' ? 'Sujet écrit' : 'QCM'}
+            <span className={`px-1.5 py-0.5 rounded font-bold ${set.kind === 'sujet' || !set.questions ? 'bg-sky-50 text-sky-900' : 'bg-gray-100 text-gray-700'}`}>
+              {set.kind === 'sujet' ? 'Sujet écrit' : !set.questions ? 'Sujet d’entraînement' : 'QCM'}
             </span>
             {set.examYear && <span className="px-1.5 py-0.5 rounded bg-[#FDF2F7] text-[#8D174B] font-bold">{set.examYear}</span>}
             {set.status !== 'published' && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">non publiée</span>}
