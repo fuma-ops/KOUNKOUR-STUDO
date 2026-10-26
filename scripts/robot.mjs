@@ -15,6 +15,7 @@
 //   dossier <fichier.json>     crée / complète un dossier de préparation (prep_folder_upsert)
 //   annales <fichier.json>     importe des séries QCM / sujets (annales_import)
 //   corrige <fichier.json>     ajoute des corrigés de sujets (annales_set_corrige)
+//   logos                      logo officiel des organismes sans logo (nom exact sur emploi-public)
 //   bilan                      chiffres du jour pour le rapport
 import { readFileSync } from 'node:fs';
 
@@ -90,6 +91,46 @@ switch (cmd) {
   case 'corrige':
     out(await api('POST', '/rpc/annales_set_corrige', { p: json(a1) }));
     break;
+  case 'logos': {
+    // Logo officiel par NOM EXACT : sur emploi-public, chaque carte de concours porte
+    // <img src=".../administrations/..." alt="Nom de l'organisme">. Le logo n'est jamais
+    // pris « au hasard » sur la fiche (les images y sont celles des concours similaires).
+    const norm = (s) => (s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/’/g, "'").replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, '&').replace(/[^a-z0-9]+/g, ' ').trim();
+    const adms = await api('GET', '/administrations?select=id,name_fr,logo_url&limit=2000');
+    const todo = adms.filter((a) => !a.logo_url);
+    const open = await api('GET', `/contests?select=source_url&source_url=like.*emploi-public.ma*&deadline_date=gte.${today}&limit=1000`);
+    const pages = new Set(open.map((c) => c.source_url.split('#')[0]));
+    for (const stat of ['service_etat', 'collec', 'etab_publics']) for (let p = 1; p <= 40; p++) pages.add(`https://www.emploi-public.ma/fr/concours-liste?stat=${stat}&page=${p}`);
+    const seen = new Map(); // nom → Map(src → n)
+    const list = [...pages];
+    for (let i = 0; i < list.length; i += 5) {
+      const htmls = await Promise.all(list.slice(i, i + 5).map((u) => fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0' } }).then((r) => (r.ok ? r.text() : '')).catch(() => '')));
+      for (const h of htmls) for (const m of h.matchAll(/<img src="(\/backoffice\/files\/images\/administrations\/[^"]+)"\s+alt="([^"]*)"/g)) {
+        const n = norm(m[2]);
+        const c = seen.get(n) || new Map();
+        c.set(m[1], (c.get(m[1]) || 0) + 1);
+        seen.set(n, c);
+      }
+    }
+    const owners = new Map();
+    for (const [n, c] of seen) for (const s of c.keys()) owners.set(s, (owners.get(s) || new Set()).add(n));
+    const items = [];
+    for (const a of todo) {
+      const c = seen.get(norm(a.name_fr));
+      if (!c) continue;
+      const src = [...c.entries()].sort((x, y) => y[1] - x[1])[0][0];
+      if ((owners.get(src)?.size || 0) > 2) continue; // image par défaut du portail
+      const r = await fetch('https://www.emploi-public.ma' + src, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const buf = Buffer.from(await r.arrayBuffer());
+      const mime = r.headers.get('content-type') || 'image/png';
+      if (!r.ok || buf.length > 250000 || !/^image\//.test(mime)) continue;
+      items.push({ administration_id: a.id, mime, content_b64: buf.toString('base64'), source_url: 'https://www.emploi-public.ma' + src });
+    }
+    let n = 0;
+    for (let i = 0; i < items.length; i += 10) n += (await api('POST', '/rpc/admin_logo_add', { p: items.slice(i, i + 10) })) || 0;
+    out({ organismes_sans_logo: todo.length, logos_ajoutes: n, toujours_sans_logo: todo.length - n });
+    break;
+  }
   case 'bilan': {
     const count = async (path) => {
       const r = await fetch(URL + path, { method: 'HEAD', headers: { apikey: ANON, 'x-radar-key': KEY, Prefer: 'count=exact', Range: '0-0' } });

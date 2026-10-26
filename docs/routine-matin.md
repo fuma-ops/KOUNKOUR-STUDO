@@ -43,5 +43,8 @@ du disque du 22/10/2026 ne peut plus se reproduire.
    - dossier : réutiliser un dossier existant si le métier correspond, sinon `dossier <fichier>`
      avec `match_terms` (mots de l'intitulé du métier, ex. `["juriste","assistant juriste"]`) ;
    - import : `annales <fichier>` (format `annales_import`), corrigés de sujets : `corrige <fichier>`.
-7. `bilan` puis court rapport en français : publiés (dont page seule), complétés, rejetés,
+7. `logos` : logo officiel des nouveaux organismes, uniquement par **nom exact** sur les cartes
+   emploi-public (`<img … alt="Nom de l'organisme">`). Ne jamais prendre une image de la fiche
+   (ce sont les concours similaires) ; sans correspondance exacte, pas de logo.
+8. `bilan` puis court rapport en français : publiés (dont page seule), complétés, rejetés,
    consignes traitées, sans spécialité, préparations ajoutées, liste « À traiter ».
