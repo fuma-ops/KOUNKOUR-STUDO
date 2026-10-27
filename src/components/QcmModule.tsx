@@ -10,6 +10,7 @@ import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolder
 import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
 import { LoadError } from './LoadError';
+import { gaEvent } from '../lib/analytics';
 import type { Contest } from '../types';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
@@ -290,6 +291,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
     }).length;
     setIsSubmitted(true);
     onRecordScore?.(selectedSet.id, score, selectedSet.questions.length);
+    gaEvent('qcm_complete', { set: selectedSet.slug, score, total: selectedSet.questions.length });
     saveProgress(selectedSet, { score });
     writeDraft(selectedSet.id, null);
   };

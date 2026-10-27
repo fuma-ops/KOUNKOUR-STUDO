@@ -1,3 +1,4 @@
+import { GA_ID } from '../lib/analytics';
 // Pages légales (politique de confidentialité, conditions d'utilisation).
 // Un seul contenu, utilisé par l'application (LegalPage) et par le rendu serveur
 // (api/_lib/seo.ts) pour que Google et la console Google OAuth lisent le texte.
@@ -70,7 +71,15 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
             'Vous pouvez aussi adresser une réclamation à la CNDP (www.cndp.ma).',
           ],
         },
-        { title: 'Stockage local et cookies', paragraphs: ['KounKour n\'utilise pas de cookies publicitaires. Le stockage local du navigateur sert à garder votre session ouverte et vos préférences.'] },
+        {
+          title: 'Stockage local et cookies',
+          paragraphs: [
+            'KounKour n\'utilise pas de cookies publicitaires. Le stockage local du navigateur sert à garder votre session ouverte et vos préférences.',
+            ...(GA_ID
+              ? ['Mesure d\'audience : Google Analytics (Google Ireland Ltd) dépose des cookies de mesure pour compter les pages vues et les visites de façon statistique. Les signaux publicitaires et la personnalisation des annonces sont désactivés. Vous pouvez bloquer ces cookies dans les réglages de votre navigateur ou avec le module de désactivation de Google Analytics.']
+              : []),
+          ],
+        },
       ],
     };
   }
@@ -113,7 +122,13 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
             'يمكنك أيضا تقديم شكاية إلى اللجنة الوطنية لمراقبة حماية المعطيات (www.cndp.ma).',
           ],
         },
-        { title: 'التخزين المحلي وملفات تعريف الارتباط', paragraphs: ['لا يستعمل كونكور ملفات تعريف ارتباط إشهارية. يُستعمل التخزين المحلي للمتصفح للإبقاء على جلستك وتفضيلاتك.'] },
+        {
+          title: 'التخزين المحلي وملفات تعريف الارتباط',
+          paragraphs: [
+            'لا يستعمل كونكور ملفات تعريف ارتباط إشهارية. يُستعمل التخزين المحلي للمتصفح للإبقاء على جلستك وتفضيلاتك.',
+            ...(GA_ID ? ['قياس الزيارات: يستعمل Google Analytics ملفات تعريف ارتباط لإحصاء الصفحات المزارة والزيارات إحصائيا، مع تعطيل الإشارات الإشهارية. يمكنك حظرها من إعدادات متصفحك.'] : []),
+          ],
+        },
       ],
     };
   }

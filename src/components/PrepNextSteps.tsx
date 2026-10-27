@@ -4,6 +4,7 @@ import type { Contest, Language, QcmSet } from '../types';
 import { QcmFolder, QcmProgress, contentType, CONTENT_TYPES } from '../data/qcmApi';
 import { prepFolderSlugsFor } from '../utils/prepMatch';
 import { TYPE_META } from './prepTypes';
+import { gaEvent } from '../lib/analytics';
 
 // Bloc « Et maintenant ? » en fin de QCM ou de sujet : la suite dans la même spécialité,
 // les concours ouverts du même métier, le profil (alertes) et le simulateur de salaire.
@@ -125,7 +126,7 @@ export const PrepNextSteps: React.FC<Props> = ({
               const M = TYPE_META[contentType(s)];
               const I = M.icon;
               return (
-                <button key={s.id} onClick={() => onOpenSet(s)} className={`${row} animate-fade-in`} style={{ animationDelay: `${i * 80}ms` }}>
+                <button key={s.id} onClick={() => { gaEvent('next_step', { kind: 'support', target: s.slug }); onOpenSet(s); }} className={`${row} animate-fade-in`} style={{ animationDelay: `${i * 80}ms` }}>
                   <span className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${M.cls}`}>
                     <I className="w-4 h-4" />
                   </span>
@@ -146,7 +147,7 @@ export const PrepNextSteps: React.FC<Props> = ({
           <p className="text-[12px] font-extrabold text-[#242126] mb-2">{fr ? 'Concours ouverts pour ce métier' : 'مباريات مفتوحة لهذا التخصص'}</p>
           <div className="space-y-2">
             {open.map((c, i) => (
-              <button key={c.id} onClick={() => onOpenContest(c)} className={`${row} animate-fade-in`} style={{ animationDelay: `${i * 80}ms` }}>
+              <button key={c.id} onClick={() => { gaEvent('next_step', { kind: 'concours', target: c.slug }); onOpenContest(c); }} className={`${row} animate-fade-in`} style={{ animationDelay: `${i * 80}ms` }}>
                 <span className="w-9 h-9 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 flex items-center justify-center shrink-0">
                   <CalendarClock className="w-4 h-4" />
                 </span>
@@ -171,7 +172,11 @@ export const PrepNextSteps: React.FC<Props> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {(isAuthed ? onOpenProfile : onRequestLogin) && (
           <button
-            onClick={() => (isAuthed ? onOpenProfile?.() : onRequestLogin?.())}
+            onClick={() => {
+              gaEvent('next_step', { kind: isAuthed ? 'alertes' : 'profil' });
+              if (isAuthed) onOpenProfile?.();
+              else onRequestLogin?.();
+            }}
             className="text-start rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white p-4 shadow-md hover:shadow-lg hover-scale active:scale-95 transition-all cursor-pointer animate-cta-bounce"
           >
             <span className="flex items-center gap-2 text-[14px] font-extrabold">
@@ -191,7 +196,10 @@ export const PrepNextSteps: React.FC<Props> = ({
         )}
         {onOpenSalarySimulator && (
           <button
-            onClick={() => onOpenSalarySimulator(open[0])}
+            onClick={() => {
+              gaEvent('next_step', { kind: 'salaire' });
+              onOpenSalarySimulator(open[0]);
+            }}
             className="text-start rounded-2xl border border-[#F1E5EC] bg-white p-4 hover:border-[#8D174B]/40 hover:shadow-md hover-scale active:scale-95 transition-all cursor-pointer"
           >
             <span className="flex items-center gap-2 text-[14px] font-extrabold text-[#242126]">
