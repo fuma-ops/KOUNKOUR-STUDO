@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ContestPostsTable } from './ContestPostsTable';
+import { ContestSummary } from './ContestSummary';
 import { Contest, Language } from '../types';
 import { translations } from '../i18n/translations';
 import { 
@@ -278,9 +279,19 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                   <span className="text-[10px] uppercase font-extrabold text-gray-400 block tracking-wider">
                     {language === 'fr' ? 'Diplôme requis' : 'الدبلوم المطلوب'}
                   </span>
-                  <strong className="text-sm sm:text-base font-black text-[#8D174B] line-clamp-2 break-words block" title={contest.degreeLevel || undefined}>
-                    {contest.degreeLevel || (language === 'fr' ? 'Selon arrêté' : 'حسب القرار')}
-                  </strong>
+                  {(contest.degreeLevel || '').includes(';') ? (
+                    // Plusieurs diplômes (un par poste) : titre court + liste compacte, au lieu d'une suite illisible.
+                    <>
+                      <strong className="text-sm sm:text-base font-black text-[#8D174B] block">{language === 'fr' ? 'Selon le poste' : 'حسب المنصب'}</strong>
+                      <span dir="auto" className="text-[12px] text-[#6E6773] leading-snug line-clamp-3 block mt-0.5" title={contest.degreeLevel || undefined}>
+                        {(contest.degreeLevel || '').split(/\s*;\s*/).filter(Boolean).join(' · ')}
+                      </span>
+                    </>
+                  ) : (
+                    <strong className="text-sm sm:text-base font-black text-[#8D174B] line-clamp-2 break-words block" title={contest.degreeLevel || undefined}>
+                      {contest.degreeLevel || (language === 'fr' ? 'Selon arrêté' : 'حسب القرار')}
+                    </strong>
+                  )}
                 </div>
               </div>
 
@@ -541,8 +552,9 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
 
                   {/* Overview summary text if available */}
                   {contest.overviewSummary?.[language] && (
-                    <div className="pt-3 border-t border-[#FAF4F7] text-xs text-[#4A4250] leading-relaxed">
-                      {contest.overviewSummary[language]}
+                    <div className="pt-3 border-t border-[#FAF4F7]">
+                      {/* Les postes sont déjà détaillés dans le tableau par affectation : pas de doublon. */}
+                      <ContestSummary text={contest.overviewSummary[language]} hidePostes={!!contest.posts?.length} />
                     </div>
                   )}
                 </div>

@@ -291,8 +291,8 @@ export function renderHome(lang: Lang, contests: ContestRow[], folders: FolderRo
   const h1 = lang === 'ar' ? 'كونكور — المباريات العمومية بالمغرب' : 'KounKour — Concours publics au Maroc';
   const intro =
     lang === 'ar'
-      ? 'مباريات التوظيف في القطاع العام بالمغرب من المصادر الرسمية، مع آخر الآجال، الشروط والرابط الرسمي، ونماذج حقيقية للتحضير.'
-      : 'Les concours de recrutement du secteur public marocain issus des sources officielles : dates limites, conditions, lien officiel, et annales réelles pour se préparer.';
+      ? 'كونكور (KounKour، ويُكتب أيضاً كنكور): مباريات التوظيف في القطاع العام بالمغرب من المصادر الرسمية، مع آخر الآجال، الشروط والرابط الرسمي، ونماذج حقيقية للتحضير.'
+      : 'KounKour (كونكور, aussi écrit Kounkour ou Councour) : les concours de recrutement du secteur public marocain issus des sources officielles, dates limites, conditions, lien officiel, et annales réelles corrigées pour se préparer.';
   const body = frame(
     lang,
     [{ text: t.home }],
@@ -305,7 +305,8 @@ export function renderHome(lang: Lang, contests: ContestRow[], folders: FolderRo
   return {
     status: 200,
     lang,
-    title: lang === 'ar' ? 'كونكور — مباريات التوظيف العمومي بالمغرب' : 'KounKour — Concours publics au Maroc : dates limites et annales',
+    // Marque en tête, avec son écriture arabe : les candidats cherchent « كونكور », « councour »…
+    title: lang === 'ar' ? 'كونكور KounKour — مباريات التوظيف العمومي بالمغرب' : 'KounKour (كونكور) — Concours publics au Maroc : dates limites et annales',
     description: truncate(intro, 158),
     path: '/',
     indexable: true,

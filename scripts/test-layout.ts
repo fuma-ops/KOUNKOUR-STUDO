@@ -1,5 +1,6 @@
 // Tests de la mise en forme des sujets / corrigés (src/utils/statementLayout.ts) : npm run -s test:layout
 import { layoutStatement, type Seg } from '../src/utils/statementLayout.ts';
+import { splitSummary } from '../src/components/ContestSummary.tsx';
 
 let failed = 0;
 const check = (name: string, ok: boolean) => {
@@ -53,6 +54,14 @@ check('arabe : réponse « س1: الجواب 2) »', ar[3].kind === 'answer' && 
 
 const f = segs('## B. Traitement\n\n### 1- Connaissances');
 check('titres ## / ###', f[0].kind === 'h2' && f[1].kind === 'h3');
+
+const sm = splitSummary("SRM recrute : 84 techniciens. Postes : Technicien commercial – Gestion (Direction clientèle) : 16; Secrétaire : 1. Diplôme : Bac+2; Licence. Conditions : Nationalité marocaine ; bonne conduite. Âge : 18 à 40 ans. Pièces : CV avec photo, CIN recto-verso, diplôme, attestations. Date du concours : 21/11/2026. Date et lieu communiqués ultérieurement.");
+check('résumé : rubriques reconnues dans l’ordre', sm.parts.map((p) => p.key).join('|') === 'Postes|Diplôme|Conditions|Âge|Pièces|Date du concours');
+check('résumé : conditions intactes', sm.parts[2].body === 'Nationalité marocaine ; bonne conduite');
+check('résumé : note après la date séparée', sm.parts[5].body === '21/11/2026' && sm.note.startsWith('Date et lieu'));
+check('résumé sans rubrique : texte inchangé', splitSummary('Texte libre.').parts.length === 0);
+const sp = splitSummary('Pièces : CV, CIN ; attestations de réussite non acceptées. Date et lieu communiqués ultérieurement. Contact : x@y.ma');
+check('résumé : note après les pièces séparée', sp.parts[0].body === 'CV, CIN ; attestations de réussite non acceptées' && sp.note.startsWith('Date et lieu') && sp.note.includes('Contact'));
 
 if (failed) {
   console.log(`\n${failed} test(s) en échec.`);

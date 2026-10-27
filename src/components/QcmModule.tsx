@@ -43,6 +43,20 @@ interface QcmModuleProps {
 // Ordre dans un dossier : annales QCM, puis sujets écrits, puis entraînement.
 const KIND_ORDER: Record<string, number> = { annales: 0, sujet: 1, entrainement: 2 };
 
+// Lettre du choix (A, B, C…) en pastille : repère visuel net sur téléphone.
+const OptionLetter: React.FC<{ i: number; tone: 'idle' | 'selected' | 'right' | 'wrong' }> = ({ i, tone }) => (
+  <span
+    className={`w-6 h-6 min-w-[24px] rounded-full border-2 text-[12px] font-black flex items-center justify-center ${
+      tone === 'selected' ? 'border-[#8D174B] bg-[#8D174B] text-white'
+        : tone === 'right' ? 'border-emerald-600 bg-emerald-600 text-white'
+        : tone === 'wrong' ? 'border-rose-500 text-rose-600'
+        : 'border-[#8D174B] text-[#8D174B]'
+    }`}
+  >
+    {String.fromCharCode(65 + i)}
+  </span>
+);
+
 // Clé d'URL d'un support : son slug en base.
 const urlKey = (set: QcmSet) => (set.serverGraded ? set.slug : set.id);
 
@@ -533,9 +547,9 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-4 py-4 sm:py-6">
       {/* Top action bar: Back to catalog, timer, progress */}
-      <div className="bg-white border border-[#F1E5EC] rounded-2xl p-4 shadow-xs mb-6 flex items-center justify-between">
+      <div className="bg-white border border-[#F1E5EC] rounded-2xl px-3 py-2.5 sm:p-4 shadow-xs mb-3 sm:mb-6 flex items-center justify-between">
         <button
           onClick={() => navigate(selectedSet.folderSlug || selectedFolder, null)}
           className="text-xs font-semibold text-[#8D174B] hover:underline flex items-center gap-1 cursor-pointer"
@@ -557,9 +571,15 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
       </div>
 
       {/* Concours d'origine : titre réel et année de la session */}
-      <div className="bg-white border border-[#F1E5EC] rounded-2xl p-4 shadow-xs mb-6 animate-fade-in">
-        <h2 dir="auto" className="text-sm sm:text-base font-extrabold text-[#242126] leading-snug mb-2">{selectedSet.title[language] || selectedSet.title.fr}</h2>
-        <ConcoursRef set={selectedSet} language={language} variant="header" />
+      {/* Sur téléphone : carte compacte, pour que la question et ses choix restent visibles sans défiler. */}
+      <div className="bg-white border border-[#F1E5EC] rounded-2xl p-3 sm:p-4 shadow-xs mb-3 sm:mb-6 animate-fade-in">
+        <h2 dir="auto" className="text-[13px] sm:text-base font-extrabold text-[#242126] leading-snug mb-2">{selectedSet.title[language] || selectedSet.title.fr}</h2>
+        <div className="sm:hidden">
+          <ConcoursRef set={selectedSet} language={language} variant="card" />
+        </div>
+        <div className="hidden sm:block">
+          <ConcoursRef set={selectedSet} language={language} variant="header" />
+        </div>
       </div>
 
       {/* Photos du sujet original (annales) : consultables pendant l'entraînement et la correction */}
@@ -639,11 +659,11 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
               const rightIds = answerIds(corr.correctOptionId);
 
               return (
-                <div key={q.id} dir={contentDir(selectedSet)} className="bg-white border border-[#F1E5EC] rounded-2xl p-5 shadow-xs">
+                <div key={q.id} dir={contentDir(selectedSet)} className="bg-white border border-[#F1E5EC] rounded-2xl p-4 sm:p-5 shadow-xs">
                   <div className="flex items-start justify-between gap-3 mb-3">
-                    <span className="text-xs font-bold text-[#8D174B]">
-                      {t.preparation.question} {idx + 1}
-                      {selectedSet.kind === 'annales' && q.number ? (language === 'fr' ? ` · n° ${q.number} du sujet` : ` · رقم ${q.number} في الموضوع`) : ''}
+                    <span className="flex items-center gap-2 text-xs font-bold text-[#8D174B]">
+                      <span className="min-w-[28px] h-7 px-1.5 rounded-full bg-[#8D174B] text-white text-[13px] font-black flex items-center justify-center">{idx + 1}</span>
+                      {selectedSet.kind === 'annales' && q.number ? (language === 'fr' ? `n° ${q.number} du sujet` : `رقم ${q.number} في الموضوع`) : ''}
                     </span>
                     {isCorrect ? (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
@@ -658,10 +678,10 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                     )}
                   </div>
 
-                  <p className="text-sm font-semibold text-[#242126] mb-3 whitespace-pre-line">{q.text[language]}</p>
+                  <p className="text-[15px] font-bold text-[#242126] leading-snug mb-3 whitespace-pre-line">{q.text[language]}</p>
 
                   <div className="space-y-2 mb-4">
-                    {q.options.map((opt) => {
+                    {q.options.map((opt, oi) => {
                       const isUserChoice = chosen.includes(opt.id);
                       const isRealCorrect = rightIds.includes(opt.id);
 
@@ -673,8 +693,11 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                       }
 
                       return (
-                        <div key={opt.id} className={`p-3 rounded-xl border text-xs flex items-center justify-between ${style}`}>
-                          <span>{opt.text[language]}</span>
+                        <div key={opt.id} className={`p-3 rounded-xl border text-[13.5px] leading-snug flex items-center justify-between gap-2 ${style}`}>
+                          <span className="flex items-start gap-2.5 min-w-0">
+                            <OptionLetter i={oi} tone={isRealCorrect ? 'right' : isUserChoice ? 'wrong' : 'idle'} />
+                            <span className="pt-0.5">{opt.text[language]}</span>
+                          </span>
                           {isRealCorrect && selectedSet.multiAnswer && !isUserChoice && (
                             <span className="text-[10px] font-bold text-emerald-700 shrink-0">{language === 'fr' ? 'à cocher' : 'كان يجب التأشير'}</span>
                           )}
@@ -685,12 +708,12 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                     })}
                   </div>
 
-                  {/* Pedagogical explanation */}
-                  <div className="p-3.5 rounded-xl bg-[#FDF2F7] border border-[#8D174B]/15 text-xs text-[#242126]">
+                  {/* Explication */}
+                  <div className="p-3.5 rounded-xl bg-[#FDF2F7] border border-[#8D174B]/15 text-[13px] text-[#242126]">
                     <strong className="block text-[#8D174B] font-bold mb-1">
                       {t.preparation.explanation}
                     </strong>
-                    <p className="text-[#6E6773] leading-relaxed mb-1.5">{corr.explanation}</p>
+                    <p className="text-[#4A4350] leading-relaxed mb-1.5">{corr.explanation}</p>
                     {corr.source && <span className="text-[10px] text-[#6E6773] italic">Source : {corr.source}</span>}
                   </div>
                 </div>
@@ -700,22 +723,27 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
         </div>
       ) : (
         /* Active Single Question View */
-        <div className="bg-white border border-[#F1E5EC] rounded-3xl p-6 sm:p-8 shadow-sm">
+        <div className="bg-white border border-[#F1E5EC] rounded-3xl p-4 sm:p-8 shadow-sm">
           {/* Progress bar */}
-          <div className="w-full bg-[#F1E5EC] h-1.5 rounded-full overflow-hidden mb-6">
-            <div 
+          <div className="w-full bg-[#F1E5EC] h-1.5 rounded-full overflow-hidden mb-5">
+            <div
               className="bg-[#8D174B] h-full transition-all duration-300"
               style={{ width: `${((currentQuestionIndex + 1) / selectedSet.questions.length) * 100}%` }}
             />
           </div>
 
-          <div className="mb-6">
-            <span className="text-xs font-bold text-[#8D174B] uppercase tracking-wider mb-2 block">
-              {t.preparation.question} {currentQuestionIndex + 1} {t.preparation.of} {selectedSet.questions.length}
+          <div className="mb-5 flex items-start gap-3" dir={contentDir(selectedSet)}>
+            <span className="min-w-[34px] h-[34px] px-1.5 rounded-full bg-[#8D174B] text-white text-sm font-black flex items-center justify-center shrink-0 animate-scale-in" key={currentQuestionIndex}>
+              {currentQuestionIndex + 1}
             </span>
-            <h3 dir={contentDir(selectedSet)} className="text-base sm:text-lg font-bold text-[#242126] leading-snug whitespace-pre-line">
-              {currentQ.text[language]}
-            </h3>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold text-[#8D174B] uppercase tracking-wider mb-1 block">
+                {t.preparation.question} {currentQuestionIndex + 1} {t.preparation.of} {selectedSet.questions.length}
+              </span>
+              <h3 className="text-[16px] sm:text-lg font-bold text-[#242126] leading-snug whitespace-pre-line">
+                {currentQ.text[language]}
+              </h3>
+            </div>
           </div>
 
           {selectedSet.multiAnswer && (
@@ -728,19 +756,22 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
 
           {/* Options */}
           <div className="space-y-3 mb-8" dir={contentDir(selectedSet)}>
-            {currentQ.options.map((opt) => {
+            {currentQ.options.map((opt, oi) => {
               const isSelected = answerIds(userAnswers[currentQ.id]).includes(opt.id);
               return (
                 <button
                   key={opt.id}
                   onClick={() => handleSelectOption(currentQ.id, opt.id)}
-                  className={`w-full p-4 rounded-xl border text-xs sm:text-sm font-medium text-start transition-all flex items-center justify-between cursor-pointer ${
+                  className={`w-full min-h-[52px] px-3.5 py-3 rounded-xl border text-[14.5px] sm:text-sm leading-snug font-medium text-start transition-all flex items-center justify-between gap-3 cursor-pointer active:scale-[0.98] ${
                     isSelected
                       ? 'border-[#8D174B] bg-[#FDF2F7] text-[#8D174B] font-bold shadow-xs'
-                      : 'border-[#F1E5EC] hover:bg-[#F8F2F5] text-[#242126]'
+                      : 'border-[#EADCE5] bg-[#FDFAFC] hover:bg-[#F8F2F5] text-[#242126]'
                   }`}
                 >
-                  <span>{opt.text[language]}</span>
+                  <span className="flex items-start gap-3 min-w-0">
+                    <OptionLetter i={oi} tone={isSelected ? 'selected' : 'idle'} />
+                    <span className="pt-0.5">{opt.text[language]}</span>
+                  </span>
                   <div className={`w-5 h-5 ${selectedSet.multiAnswer ? 'rounded-md' : 'rounded-full'} border flex items-center justify-center shrink-0 ${
                     isSelected ? 'border-[#8D174B] bg-[#8D174B] text-white' : 'border-[#F1E5EC]'
                   }`}>
