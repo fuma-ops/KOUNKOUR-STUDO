@@ -61,6 +61,8 @@ const sq = segs("1. Abonnés de Laâyoune :\nSELECT id, nom FROM Abonne WHERE vi
 check('requête SQL en bloc de code', sq[1].kind === 'code' && sq[1].text.startsWith('SELECT'));
 
 const fm = layoutStatement('Titre\n\nDisponibilité intrinsèque : Di = MTBF / (MTBF + MTTR)\nPoint de commande : Pc = consommation journalière × délai + stock de sécurité', { header: true }).flat();
+const fw = layoutStatement('Titre\n\nDemande en chlore = dose injectée − chlore résiduel', { header: true }).flat();
+check('énoncé : formule nommée en toutes lettres encadrée', fw[1].kind === 'calc');
 check('énoncé : formules à symbole court encadrées', fm[1].kind === 'calc' && fm[2].kind === 'calc' && (fm[1] as { result: string }).result === '');
 
 const sm = splitSummary("SRM recrute : 84 techniciens. Postes : Technicien commercial – Gestion (Direction clientèle) : 16; Secrétaire : 1. Diplôme : Bac+2; Licence. Conditions : Nationalité marocaine ; bonne conduite. Âge : 18 à 40 ans. Pièces : CV avec photo, CIN recto-verso, diplôme, attestations. Date du concours : 21/11/2026. Date et lieu communiqués ultérieurement.");

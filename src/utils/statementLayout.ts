@@ -54,7 +54,8 @@ function calcOrText(s: string, statement = false): Seg {
   if (statement) {
     const words = rest.replace(/[^A-Za-zÀ-ÿ\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2).length;
     // Formule à symbole court (« Cp = (USL − LSL) / (6σ) », « Q* = √(…) ») : encadrée, même si elle contient des mots.
-    const formula = /^[^\s=]{1,8}\s=\s/.test(rest) && rest.length <= 120;
+    // Le membre de gauche peut être un nom court (« Demande en chlore = dose − résiduel »), sans ponctuation de phrase.
+    const formula = /^[^=.:;,]{1,40}\s=\s/.test(rest) && rest.length <= 140;
     return /[=≈]/.test(rest) && !ARABIC.test(rest) && ((rest.length <= 90 && words <= 2) || formula)
       ? { kind: 'calc', label, before: rest, result: '' }
       : { kind: 'text', label, text: rest };
