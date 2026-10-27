@@ -159,7 +159,7 @@ export interface QcmSet {
   corrige?: string | null;
   oldSlugs?: string[]; // anciennes adresses (renommage des liens avec mots-clés)
   /** Langue du contenu (une annale arabe s'affiche de droite à gauche). */
-  contentLanguage?: 'fr' | 'ar';
+  contentLanguage?: 'fr' | 'ar' | 'en';
   concoursLabel?: string | null;
   examYear?: number | null;
   /** Organisme réel du concours d'origine et son logo officiel (/api/logo). */

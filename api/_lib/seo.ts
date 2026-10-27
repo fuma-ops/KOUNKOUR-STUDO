@@ -617,7 +617,7 @@ export function renderQcm(
   const t = L[lang];
   const name = setTitle(s, lang);
   const qs = [...(s.qcm_questions || [])].sort((a, b) => a.position - b.position);
-  const cl = s.language === 'ar' ? 'ar' : 'fr';
+  const cl = s.language === 'ar' ? 'ar' : s.language === 'en' ? 'en' : 'fr';
   const desc = (lang === 'ar' ? s.description_ar : null) || s.description_fr || '';
   const crumbs = [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }];
   if (folder) crumbs.push({ href: `/preparation/${encodeURIComponent(folder.slug)}`, text: folderTitle(folder, lang) });

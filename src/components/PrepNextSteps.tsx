@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight, ArrowLeft, CalendarClock, BellRing, Calculator, Sparkles, UserPlus } from 'lucide-react';
 import type { Contest, Language, QcmSet } from '../types';
-import { QcmFolder, QcmProgress, contentType, CONTENT_TYPES } from '../data/qcmApi';
+import { QcmFolder, QcmProgress, contentType, CONTENT_TYPES, themeIn } from '../data/qcmApi';
 import { prepFolderSlugsFor } from '../utils/prepMatch';
 import { TYPE_META } from './prepTypes';
 import { gaEvent } from '../lib/analytics';
@@ -66,6 +66,7 @@ export const PrepNextSteps: React.FC<Props> = ({
 
   // 1) La suite : d'abord l'autre moitié du même concours blanc, puis la même spécialité,
   // en préférant ce qui n'a pas encore été fait et un autre type de support.
+  // Une série dans une autre langue passe après tout le reste (banque psychotechnique FR / AR / EN).
   const next = allSets
     .filter((s) => s.id !== set.id && s.folderSlug === set.folderSlug)
     .map((s) => ({
@@ -73,6 +74,7 @@ export const PrepNextSteps: React.FC<Props> = ({
       rank:
         (pairKey(s.slug) === pairKey(set.slug) && /concours-blanc/.test(s.slug) ? -20 : 0) +
         ((s.theme || null) === (set.theme || null) ? 0 : 10) +
+        (s.contentLanguage && set.contentLanguage && s.contentLanguage !== set.contentLanguage ? 30 : 0) +
         (done(s) ? 6 : 0) +
         (contentType(s) === current ? 2 : 0) +
         CONTENT_TYPES.indexOf(contentType(s)) * 0.1,
@@ -119,7 +121,7 @@ export const PrepNextSteps: React.FC<Props> = ({
       {next.length > 0 && (
         <div>
           <p dir="auto" className="text-[12px] font-extrabold text-[#242126] mb-2">
-            {fr ? `Continuer${set.theme ? ` en ${set.theme}` : ''}` : 'تابع في نفس التخصص'}
+            {fr ? `Continuer${set.theme ? ` en ${themeIn(set.theme, set.contentLanguage)}` : ''}` : 'تابع في نفس التخصص'}
           </p>
           <div className="space-y-2">
             {next.map((s, i) => {

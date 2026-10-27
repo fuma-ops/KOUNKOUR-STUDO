@@ -6,7 +6,7 @@ import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
-import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
+import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType, themeIn } from '../data/qcmApi';
 import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
 import { LoadError } from './LoadError';
@@ -70,6 +70,14 @@ const OptionLetter: React.FC<{ i: number; tone: 'idle' | 'selected' | 'right' | 
 );
 
 // Clé d'URL d'un support : son slug en base.
+// Libellés du lecteur pour les séries en anglais (l'interface du site n'existe qu'en français et en arabe).
+const EN_PLAYER = {
+  question: 'Question', of: 'of', nextQuestion: 'Next question', prevQuestion: 'Previous question',
+  finishQcm: 'Submit and see the answers', qcmResult: 'Test result', yourScore: 'Your score',
+  congratulations: 'Excellent result! Keep practising.', goodEffort: 'Good work, review the detailed explanations below.',
+  needsWork: 'Review the key ideas and try again to improve.', explanation: 'Explanation:', restart: 'Restart this test',
+};
+
 const urlKey = (set: QcmSet) => (set.serverGraded ? set.slug : set.id);
 
 // Supports d'un dossier regroupés par thème (ordre d'apparition des thèmes, sans thème en dernier),
@@ -124,10 +132,13 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   // Dossier ouvert : spécialité et nature de support choisies (filtres de l'écran 2).
   const [specFilter, setSpecFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<ContentType | null>(null);
+  // Dossier en plusieurs langues (tests psychotechniques FR / AR / EN) : langue du contenu choisie.
+  const [langFilter, setLangFilter] = useState<string | null>(null);
   const resultsRef = React.useRef<HTMLDivElement>(null);
   useEffect(() => {
     setSpecFilter(null);
     setTypeFilter(null);
+    setLangFilter(null);
   }, [selectedFolder]);
   const navigate = (folder: string | null, set: string | null) => onNavigate?.(folder, set);
   // Nouveau chargement demandé après un échec réseau (bouton « Réessayer »).
@@ -192,7 +203,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   );
 
   // Une annale en arabe s'affiche de droite à gauche, même dans l'interface en français.
-  const contentDir = (set: QcmSet | null) => (set?.contentLanguage === 'ar' ? 'rtl' : set?.contentLanguage === 'fr' ? 'ltr' : undefined);
+  const contentDir = (set: QcmSet | null) => (set?.contentLanguage === 'ar' ? 'rtl' : set?.contentLanguage === 'fr' || set?.contentLanguage === 'en' ? 'ltr' : undefined);
 
   // Timer effect when a set is active and not submitted
   useEffect(() => {
@@ -303,6 +314,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   };
 
   const fr = language === 'fr';
+  const en = selectedSet?.contentLanguage === 'en';
+  const qp = en ? { ...t.preparation, ...EN_PLAYER } : t.preparation;
   const progressBar = (pct: number) => (
     <div className="w-full h-1.5 bg-[#F1E5EC] rounded-full overflow-hidden">
       <div className="h-full bg-[#8D174B] rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
@@ -558,7 +571,9 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
           (() => {
             // Écran du dossier : 1) la spécialité (cartes), 2) la nature du support (filtres),
             // 3) les supports de la spécialité rangés par nature, toujours dans le même ordre.
-            const groups = themeGroups(sets);
+            // Langues présentes dans le dossier ; le filtre ne s'affiche que s'il y en a plusieurs.
+            const langs = ['fr', 'ar', 'en'].filter((l) => sets.some((x) => (x.contentLanguage || 'fr') === l));
+            const groups = themeGroups(langFilter ? sets.filter((x) => (x.contentLanguage || 'fr') === langFilter) : sets);
             const hasSpecs = groups.length > 1;
             const inSpec = groups.filter((g) => !specFilter || g.theme === specFilter);
             const pool = inSpec.flatMap((g) => g.sets);
@@ -576,6 +591,24 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
               }`;
             return (
               <div className="space-y-6">
+                {langs.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-2 animate-fade-in" role="group" aria-label={fr ? 'Langue des exercices' : 'لغة التمارين'}>
+                    <span className="text-[12px] font-bold text-[#6E6773]">{fr ? 'Langue :' : 'اللغة:'}</span>
+                    {[null, ...langs].map((l) => (
+                      <button
+                        key={l || 'all'}
+                        onClick={() => {
+                          setLangFilter(l);
+                          setSpecFilter(null);
+                          setTypeFilter(null);
+                        }}
+                        className={chip(langFilter === l, 'bg-white text-[#6E6773] border-[#F1E5EC]')}
+                      >
+                        {l === null ? (fr ? 'Toutes' : 'الكل') : l === 'fr' ? 'Français' : l === 'ar' ? 'العربية' : 'English'}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {hasSpecs && (
                   <section className="animate-fade-in">
                     <div className="flex items-center justify-between gap-2 mb-3">
@@ -597,7 +630,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                           >
                             <span dir="auto" className="flex items-start gap-1.5 text-[13px] font-extrabold text-[#242126] leading-snug">
                               <FolderOpen className="w-4 h-4 text-[#8D174B] shrink-0 mt-0.5" />
-                              {g.theme}
+                              {g.theme && themeIn(g.theme, langFilter)}
                             </span>
                             <span className="mt-2 flex flex-wrap gap-1">
                               {countBy(g.sets).map(([ct, n]) => {
@@ -661,7 +694,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                           {g.theme && !specFilter && (
                             <div className="flex items-center gap-2 mb-3">
                               <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#8D174B] to-[#C73578]" />
-                              <h3 dir="auto" className="text-sm sm:text-base font-extrabold text-[#242126]">{g.theme}</h3>
+                              <h3 dir="auto" className="text-sm sm:text-base font-extrabold text-[#242126]">{themeIn(g.theme, langFilter)}</h3>
                               <span className="text-[11px] font-bold text-[#8D174B] bg-[#FDF2F7] border border-[#8D174B]/15 px-2 py-0.5 rounded-full">{g.sets.length}</span>
                             </div>
                           )}
@@ -787,16 +820,16 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
             <div className="w-16 h-16 rounded-2xl bg-[#FDF2F7] text-[#8D174B] flex items-center justify-center mx-auto mb-3 shadow-inner">
               <Award className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-[#242126] mb-1">{t.preparation.qcmResult}</h3>
+            <h3 className="text-lg font-bold text-[#242126] mb-1">{qp.qcmResult}</h3>
             <div className="text-3xl font-extrabold text-[#8D174B] mb-2">
               {score} / {selectedSet.questions.length}
             </div>
             <p className="text-xs sm:text-sm text-[#6E6773] max-w-md mx-auto mb-6">
               {score === selectedSet.questions.length
-                ? t.preparation.congratulations
+                ? qp.congratulations
                 : score >= selectedSet.questions.length / 2
-                ? t.preparation.goodEffort
-                : t.preparation.needsWork}
+                ? qp.goodEffort
+                : qp.needsWork}
             </p>
 
             <button
@@ -804,7 +837,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
             >
               <RotateCcw className="w-4 h-4" />
-              <span>{t.preparation.restart}</span>
+              <span>{qp.restart}</span>
             </button>
           </div>
 
@@ -813,7 +846,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
           {/* Detailed corrections review */}
           <div className="space-y-4">
             <h4 className="text-sm font-bold text-[#242126] uppercase tracking-wide">
-              {language === 'fr' ? 'Correction détaillée des questions' : 'التصحيح المفصل للأسئلة'}
+              {en ? 'Detailed answers' : language === 'fr' ? 'Correction détaillée des questions' : 'التصحيح المفصل للأسئلة'}
             </h4>
             {selectedSet.kind === 'annales' && (
               <p className="text-[11px] text-[#6E6773] bg-[#FAF7F9] border border-[#F1E5EC] rounded-xl p-3 flex items-start gap-2">
@@ -892,7 +925,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                   {/* Explication */}
                   <div className="p-3.5 rounded-xl bg-[#FDF2F7] border border-[#8D174B]/15 text-[13px] text-[#242126]">
                     <strong className="block text-[#8D174B] font-bold mb-1">
-                      {t.preparation.explanation}
+                      {qp.explanation}
                     </strong>
                     <p className="text-[#4A4350] leading-relaxed mb-1.5">{corr.explanation}</p>
                     {corr.source && <span className="text-[10px] text-[#6E6773] italic">Source : {corr.source}</span>}
@@ -919,7 +952,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
             </span>
             <div className="min-w-0">
               <span className="text-[11px] font-bold text-[#8D174B] uppercase tracking-wider mb-1 block">
-                {t.preparation.question} {currentQuestionIndex + 1} {t.preparation.of} {selectedSet.questions.length}
+                {qp.question} {currentQuestionIndex + 1} {qp.of} {selectedSet.questions.length}
               </span>
               <h3 className="text-[16px] sm:text-lg font-bold text-[#242126] leading-snug whitespace-pre-line">
                 {currentQ.text[language]}
@@ -971,7 +1004,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
               className="px-4 py-2 rounded-xl border border-[#F1E5EC] text-xs font-semibold text-[#6E6773] hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
             >
               <PrevIcon className="w-4 h-4" />
-              <span>{t.preparation.prevQuestion}</span>
+              <span>{qp.prevQuestion}</span>
             </button>
 
             {currentQuestionIndex < selectedSet.questions.length - 1 ? (
@@ -979,7 +1012,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                 onClick={() => setCurrentQuestionIndex((prev) => prev + 1)}
                 className="px-5 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <span>{t.preparation.nextQuestion}</span>
+                <span>{qp.nextQuestion}</span>
                 <NextIcon className="w-4 h-4" />
               </button>
             ) : (
@@ -989,11 +1022,11 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                   disabled={grading}
                   className="px-6 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold shadow-xs cursor-pointer active:scale-95 disabled:opacity-60"
                 >
-                  {grading ? (fr ? 'Correction…' : 'جارٍ التصحيح…') : t.preparation.finishQcm}
+                  {grading ? (en ? 'Grading…' : fr ? 'Correction…' : 'جارٍ التصحيح…') : qp.finishQcm}
                 </button>
                 {gradeError && (
                   <span className="text-[11px] text-rose-700">
-                    {fr ? 'Correction indisponible (connexion). Réessayez.' : 'تعذر التصحيح (الاتصال). أعد المحاولة.'}
+                    {en ? 'Grading unavailable (connection). Please try again.' : fr ? 'Correction indisponible (connexion). Réessayez.' : 'تعذر التصحيح (الاتصال). أعد المحاولة.'}
                   </span>
                 )}
               </div>
