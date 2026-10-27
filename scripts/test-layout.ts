@@ -55,6 +55,11 @@ check('arabe : réponse « س1: الجواب 2) »', ar[3].kind === 'answer' && 
 const f = segs('## B. Traitement\n\n### 1- Connaissances');
 check('titres ## / ###', f[0].kind === 'h2' && f[1].kind === 'h3');
 
+const bp = segs('1. Donner le nouveau masque (notation CIDR et décimale). (1,5 pt)');
+check('barème seul : intitulé complet en titre', bp.length === 1 && bp[0].kind === 'question' && bp[0].title.endsWith('(1,5 pt)'));
+const sq = segs("1. Abonnés de Laâyoune :\nSELECT id, nom FROM Abonne WHERE ville = 'Laâyoune';");
+check('requête SQL en bloc de code', sq[1].kind === 'code' && sq[1].text.startsWith('SELECT'));
+
 const sm = splitSummary("SRM recrute : 84 techniciens. Postes : Technicien commercial – Gestion (Direction clientèle) : 16; Secrétaire : 1. Diplôme : Bac+2; Licence. Conditions : Nationalité marocaine ; bonne conduite. Âge : 18 à 40 ans. Pièces : CV avec photo, CIN recto-verso, diplôme, attestations. Date du concours : 21/11/2026. Date et lieu communiqués ultérieurement.");
 check('résumé : rubriques reconnues dans l’ordre', sm.parts.map((p) => p.key).join('|') === 'Postes|Diplôme|Conditions|Âge|Pièces|Date du concours');
 check('résumé : conditions intactes', sm.parts[2].body === 'Nationalité marocaine ; bonne conduite');

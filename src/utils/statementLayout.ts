@@ -10,6 +10,7 @@
 //   « A. … » / « b) … » → choix de QCM (lettre en pastille)
 //   « 1. Réponse : B. … » → réponse de corrigé (lettre mise en valeur)
 //   « a | b | c »     → tableau
+//   « SELECT … »      → requête SQL (bloc de code)
 //   1er bloc d'un sujet (organisme, intitulé) → en-tête
 
 export type Seg =
@@ -22,6 +23,7 @@ export type Seg =
   | { kind: 'answer'; num: string; letters: string; text: string; src?: string }
   | { kind: 'option'; letter: string; text: string }
   | { kind: 'table'; rows: string[][] }
+  | { kind: 'code'; text: string }
   | { kind: 'header'; lines: string[] };
 
 const ARABIC = /[\u0600-\u06FF]/;
@@ -104,6 +106,10 @@ export function layoutStatement(text: string, opts: { header?: boolean } = {}): 
           else out.push({ kind: 'table', rows: [cells] });
           continue;
         }
+        if (/^(SELECT|INSERT|UPDATE|DELETE|CREATE|WITH)\s/.test(line)) {
+          out.push({ kind: 'code', text: line });
+          continue;
+        }
         if (ARABIC.test(line)) {
           // Arabe : « س3: الجواب 2) … » (corrigé), « 12) … » / « س1 : … » (question), « 1. … » / « 1- … » (choix).
           const ar = /^س\s?(\d{1,3})\s*:\s*الجواب\s*(\d(?:\s*(?:و|،|,)\s*\d)*)\)?\s*(.*)$/.exec(line);
@@ -162,7 +168,9 @@ export function layoutStatement(text: string, opts: { header?: boolean } = {}): 
           const body = q[2];
           const cut = /^(.{3,90}?)(?:\s:\s|\.\s|\.$|\s?:$)/.exec(body);
           // Titre = intitulé court (≤ 9 mots) ; sinon la première phrase reste dans le corps.
-          if (cut && !/[=≈]/.test(cut[1]) && cut[1].trim().split(/\s+/).length <= 9) {
+          // « Calculer … (notation CIDR). (1,5 pt) » : le barème seul ne forme pas une suite, on garde tout l'intitulé.
+          const onlyPts = cut && /^\(\d+(?:[,.]\d+)?\s*pts?\)$/.test(body.slice(cut[0].length).trim());
+          if (cut && !onlyPts && !/[=≈]/.test(cut[1]) && cut[1].trim().split(/\s+/).length <= 9) {
             out.push({ kind: 'question', num: q[1], title: cut[1].trim() });
             rest = body.slice(cut[0].length).trim();
           } else if (!/[=≈]/.test(body) && body.length <= 240) {

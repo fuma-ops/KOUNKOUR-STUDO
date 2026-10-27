@@ -46,7 +46,7 @@ function group(blocks: Seg[][]): Item[] {
       } else if (seg.kind === 'h2' || seg.kind === 'h3' || seg.kind === 'header') {
         card = null;
         items.push({ kind: 'seg', seg });
-      } else if (card && (j > 0 || seg.kind === 'option' || seg.kind === 'table' || seg.kind === 'calc')) {
+      } else if (card && (j > 0 || seg.kind === 'option' || seg.kind === 'table' || seg.kind === 'calc' || seg.kind === 'code')) {
         // Un paragraphe isolé après une ligne vide ouvre une nouvelle partie : il sort de la carte.
         card.body.push(seg);
       } else {
@@ -137,6 +137,12 @@ function SegView({ seg }: { seg: Seg }) {
       );
     case 'table':
       return <Table rows={seg.rows} />;
+    case 'code':
+      return (
+        <pre dir="ltr" className="rounded-xl bg-[#241F27] text-[#F7EEF3] px-3 py-2.5 text-[13px] leading-relaxed font-mono whitespace-pre-wrap break-words">
+          {seg.text}
+        </pre>
+      );
     case 'option':
       return <Options opts={[seg]} />;
     case 'answer':
