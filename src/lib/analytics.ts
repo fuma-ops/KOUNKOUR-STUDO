@@ -2,7 +2,7 @@
 // Chargé seulement sur kounkour.com, jamais pour les robots ni pour un appareil de
 // l'équipe (espace admin) ; aucun cookie publicitaire (signaux Google désactivés).
 // Identifiant de mesure GA4 (public, de la forme G-XXXXXXXXXX) : vide = GA désactivé.
-export const GA_ID: string = '';
+export const GA_ID: string = 'G-YK6392SLTQ';
 
 const BOT = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp\/|bingpreview/i;
 type Gtag = (...args: unknown[]) => void;
