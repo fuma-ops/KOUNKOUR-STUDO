@@ -728,13 +728,27 @@ export function headTags(p: Page, base: string): string {
   return tags.filter(Boolean).join('\n    ');
 }
 
+// Balise Google Analytics (aussi dans index.html) : ajoutée par le serveur si le gabarit
+// en cache ne l'a pas encore. Les pages vues sont envoyées par l'application.
+const GA_TAG = `    <!-- Google tag (gtag.js) : les pages vues sont envoyées par l'application (src/lib/analytics.ts),
+         hors robots et hors espace admin ; aucun signal publicitaire. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YK6392SLTQ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-YK6392SLTQ', { send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false });
+    </script>
+`;
+
 // Injecte la page dans le HTML de l'application (app.html construit par Vite).
 export function renderDocument(template: string, p: Page, base: string): string {
   const cleaned = template
     .replace(/<title>[\s\S]*?<\/title>\s*/i, '')
     .replace(/<meta\s+(name|property)="(description|robots|og:[^"]*|twitter:[^"]*)"[^>]*>\s*/gi, '')
     .replace(/<link\s+rel="(canonical|alternate)"[^>]*>\s*/gi, '');
-  return cleaned
+  const withGa = cleaned.includes('googletagmanager.com/gtag/js') ? cleaned : cleaned.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${GA_TAG}`);
+  return withGa
     .replace(/<html[^>]*>/i, `<html lang="${p.lang}" dir="${p.lang === 'ar' ? 'rtl' : 'ltr'}">`)
     .replace(/<\/head>/i, `    ${headTags(p, base)}\n  </head>`)
     .replace(/<div id="root"><\/div>/i, `<div id="root">${p.body}</div>`);
@@ -747,16 +761,7 @@ export function fallbackTemplate(): string {
 <html lang="fr" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <!-- Google tag (gtag.js) : les pages vues sont envoyées par l'application (src/lib/analytics.ts),
-         hors robots et hors espace admin ; aucun signal publicitaire. -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YK6392SLTQ"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-YK6392SLTQ', { send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false });
-    </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+${GA_TAG}    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#8D174B" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />

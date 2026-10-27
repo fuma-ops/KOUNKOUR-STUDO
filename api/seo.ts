@@ -62,7 +62,7 @@ let templateCache: string | null = null;
 async function template(origin: string): Promise<string | null> {
   if (templateCache) return templateCache;
   try {
-    const r = await fetch(`${origin}/app.html`, { headers: { 'user-agent': 'kounkour-ssr' } });
+    const r = await fetch(`${origin}/app.html`, { headers: { 'user-agent': 'kounkour-ssr' }, cache: 'no-store' });
     if (!r.ok) return null;
     const html = await r.text();
     if (!html.includes('id="root"')) return null;
