@@ -93,6 +93,11 @@ const other = { ...set, id: 's3', slug: 'qcm-y', title_fr: 'QCM Y', theme: 'Gén
 const qn = renderQcm('fr', { ...set, theme: 'Électricité' }, { slug: 'f1', title_fr: 'Gardiens de la paix', title_ar: null, organization: null, description_fr: null, description_ar: null }, BASE, [other, sib], [contest({})], TODAY);
 check('QCM : suite de visite (même spécialité d’abord, concours ouverts, dossier)',
   qn.body.indexOf('Concours blanc X') < qn.body.indexOf('QCM Y') && qn.body.includes('Dans la même spécialité : Électricité') && qn.body.includes('Concours ouverts') && qn.body.includes('Tous les supports du dossier'));
+const psyFolder = { slug: 'tests-psychotechniques', title_fr: 'Tests psychotechniques', title_ar: null, organization: null, description_fr: null, description_ar: null };
+const psyEn = renderQcm('fr', { ...set, slug: 'test-psychotechnique-codage-en', folder_slug: 'tests-psychotechniques', kind: 'entrainement', language: 'en', title_fr: 'Coding and decoding: practice set' }, psyFolder, BASE);
+check('psycho : série anglaise en LTR, titre sans « Concours »', psyEn.body.includes('<ol lang="en" dir="ltr">') && psyEn.title.startsWith('Coding and decoding'));
+const psyF = renderFolder('fr', psyFolder, [{ ...set, folder_slug: 'tests-psychotechniques', kind: 'entrainement' }], BASE);
+check('psycho : titre du dossier sans « Concours » ni « annales »', psyF.title.startsWith('Tests psychotechniques : QCM corrigés') && !/annales/.test(psyF.title));
 const emptyFolder = renderFolder('fr', { slug: 'vide', title_fr: 'Vide', title_ar: null, organization: null, description_fr: null, description_ar: null }, [], BASE);
 check('dossier sans annale = non indexé', emptyFolder.indexable === false);
 const nf = renderNotFound('fr', '/concours/absent');
