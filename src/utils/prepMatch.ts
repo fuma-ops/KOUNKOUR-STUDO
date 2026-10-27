@@ -17,6 +17,10 @@ const norm = (s: string) =>
     .replace(/[̀-ͯ]/g, '')
     .replace(/[’`]/g, "'");
 
+const SRM = /multiservices|\bsrm\b|\bonee\b|\bradee|\bregie autonome/;
+const SRM_TECH = /technicien|agents? (d'execution|de maitrise)|ouvriers?|caissier|secretaire|laborantin|plombier|electricien|conducteurs?\b/;
+const SRM_CADRE = /ingenieur|\bcadres?\b|responsables?\b|directeur|juriste|licencie/;
+
 // Ordre = du plus spécifique au plus général ; au plus 3 dossiers proposés.
 // Slugs = qcm_folders.slug actuels (à mettre à jour si un dossier est renommé).
 const RULES: { slug: string; test: (t: string, admin: string) => boolean }[] = [
@@ -24,7 +28,10 @@ const RULES: { slug: string; test: (t: string, admin: string) => boolean }[] = [
   { slug: 'concours-dgsn-inspecteur-de-police', test: (t, a) => /surete nationale|dgsn|\bpolice\b/.test(a + ' ' + t) && /inspecteur/.test(t) },
   { slug: 'concours-dgsn-officier-de-police', test: (t, a) => /surete nationale|dgsn|\bpolice\b/.test(a + ' ' + t) && /officier/.test(t) },
   { slug: 'concours-dgsn-commissaire-de-police', test: (t, a) => /surete nationale|dgsn|\bpolice\b/.test(a + ' ' + t) && /commissaire/.test(t) },
-  { slug: 'concours-srm-onee-ingenieur-technicien-cadre', test: (t, a) => /multiservices|\bsrm\b|\bonee\b|\bradee|\bregie autonome/.test(a + ' ' + t) },
+  // SRM / ONEE / régies : un dossier ingénieurs-cadres et un dossier techniciens-agents ;
+  // une annonce mixte (ou sans grade lisible) reçoit les deux.
+  { slug: 'concours-srm-techniciens-agents', test: (t, a) => SRM.test(a + ' ' + t) && (SRM_TECH.test(t) || !SRM_CADRE.test(t)) },
+  { slug: 'concours-srm-onee-ingenieur-technicien-cadre', test: (t, a) => SRM.test(a + ' ' + t) && (SRM_CADRE.test(t) || !SRM_TECH.test(t)) },
   { slug: 'concours-infirmier-technicien-sante', test: (t) => /infirmi|sage-femme|sages-femmes|technicien(s)? de sante|\bide\b|kinesitherap|aide-soignant/.test(t) },
   { slug: 'concours-chu-sante-technicien', test: (t, a) => /technicien/.test(t) && /\bchu\b|hospitalier|sante|biomedic/.test(a + ' ' + t) },
   { slug: 'concours-technicien-ingenieur-informatique', test: (t) => /(technicien|ingenieur)/.test(t) && /informatique|reseaux|developpement (des systemes|informatique)|systemes d'information|\bdigital|numerique/.test(t) },
