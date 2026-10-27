@@ -747,6 +747,15 @@ export function fallbackTemplate(): string {
 <html lang="fr" dir="ltr">
   <head>
     <meta charset="UTF-8" />
+    <!-- Google tag (gtag.js) : les pages vues sont envoyées par l'application (src/lib/analytics.ts),
+         hors robots et hors espace admin ; aucun signal publicitaire. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YK6392SLTQ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-YK6392SLTQ', { send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false });
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#8D174B" />

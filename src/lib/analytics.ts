@@ -27,6 +27,8 @@ function allowed(path: string): boolean {
 
 let loaded = false;
 function gtag(): Gtag {
+  // La balise Google est déjà dans le <head> (index.html) : on la réutilise telle quelle.
+  if (!loaded && typeof window.gtag === 'function') loaded = true;
   if (!loaded) {
     loaded = true;
     window.dataLayer = window.dataLayer || [];
