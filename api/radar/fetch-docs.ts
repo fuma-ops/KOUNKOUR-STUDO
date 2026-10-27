@@ -180,17 +180,33 @@ export default async function handler(req: any, res: any) {
   try {
     const { data: rows, error } = await supabase
       .from('radar_candidates')
-      .select('id, title_original, source_url')
+      .select('id, title_original, source_url, deadline_date')
       .eq('status', 'pending_review')
       .is('docs_fetched_at', null)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw new Error(error.message);
 
+    // Le scan de nuit relit tout le catalogue emploi-public, y compris des annonces expirées :
+    // elles sont écartées ici, sans téléchargement, pour ne jamais encombrer « À analyser ».
+    const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
     const processed: any[] = [];
     for (const c of rows || []) {
       if (Date.now() - started > TIME_BUDGET_MS) break; // le reste au prochain appel
       const report: any = { id: c.id, title: c.title_original, url: c.source_url, files: 0, errors: [] as string[] };
+      if (c.deadline_date && c.deadline_date < todayLocal) {
+        const [y, m, d] = String(c.deadline_date).split('-');
+        await supabase
+          .from('radar_candidates')
+          .update({
+            docs_fetched_at: new Date().toISOString(),
+            analysis_status: 'rejete',
+            analysis: { raison: `Annonce déjà expirée à son arrivée (date limite ${d}/${m}/${y})` },
+          })
+          .eq('id', c.id);
+        processed.push({ ...report, expired: true });
+        continue;
+      }
       let host = '';
       try {
         host = new URL(c.source_url).hostname;
