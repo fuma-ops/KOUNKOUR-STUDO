@@ -1,4 +1,4 @@
-import { GA_ID } from '../lib/analytics';
+import { GA_ID } from '../lib/analytics.ts';
 // Pages légales (politique de confidentialité, conditions d'utilisation).
 // Un seul contenu, utilisé par l'application (LegalPage) et par le rendu serveur
 // (api/_lib/seo.ts) pour que Google et la console Google OAuth lisent le texte.
