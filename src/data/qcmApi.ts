@@ -1,5 +1,6 @@
 import { getSupabase } from '../lib/supabase';
 import { QcmSet } from '../types';
+import { withRetry } from '../lib/retry';
 
 export interface QcmFolder {
   slug: string;
@@ -21,11 +22,15 @@ export const FALLBACK_FOLDERS: QcmFolder[] = [
   { slug: 'concours-dgsn-qcm-culture-generale', oldSlugs: ['dgsn-concours-non-precise'], title: { fr: 'DGSN — sujets à identifier', ar: 'الأمن الوطني — مواضيع غير محددة' }, organization: 'DGSN — Sûreté nationale', description: { fr: 'Sujets réels de la DGSN dont le concours exact n’est pas indiqué sur la copie.', ar: 'مواضيع حقيقية للأمن الوطني لم يُحدَّد نوع مباراتها.' }, position: 90 },
 ];
 
-export async function fetchQcmFolders(): Promise<QcmFolder[]> {
+export function fetchQcmFolders(): Promise<QcmFolder[]> {
+  return withRetry(fetchQcmFoldersOnce, (r) => !!r && r.length > 0).then((r) => (r && r.length ? r : FALLBACK_FOLDERS));
+}
+
+async function fetchQcmFoldersOnce(): Promise<QcmFolder[] | null> {
   const sb = getSupabase();
-  if (!sb) return FALLBACK_FOLDERS;
+  if (!sb) return null;
   const { data, error } = await sb.from('qcm_folders').select('*').eq('status', 'published').order('position');
-  if (error || !data || data.length === 0) return FALLBACK_FOLDERS;
+  if (error || !data || data.length === 0) return null;
   return data.map((f: any) => ({
     slug: f.slug,
     title: { fr: f.title_fr, ar: f.title_ar || f.title_fr },
@@ -46,7 +51,11 @@ const CATEGORIES = new Set([
   'informatique', 'culture_generale', 'education', 'francais', 'arabe',
 ]);
 
-export async function fetchQcmSets(): Promise<QcmSet[]> {
+export function fetchQcmSets(): Promise<QcmSet[]> {
+  return withRetry(fetchQcmSetsOnce, (r) => !!r && r.length > 0).then((r) => r || []);
+}
+
+async function fetchQcmSetsOnce(): Promise<QcmSet[]> {
   const sb = getSupabase();
   if (!sb) return [];
   const { data, error } = await sb

@@ -16,6 +16,7 @@ import { ContestDetailModal } from './components/ContestDetailModal';
 import { SalarySimulatorModal } from './components/SalarySimulatorModal';
 import { AdminCvModal } from './components/AdminCvModal';
 import { QcmModule } from './components/QcmModule';
+import { LoadError } from './components/LoadError';
 import { CommunityModule } from './components/CommunityModule';
 import { ProfileModule } from './components/ProfileModule';
 import { InstallAppBanner } from './components/InstallAppBanner';
@@ -54,6 +55,8 @@ export default function App() {
     return { folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null };
   });
   const [contestsLoaded, setContestsLoaded] = useState(false);
+  // Chargement des concours impossible (réseau) même après les nouveaux essais.
+  const [contestsFailed, setContestsFailed] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<ContestStatus | 'all'>('open');
   const [selectedSector, setSelectedSector] = useState<string>('all');
@@ -155,9 +158,12 @@ export default function App() {
   const [allActiveContests, setAllActiveContests] = useState<Contest[]>(() => getAllActiveContests());
   useEffect(() => {
     let cancelled = false;
+    setContestsFailed(false);
+    setContestsLoaded(false);
     fetchPublishedContests()
       .then((rows) => {
         if (!cancelled) {
+          if (rows === null) setContestsFailed(true);
           const deletedIds = new Set(getDeletedContestIds());
           const imported = loadImportedContests().filter((c) => !deletedIds.has(c.id));
           const supabaseRows = (rows || []).filter((r) => !deletedIds.has(r.id));
@@ -585,7 +591,16 @@ export default function App() {
             </div>
 
             {/* Contests Count & Grid */}
-            {filteredContests.length === 0 ? (
+            {filteredContests.length === 0 && allActiveContests.length === 0 && !contestsLoaded ? (
+              // Chargement en cours : cartes en attente plutôt qu'un faux « aucun concours ».
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-44 rounded-3xl bg-[#FAF4F7] border border-[#F1E5EC] animate-pulse" />
+                ))}
+              </div>
+            ) : filteredContests.length === 0 && allActiveContests.length === 0 && contestsFailed ? (
+              <LoadError language={language} onRetry={() => setContestsVersion((v) => v + 1)} />
+            ) : filteredContests.length === 0 ? (
               <EmptyState language={language} onResetFilters={handleResetFilters} />
             ) : (
               <div>

@@ -1,3 +1,4 @@
+import { withRetry } from '../lib/retry';
 import { getSupabase } from '../lib/supabase';
 import { Contest, ContestCategory, ContestStatus } from '../types';
 import { removeImportedContest } from '../utils/radarStorage';
@@ -144,7 +145,12 @@ function mapRow(row: any): Contest {
 }
 
 // Renvoie les concours publiés, ou null si Supabase indisponible (→ repli local).
-export async function fetchPublishedContests(): Promise<Contest[] | null> {
+// null = chargement impossible même après plusieurs essais (voir withRetry).
+export function fetchPublishedContests(): Promise<Contest[] | null> {
+  return withRetry(fetchPublishedContestsOnce, (r) => !!r && r.length > 0).then((r) => r ?? null);
+}
+
+async function fetchPublishedContestsOnce(): Promise<Contest[] | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
   try {

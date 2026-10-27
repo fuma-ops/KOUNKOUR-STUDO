@@ -9,6 +9,7 @@ import { translations } from '../i18n/translations';
 import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
 import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
+import { LoadError } from './LoadError';
 import type { Contest } from '../types';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
@@ -128,9 +129,12 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
     setTypeFilter(null);
   }, [selectedFolder]);
   const navigate = (folder: string | null, set: string | null) => onNavigate?.(folder, set);
+  // Nouveau chargement demandé après un échec réseau (bouton « Réessayer »).
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchQcmSets(), fetchQcmFolders(), loadQcmProgress()])
+    setLoadingSets(true);
+    Promise.all([fetchQcmSets(), fetchQcmFolders(), loadQcmProgress().catch(() => ({}))])
       .then(([sets, fs, prog]) => {
         if (cancelled) return;
         setRealSets(sets);
@@ -139,7 +143,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
       })
       .finally(() => { if (!cancelled) setLoadingSets(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
   // Annales réelles et QCM d'entraînement : tous stockés en base, corrigés par le serveur.
   const allSets: QcmSet[] = realSets;
   const setsOf = (slug: string) => allSets.filter((x) => x.folderSlug === slug);
@@ -302,6 +306,15 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
       <div className="h-full bg-[#8D174B] rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
     </div>
   );
+
+  // Aucun support chargé (réseau) : message clair et nouvel essai, plutôt que des dossiers vides.
+  if (!loadingSets && realSets.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <LoadError language={language} onRetry={() => setReloadKey((k) => k + 1)} />
+      </div>
+    );
+  }
 
   // ─── Écran 1 : les dossiers (un par concours) ───────────────────────────────
   if (!selectedSet && !selectedFolder) {
