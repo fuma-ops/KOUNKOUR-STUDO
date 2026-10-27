@@ -112,6 +112,17 @@ export async function fetchQcmSets(): Promise<QcmSet[]> {
 export const isWrittenSet = (s: Pick<QcmSet, 'kind' | 'statement' | 'questions'>) =>
   s.kind === 'sujet' || (s.kind === 'entrainement' && !s.questions.length && !!s.statement);
 
+// Nature d'un support, pour s'y retrouver dans un dossier : cours, annales réelles, concours blancs, QCM.
+// Déduite du type en base et du slug (les slugs KounKour portent « concours-blanc », « support-preparation »…).
+export type ContentType = 'support' | 'annale' | 'blanc' | 'qcm' | 'sujet';
+export const CONTENT_TYPES: ContentType[] = ['support', 'annale', 'blanc', 'qcm', 'sujet'];
+export function contentType(s: Pick<QcmSet, 'kind' | 'slug' | 'questions'>): ContentType {
+  if (s.kind === 'annales' || s.kind === 'sujet') return 'annale';
+  if (/concours-blanc/.test(s.slug || '')) return 'blanc';
+  if (/support|fiche-revision|memento|resume-cours/.test(s.slug || '')) return 'support';
+  return s.questions.length ? 'qcm' : 'sujet';
+}
+
 export interface QcmCorrection {
   /** Bonne(s) réponse(s) : un id d'option, ou plusieurs joints par « | » (QCM à plusieurs réponses). */
   correctOptionId: string;

@@ -6,7 +6,7 @@ import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
-import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet } from '../data/qcmApi';
+import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
   ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy, FileText
@@ -42,6 +42,32 @@ interface QcmModuleProps {
 
 // Ordre dans un dossier : annales QCM, puis sujets écrits, puis entraînement.
 const KIND_ORDER: Record<string, number> = { annales: 0, sujet: 1, entrainement: 2 };
+
+// Natures de support : même libellé, même couleur et même icône partout (filtres, rubriques, cartes).
+const TYPE_META: Record<ContentType, { fr: string; frOne: string; ar: string; short: [string, string, string]; icon: React.ElementType; cls: string }> = {
+  support: { fr: 'Supports de cours', frOne: 'Support de cours', ar: 'دعامات الدروس', short: ['cours', 'cours', 'دروس'], icon: BookOpen, cls: 'bg-violet-50 text-violet-800 border-violet-200' },
+  annale: { fr: 'Annales réelles', frOne: 'Annale réelle', ar: 'نماذج حقيقية', short: ['annale', 'annales', 'نماذج'], icon: ShieldCheck, cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  blanc: { fr: 'Concours blancs', frOne: 'Concours blanc', ar: 'مباريات تجريبية', short: ['blanc', 'blancs', 'تجريبية'], icon: Award, cls: 'bg-amber-50 text-amber-900 border-amber-200' },
+  qcm: { fr: 'QCM d’entraînement', frOne: 'QCM d’entraînement', ar: 'أسئلة تدريبية', short: ['QCM', 'QCM', 'أسئلة'], icon: HelpCircle, cls: 'bg-sky-50 text-sky-900 border-sky-200' },
+  sujet: { fr: 'Sujets d’entraînement', frOne: 'Sujet d’entraînement', ar: 'مواضيع تدريبية', short: ['sujet', 'sujets', 'مواضيع'], icon: FileText, cls: 'bg-gray-100 text-gray-700 border-gray-200' },
+};
+
+const TypeBadge: React.FC<{ set: QcmSet; fr: boolean }> = ({ set, fr }) => {
+  const ct = contentType(set);
+  const m = TYPE_META[ct];
+  const Icon = m.icon;
+  // Annale ou concours blanc : on précise s'il s'agit du sujet complet ou de ses QCM.
+  const detail = ct === 'annale' || ct === 'blanc'
+    ? isWrittenSet(set) ? (fr ? 'sujet complet' : 'موضوع كامل') : (fr ? 'QCM' : 'أسئلة')
+    : null;
+  return (
+    <span className={`font-bold border px-2.5 py-1 rounded-md flex items-center gap-1 ${m.cls}`}>
+      <Icon className="w-3.5 h-3.5 shrink-0" />
+      {fr ? m.frOne : m.ar}
+      {detail && <span className="font-semibold opacity-80">· {detail}</span>}
+    </span>
+  );
+};
 
 // Lettre du choix (A, B, C…) en pastille : repère visuel net sur téléphone.
 const OptionLetter: React.FC<{ i: number; tone: 'idle' | 'selected' | 'right' | 'wrong' }> = ({ i, tone }) => (
@@ -97,6 +123,14 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
   const [loadingSets, setLoadingSets] = useState(true);
   const [progress, setProgress] = useState<Record<string, QcmProgress>>({});
   const selectedFolder = folderSlug;
+  // Dossier ouvert : spécialité et nature de support choisies (filtres de l'écran 2).
+  const [specFilter, setSpecFilter] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<ContentType | null>(null);
+  const resultsRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setSpecFilter(null);
+    setTypeFilter(null);
+  }, [selectedFolder]);
   const navigate = (folder: string | null, set: string | null) => onNavigate?.(folder, set);
   useEffect(() => {
     let cancelled = false;
@@ -280,6 +314,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
               const st = statsOf(sets);
               // Annales réelles = QCM transcrits + sujets écrits.
               const annales = sets.filter((x) => x.kind === 'annales' || x.kind === 'sujet').length;
+              const specs = new Set(sets.map((x) => x.theme).filter(Boolean)).size;
               return (
                 <button
                   key={f.slug}
@@ -309,6 +344,11 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                     <span className="px-2 py-0.5 rounded-md bg-[#FDF2F7] text-[#8D174B] font-bold">
                       {sets.length} {fr ? (sets.length > 1 ? 'supports' : 'support') : 'دعامة'}
                     </span>
+                    {specs > 1 && (
+                      <span className="px-2 py-0.5 rounded-md bg-[#FDF2F7] text-[#8D174B] border border-[#8D174B]/15 font-bold">
+                        {specs} {fr ? 'spécialités' : 'تخصص'}
+                      </span>
+                    )}
                     {annales > 0 && (
                       <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
                         {annales} {fr ? (annales > 1 ? 'annales réelles' : 'annale réelle') : 'نموذج حقيقي'}
@@ -353,10 +393,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                   >
                     <div>
                       <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3 gap-2">
-                        <span className="font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-md flex items-center gap-1">
-                          <FileText className="w-3.5 h-3.5" />
-                          {set.kind === 'sujet' ? (fr ? 'Sujet écrit réel' : 'موضوع كتابي حقيقي') : fr ? 'Sujet d’entraînement KounKour' : 'موضوع تدريبي من KounKour'}
-                        </span>
+                        <TypeBadge set={set} fr={fr} />
                         {set.examYear && <span className="font-bold text-[#8D174B]">{set.examYear}</span>}
                       </div>
                       <h3 dir="auto" className="text-base font-bold text-[#242126] mb-2">{set.title[language]}</h3>
@@ -397,14 +434,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
                 >
                   <div>
                     <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3 gap-2">
-                      {set.kind === 'annales' ? (
-                        <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md flex items-center gap-1">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          {fr ? 'Annales réelles' : 'نماذج حقيقية'}
-                        </span>
-                      ) : (
-                        <span className="font-semibold text-[#6E6773] bg-gray-100 px-2.5 py-1 rounded-md">{fr ? 'Entraînement KounKour' : 'تدريب KounKour'}</span>
-                      )}
+                      <TypeBadge set={set} fr={fr} />
                       <div className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
                         <span>{set.durationMinutes} {t.preparation.minutes}</span>
@@ -494,22 +524,139 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
             <p className="text-xs text-[#6E6773]">{fr ? 'Aucun support pour ce concours pour l’instant.' : 'لا توجد دعامات لهذه المباراة حالياً.'}</p>
           </div>
         ) : (
-          <div className="space-y-8">
-            {themeGroups(sets).map((g, gi) => (
-              <section key={g.theme || '__all'} className="animate-fade-in" style={{ animationDelay: `${gi * 80}ms` }}>
-                {g.theme && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#8D174B] to-[#C73578]" />
-                    <h3 className="text-sm sm:text-base font-extrabold text-[#242126]">{g.theme}</h3>
-                    <span className="text-[11px] font-bold text-[#8D174B] bg-[#FDF2F7] border border-[#8D174B]/15 px-2 py-0.5 rounded-full">{g.sets.length}</span>
-                  </div>
+          (() => {
+            // Écran du dossier : 1) la spécialité (cartes), 2) la nature du support (filtres),
+            // 3) les supports de la spécialité rangés par nature, toujours dans le même ordre.
+            const groups = themeGroups(sets);
+            const hasSpecs = groups.length > 1;
+            const inSpec = groups.filter((g) => !specFilter || g.theme === specFilter);
+            const pool = inSpec.flatMap((g) => g.sets);
+            const countBy = (list: QcmSet[]) =>
+              CONTENT_TYPES.map((ct) => [ct, list.filter((x) => contentType(x) === ct).length] as const).filter(([, n]) => n > 0);
+            const types = countBy(pool);
+            const pickSpec = (name: string | null) => {
+              setSpecFilter(name);
+              setTypeFilter(null);
+              requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            };
+            const chip = (active: boolean, idle: string) =>
+              `shrink-0 inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[12px] font-bold cursor-pointer transition-all active:scale-95 ${
+                active ? 'bg-[#8D174B] text-white border-[#8D174B] shadow-sm' : idle
+              }`;
+            return (
+              <div className="space-y-6">
+                {hasSpecs && (
+                  <section className="animate-fade-in">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <h3 className="text-sm sm:text-base font-extrabold text-[#242126]">{fr ? 'Choisissez votre spécialité' : 'اختر تخصصك'}</h3>
+                      <span className="text-[11px] text-[#6E6773]">{groups.length} {fr ? 'spécialités' : 'تخصص'}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {groups.map((g, gi) => {
+                        const on = specFilter === g.theme;
+                        return (
+                          <button
+                            key={g.theme || '__all'}
+                            onClick={() => pickSpec(on ? null : g.theme)}
+                            aria-pressed={on}
+                            className={`text-start rounded-2xl border p-3 transition-all cursor-pointer hover-scale hover:shadow-md active:scale-95 animate-fade-in ${
+                              on ? 'border-[#8D174B] bg-[#FDF2F7] shadow-md ring-2 ring-[#8D174B]/20' : 'border-[#F1E5EC] bg-white'
+                            }`}
+                            style={{ animationDelay: `${gi * 60}ms` }}
+                          >
+                            <span dir="auto" className="flex items-start gap-1.5 text-[13px] font-extrabold text-[#242126] leading-snug">
+                              <FolderOpen className="w-4 h-4 text-[#8D174B] shrink-0 mt-0.5" />
+                              {g.theme}
+                            </span>
+                            <span className="mt-2 flex flex-wrap gap-1">
+                              {countBy(g.sets).map(([ct, n]) => {
+                                const M = TYPE_META[ct];
+                                const I = M.icon;
+                                return (
+                                  <span key={ct} title={fr ? M.fr : M.ar} className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10.5px] font-bold ${M.cls}`}>
+                                    <I className="w-3 h-3" />
+                                    {n} {fr ? M.short[n > 1 ? 1 : 0] : M.short[2]}
+                                  </span>
+                                );
+                              })}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {g.sets.map((set, i) => renderSetCard(set, i))}
+
+                <div ref={resultsRef} className="scroll-mt-24">
+                  {specFilter && (
+                    <div className="flex items-center justify-between gap-2 mb-3 animate-fade-in">
+                      <h3 dir="auto" className="flex items-center gap-2 text-base sm:text-lg font-extrabold text-[#8D174B] min-w-0">
+                        <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#8D174B] to-[#C73578] shrink-0" />
+                        {specFilter}
+                      </h3>
+                      <button
+                        onClick={() => pickSpec(null)}
+                        className="shrink-0 text-[11px] font-bold text-[#8D174B] bg-white border border-[#8D174B]/20 rounded-lg px-2.5 py-1 cursor-pointer active:scale-95"
+                      >
+                        {fr ? 'Toutes les spécialités' : 'كل التخصصات'}
+                      </button>
+                    </div>
+                  )}
+                  {types.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 mb-5">
+                      <button onClick={() => setTypeFilter(null)} className={chip(!typeFilter, 'bg-white text-[#6E6773] border-[#F1E5EC]')}>
+                        {fr ? 'Tout' : 'الكل'} · {pool.length}
+                      </button>
+                      {types.map(([ct, n]) => {
+                        const M = TYPE_META[ct];
+                        const I = M.icon;
+                        return (
+                          <button key={ct} onClick={() => setTypeFilter(typeFilter === ct ? null : ct)} className={chip(typeFilter === ct, M.cls)}>
+                            <I className="w-3.5 h-3.5" />
+                            {fr ? M.fr : M.ar} · {n}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="space-y-8">
+                    {inSpec.map((g, gi) => {
+                      const blocks = CONTENT_TYPES.filter((ct) => !typeFilter || ct === typeFilter)
+                        .map((ct) => [ct, g.sets.filter((x) => contentType(x) === ct)] as const)
+                        .filter(([, list]) => list.length > 0);
+                      if (!blocks.length) return null;
+                      return (
+                        <section key={g.theme || '__all'} className="animate-fade-in" style={{ animationDelay: `${gi * 80}ms` }}>
+                          {g.theme && !specFilter && (
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#8D174B] to-[#C73578]" />
+                              <h3 dir="auto" className="text-sm sm:text-base font-extrabold text-[#242126]">{g.theme}</h3>
+                              <span className="text-[11px] font-bold text-[#8D174B] bg-[#FDF2F7] border border-[#8D174B]/15 px-2 py-0.5 rounded-full">{g.sets.length}</span>
+                            </div>
+                          )}
+                          <div className="space-y-5">
+                            {blocks.map(([ct, list]) => {
+                              const M = TYPE_META[ct];
+                              const I = M.icon;
+                              return (
+                                <div key={ct}>
+                                  <p className={`inline-flex items-center gap-1.5 text-[12px] font-extrabold rounded-lg border px-2.5 py-1 mb-2.5 ${M.cls}`}>
+                                    <I className="w-3.5 h-3.5" />
+                                    {fr ? M.fr : M.ar} · {list.length}
+                                  </p>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{list.map((set, i) => renderSetCard(set, i))}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
                 </div>
-              </section>
-            ))}
-          </div>
+              </div>
+            );
+          })()
         )}
       </div>
     );
