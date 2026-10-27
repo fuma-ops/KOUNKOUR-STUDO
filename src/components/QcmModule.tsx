@@ -7,6 +7,9 @@ import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
 import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
+import { TYPE_META, TypeBadge } from './prepTypes';
+import { PrepNextSteps } from './PrepNextSteps';
+import type { Contest } from '../types';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
   ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy, FileText
@@ -38,36 +41,17 @@ interface QcmModuleProps {
   folderSlug?: string | null;
   setSlug?: string | null;
   onNavigate?: (folder: string | null, set: string | null) => void;
+  // Bloc « Et maintenant ? » (fin de QCM / de sujet) : concours, profil, simulateur.
+  contests?: Contest[];
+  isAuthed?: boolean;
+  onOpenContest?: (contest: Contest) => void;
+  onRequestLogin?: () => void;
+  onOpenProfile?: () => void;
+  onOpenSalarySimulator?: (contest?: Contest) => void;
 }
 
 // Ordre dans un dossier : annales QCM, puis sujets écrits, puis entraînement.
 const KIND_ORDER: Record<string, number> = { annales: 0, sujet: 1, entrainement: 2 };
-
-// Natures de support : même libellé, même couleur et même icône partout (filtres, rubriques, cartes).
-const TYPE_META: Record<ContentType, { fr: string; frOne: string; ar: string; short: [string, string, string]; icon: React.ElementType; cls: string }> = {
-  support: { fr: 'Supports de cours', frOne: 'Support de cours', ar: 'دعامات الدروس', short: ['cours', 'cours', 'دروس'], icon: BookOpen, cls: 'bg-violet-50 text-violet-800 border-violet-200' },
-  annale: { fr: 'Annales réelles', frOne: 'Annale réelle', ar: 'نماذج حقيقية', short: ['annale', 'annales', 'نماذج'], icon: ShieldCheck, cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  blanc: { fr: 'Concours blancs', frOne: 'Concours blanc', ar: 'مباريات تجريبية', short: ['blanc', 'blancs', 'تجريبية'], icon: Award, cls: 'bg-amber-50 text-amber-900 border-amber-200' },
-  qcm: { fr: 'QCM d’entraînement', frOne: 'QCM d’entraînement', ar: 'أسئلة تدريبية', short: ['QCM', 'QCM', 'أسئلة'], icon: HelpCircle, cls: 'bg-sky-50 text-sky-900 border-sky-200' },
-  sujet: { fr: 'Sujets d’entraînement', frOne: 'Sujet d’entraînement', ar: 'مواضيع تدريبية', short: ['sujet', 'sujets', 'مواضيع'], icon: FileText, cls: 'bg-gray-100 text-gray-700 border-gray-200' },
-};
-
-const TypeBadge: React.FC<{ set: QcmSet; fr: boolean }> = ({ set, fr }) => {
-  const ct = contentType(set);
-  const m = TYPE_META[ct];
-  const Icon = m.icon;
-  // Annale ou concours blanc : on précise s'il s'agit du sujet complet ou de ses QCM.
-  const detail = ct === 'annale' || ct === 'blanc'
-    ? isWrittenSet(set) ? (fr ? 'sujet complet' : 'موضوع كامل') : (fr ? 'QCM' : 'أسئلة')
-    : null;
-  return (
-    <span className={`font-bold border px-2.5 py-1 rounded-md flex items-center gap-1 ${m.cls}`}>
-      <Icon className="w-3.5 h-3.5 shrink-0" />
-      {fr ? m.frOne : m.ar}
-      {detail && <span className="font-semibold opacity-80">· {detail}</span>}
-    </span>
-  );
-};
 
 // Lettre du choix (A, B, C…) en pastille : repère visuel net sur téléphone.
 const OptionLetter: React.FC<{ i: number; tone: 'idle' | 'selected' | 'right' | 'wrong' }> = ({ i, tone }) => (
@@ -100,7 +84,19 @@ function themeGroups(sets: QcmSet[]): { theme: string | null; sets: QcmSet[] }[]
   return order.map((t) => ({ theme: t ?? 'Autres supports', sets: byKind.filter((x) => (x.theme || null) === t) }));
 }
 
-export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, folderSlug = null, setSlug = null, onNavigate }) => {
+export const QcmModule: React.FC<QcmModuleProps> = ({
+  language,
+  onRecordScore,
+  folderSlug = null,
+  setSlug = null,
+  onNavigate,
+  contests = [],
+  isAuthed = false,
+  onOpenContest,
+  onRequestLogin,
+  onOpenProfile,
+  onOpenSalarySimulator,
+}) => {
   const t = translations[language];
   const isRTL = language === 'ar';
   const NextIcon = isRTL ? ArrowLeft : ArrowRight;
@@ -169,6 +165,26 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
     saveProgress(selectedSet, { seen: fresh });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSet, currentQuestionIndex, isSubmitted]);
+
+  const nextSteps = (set: QcmSet) => (
+    <PrepNextSteps
+      set={set}
+      allSets={allSets}
+      folders={folders}
+      progress={progress}
+      contests={contests}
+      language={language}
+      isAuthed={isAuthed}
+      onOpenSet={(s) => {
+        handleStartSet(s);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }}
+      onOpenContest={onOpenContest}
+      onRequestLogin={onRequestLogin}
+      onOpenProfile={onOpenProfile}
+      onOpenSalarySimulator={onOpenSalarySimulator}
+    />
+  );
 
   // Une annale en arabe s'affiche de droite à gauche, même dans l'interface en français.
   const contentDir = (set: QcmSet | null) => (set?.contentLanguage === 'ar' ? 'rtl' : set?.contentLanguage === 'fr' ? 'ltr' : undefined);
@@ -671,6 +687,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
         language={language}
         isStaff={isStaff}
         onBack={() => navigate(selectedSet.folderSlug || selectedFolder, null)}
+        footer={nextSteps(selectedSet)}
         onImages={(images) => {
           setSelectedSet((s) => (s ? { ...s, sourceImages: images } : s));
           setRealSets((all) => all.map((x) => (x.id === selectedSet.id ? { ...x, sourceImages: images } : x)));
@@ -775,6 +792,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({ language, onRecordScore, f
               <span>{t.preparation.restart}</span>
             </button>
           </div>
+
+          {nextSteps(selectedSet)}
 
           {/* Detailed corrections review */}
           <div className="space-y-4">

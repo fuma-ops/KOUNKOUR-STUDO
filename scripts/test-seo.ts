@@ -88,6 +88,11 @@ const q = renderQcm('fr', set, { slug: 'f1', title_fr: 'Gardiens de la paix', ti
 check('QCM : questions dans le HTML', q.body.includes('سؤال؟') && q.body.includes('<li value="3">'));
 check('QCM : contenu arabe en RTL', q.body.includes('<ol lang="ar" dir="rtl">'));
 check('QCM : réponses non exposées (mention)', q.body.includes('après avoir répondu'));
+const sib = { ...set, id: 's2', slug: 'blanc-x', title_fr: 'Concours blanc X', theme: 'Électricité' };
+const other = { ...set, id: 's3', slug: 'qcm-y', title_fr: 'QCM Y', theme: 'Génie civil' };
+const qn = renderQcm('fr', { ...set, theme: 'Électricité' }, { slug: 'f1', title_fr: 'Gardiens de la paix', title_ar: null, organization: null, description_fr: null, description_ar: null }, BASE, [other, sib], [contest({})], TODAY);
+check('QCM : suite de visite (même spécialité d’abord, concours ouverts, dossier)',
+  qn.body.indexOf('Concours blanc X') < qn.body.indexOf('QCM Y') && qn.body.includes('Dans la même spécialité : Électricité') && qn.body.includes('Concours ouverts') && qn.body.includes('Tous les supports du dossier'));
 const emptyFolder = renderFolder('fr', { slug: 'vide', title_fr: 'Vide', title_ar: null, organization: null, description_fr: null, description_ar: null }, [], BASE);
 check('dossier sans annale = non indexé', emptyFolder.indexable === false);
 const nf = renderNotFound('fr', '/concours/absent');

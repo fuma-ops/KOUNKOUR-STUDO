@@ -66,6 +66,7 @@ export interface QcmSetRow {
   source_note: string | null;
   statement?: string | null; // sujet écrit (kind = 'sujet') : texte transcrit
   corrige?: string | null; // corrigé proposé par l'équipe KounKour (pas un corrigé officiel)
+  theme?: string | null; // spécialité (rubrique du dossier)
   qcm_questions?: { id: string; position: number; source_number: number | null; question: string; options: string[] }[];
   old_slugs?: string[] | null; // anciennes adresses, redirigées (301) vers le slug actuel
 }
@@ -150,6 +151,8 @@ const L = {
     prepLink: 'Se préparer : annales réelles et QCM',
     allContests: 'Tous les concours',
     openNow: 'Concours ouverts',
+    sameSpec: 'Dans la même spécialité',
+    allSupports: 'Tous les supports du dossier',
     archives: 'Clôturés, annulés et résultats',
     deadlineShort: 'date limite',
     questions: 'questions',
@@ -194,6 +197,8 @@ const L = {
     prepLink: 'التحضير: نماذج حقيقية وأسئلة متعددة الاختيارات',
     allContests: 'جميع المباريات',
     openNow: 'مباريات مفتوحة',
+    sameSpec: 'في نفس التخصص',
+    allSupports: 'كل دعامات الملف',
     archives: 'منتهية أو ملغاة أو بنتائج منشورة',
     deadlineShort: 'آخر أجل',
     questions: 'سؤال',
@@ -600,7 +605,15 @@ export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: 
   };
 }
 
-export function renderQcm(lang: Lang, s: QcmSetRow, folder: FolderRow | null, base: string): Page {
+export function renderQcm(
+  lang: Lang,
+  s: QcmSetRow,
+  folder: FolderRow | null,
+  base: string,
+  siblings: QcmSetRow[] = [],
+  openContests: ContestRow[] = [],
+  today = '',
+): Page {
   const t = L[lang];
   const name = setTitle(s, lang);
   const qs = [...(s.qcm_questions || [])].sort((a, b) => a.position - b.position);
@@ -609,6 +622,13 @@ export function renderQcm(lang: Lang, s: QcmSetRow, folder: FolderRow | null, ba
   const crumbs = [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }];
   if (folder) crumbs.push({ href: `/preparation/${encodeURIComponent(folder.slug)}`, text: folderTitle(folder, lang) });
   const meta = [kindLabel(s, t), s.concours_label, s.exam_year ? String(s.exam_year) : '', isSujet(s) ? '' : `${qs.length} ${t.questions}`].filter(Boolean);
+  // Suite de la visite : la même spécialité d'abord, puis les concours ouverts du métier.
+  const related = [...siblings.filter((x) => hasContent(x) && x.theme && x.theme === s.theme), ...siblings.filter((x) => hasContent(x) && (!x.theme || x.theme !== s.theme))].slice(0, 6);
+  const nextHtml = `${
+    related.length ? `<h2>${esc(t.sameSpec)}${s.theme ? ` : ${esc(s.theme)}` : ''}</h2><ul>${related.map((x) => setLi(x, lang)).join('')}</ul>` : ''
+  }${openContests.length ? `<h2>${esc(t.openNow)}</h2><ul>${openContests.map((c) => contestLi(c, lang, today)).join('')}</ul>` : ''}${
+    folder ? `<p>${link(`/preparation/${encodeURIComponent(folder.slug)}`, `${t.allSupports} « ${folderTitle(folder, lang)} »`, lang)}</p>` : ''
+  }`;
   const list = qs
     .map((q) => `<li${q.source_number ? ` value="${q.source_number}"` : ''}><p>${esc(q.question)}</p><ul>${(q.options || []).map((o) => `<li>${esc(o)}</li>`).join('')}</ul></li>`)
     .join('');
@@ -623,7 +643,7 @@ export function renderQcm(lang: Lang, s: QcmSetRow, folder: FolderRow | null, ba
               : ''
           }`
         : `<p><strong>${esc(t.answersAfter)}</strong></p><ol lang="${cl}" dir="${cl === 'ar' ? 'rtl' : 'ltr'}">${list}</ol>`
-    }`
+    }${nextHtml}`
   );
   return {
     status: 200,

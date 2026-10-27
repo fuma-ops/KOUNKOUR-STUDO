@@ -245,10 +245,12 @@ interface Props {
   isStaff: boolean;
   onBack: () => void;
   onImages: (images: string[]) => void;
+  // Suite proposée sous le sujet (bloc « Et maintenant ? »).
+  footer?: React.ReactNode;
 }
 
 // Écran d'un sujet d'examen écrit (pas de QCM) : sujet transcrit + photos de la copie originale.
-export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onImages }) => {
+export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onImages, footer }) => {
   const fr = language === 'fr';
   const [showCorrige, setShowCorrige] = useState(false);
   const PrevIcon = fr ? ArrowLeft : ArrowRight;
@@ -352,6 +354,7 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
           </a>
         )}
       </div>
+      {footer && <div className="mt-5">{footer}</div>}
     </div>
   );
 };

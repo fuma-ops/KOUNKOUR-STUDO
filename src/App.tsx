@@ -627,6 +627,18 @@ export default function App() {
             folderSlug={qcmRoute.folder}
             setSlug={qcmRoute.set}
             onNavigate={(folder, set) => setQcmRoute({ folder, set })}
+            contests={allActiveContests}
+            isAuthed={!!session.user}
+            onOpenContest={setSelectedContest}
+            onRequestLogin={() => setAuthOpen(true)}
+            onOpenProfile={() => {
+              setProfileInitialTab('recommendations');
+              goTab('profile');
+            }}
+            onOpenSalarySimulator={(contest) => {
+              setSalaryContestTarget(contest || null);
+              setIsSalaryModalOpen(true);
+            }}
           />
         )}
 

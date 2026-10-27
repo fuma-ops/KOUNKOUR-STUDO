@@ -34,7 +34,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './_lib/supabaseEnv.ts';
 const CONTEST_COLS =
   'id,slug,title_fr,title_ar,title_original,status,summary_fr,summary_ar,diploma_fr,positions,region_fr,deadline_date,exam_date,apply_url,source_url,source_org,publication_date,published_at,verified_at,updated_at,grade_fr,reference,administration_id,administrations(name_fr,name_ar),contest_positions(position,province,category,diploma,specialty,count,note),stage,contest_documents(doc_type,title_fr,title_ar,url,position)';
 const SET_COLS =
-  'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,statement,corrige,position,old_slugs,qcm_questions(id,position,source_number,question,options)';
+  'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,statement,corrige,position,theme,old_slugs,qcm_questions(id,position,source_number,question,options)';
 
 const CANONICAL_ORIGIN = 'https://kounkour.com';
 const OLD_HOSTS = ['kounkour-studo.vercel.app', 'www.kounkour.com'];
@@ -120,7 +120,16 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
         const moved = s.find((x) => x.old_slugs?.includes(r.slug));
         return moved ? redirectTo(lang, `/preparation/qcm/${encodeURIComponent(moved.slug)}`) : renderNotFound(lang, pathname);
       }
-      return renderQcm(lang, set, f.find((x) => x.slug === set.folder_slug) || null, base);
+      const c = set.folder_slug ? await contests() : [];
+      return renderQcm(
+        lang,
+        set,
+        f.find((x) => x.slug === set.folder_slug) || null,
+        base,
+        s.filter((x) => x.folder_slug && x.folder_slug === set.folder_slug && x.slug !== set.slug),
+        set.folder_slug ? contestsForFolder(set.folder_slug, c, today, f).slice(0, 5) : [],
+        today,
+      );
     }
     case 'community':
       return renderCommunity(lang);
