@@ -13,6 +13,7 @@ import { PdfViewerModal } from './PdfViewerModal';
 import { ContestComments } from './ContestComments';
 import { ContestPrepLinks } from './ContestPrepLinks';
 import { ContestStageTracker } from './ContestStageTracker';
+import { ContestAlertButton } from './AlertMe';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
 import { OrgLogo } from './OrgLogo';
@@ -223,6 +224,10 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
           {/* ========================================================================= */}
           <div className="p-4 sm:p-6 space-y-5 bg-[#FAF7F9]/60">
             {/* Suivi après la clôture : convoqués écrit / oral, résultats (listes officielles) */}
+            {/* Alerte en un clic, sans inscription : rappel, convoqués, résultats */}
+            {/^[0-9a-f-]{36}$/.test(contest.id) && (
+              <ContestAlertButton contestId={contest.id} language={language} closed={['closed', 'in_progress', 'results'].includes(contest.status)} />
+            )}
             <ContestStageTracker contest={contest} language={language} />
 
             {/* Smart Match : verdict expliqué critère par critère */}

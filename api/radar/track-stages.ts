@@ -100,6 +100,7 @@ export default async function handler(req: any, res: any) {
   const evs = (events || []) as StageEvent[];
   let notified = 0;
   if (evs.length) notified = await notify(supabase, evs).catch(() => 0);
+  if (evs.length) notified += await notifyFollowers(supabase, evs).catch(() => 0);
 
   const remaining = Math.max(0, (data.remaining as number) - checked.length);
   res.status(200).json({ ok: true, remaining, verifies: checked.length, changements: updates.length, nouvelles_listes: evs.length, notifies: notified, report });
@@ -140,6 +141,39 @@ async function notify(supabase: any, evs: StageEvent[]): Promise<number> {
     if (delivered) logged.push({ user_id: s.user_id, contest_id: s.contest_id, kind: ev.doc_type });
   }
   if (logged.length) await supabase.rpc('alerts_record', { p: logged });
+  if (gone.length || ok.length) await supabase.rpc('push_drop', { p_endpoints: gone, p_ok: ok });
+  return logged.length;
+}
+
+// Appareils abonnés « en un clic » (sans compte) qui suivent ces concours.
+async function notifyFollowers(supabase: any, evs: StageEvent[]): Promise<number> {
+  const ids = [...new Set(evs.map((e) => e.contest_id))];
+  const { data: subs, error } = await supabase.rpc('push_follow_targets', { p_contest_ids: ids });
+  if (error || !subs?.length) return 0;
+  const { data: cfg } = await supabase.rpc('push_secret');
+  if (!cfg?.public || !cfg?.private || cfg.private === 'PLACEHOLDER') return 0;
+  webpush.setVapidDetails(cfg.subject || SITE_URL, cfg.public, cfg.private);
+  const logged: any[] = [];
+  const gone: string[] = [];
+  const ok: string[] = [];
+  for (const s of subs as any[]) {
+    const ev = evs
+      .filter((e) => e.contest_id === s.contest_id && !(s.sent || []).includes(e.doc_type))
+      .sort((a, b) => b.doc_type.localeCompare(a.doc_type))[0];
+    if (!ev) continue;
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(renderStagePush(ev, s.lang === 'ar' ? 'ar' : 'fr', SITE_URL)), {
+        TTL: 86400,
+        urgency: 'normal',
+        topic: 'suivi',
+      });
+      ok.push(s.endpoint);
+      logged.push({ endpoint: s.endpoint, contest_id: s.contest_id, kind: ev.doc_type });
+    } catch (e: any) {
+      if (e?.statusCode === 404 || e?.statusCode === 410) gone.push(s.endpoint);
+    }
+  }
+  if (logged.length) await supabase.rpc('push_follow_record', { p: logged });
   if (gone.length || ok.length) await supabase.rpc('push_drop', { p_endpoints: gone, p_ok: ok });
   return logged.length;
 }

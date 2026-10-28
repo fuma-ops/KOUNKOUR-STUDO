@@ -115,3 +115,40 @@ export async function removePushSubscription(endpoint: string): Promise<void> {
   if (!sb) return;
   await sb.rpc('push_unsubscribe', { p_endpoint: endpoint });
 }
+
+/** État des alertes « en un clic » de cet appareil (sans compte). */
+export interface FollowState {
+  follows: string[];
+  new_contests: boolean;
+}
+
+/** Abonne l'appareil (sans compte) et suit un concours et/ou les nouveaux concours. */
+export async function savePushFollow(sub: PushSubscription, o: { contestId?: string; newContests?: boolean; lang: 'fr' | 'ar' }): Promise<{ ok: boolean; state?: FollowState; error?: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Service indisponible' };
+  const j = sub.toJSON();
+  const { data, error } = await sb.rpc('push_follow', {
+    p_endpoint: sub.endpoint,
+    p_p256dh: j.keys?.p256dh || '',
+    p_auth: j.keys?.auth || '',
+    p_ua: navigator.userAgent,
+    p_contest: o.contestId || null,
+    p_new: o.newContests ?? null,
+    p_lang: o.lang,
+  });
+  return error ? { ok: false, error: error.message } : { ok: true, state: data as FollowState };
+}
+
+export async function removePushFollow(endpoint: string, o: { contestId?: string; newContests?: false }): Promise<FollowState | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data } = await sb.rpc('push_unfollow', { p_endpoint: endpoint, p_contest: o.contestId || null, p_new: o.newContests ?? null });
+  return (data as FollowState) || null;
+}
+
+export async function loadPushFollow(endpoint: string): Promise<FollowState | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data } = await sb.rpc('push_status', { p_endpoint: endpoint });
+  return (data as FollowState) || null;
+}

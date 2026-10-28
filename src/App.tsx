@@ -20,6 +20,7 @@ import { LoadError } from './components/LoadError';
 import { CommunityModule } from './components/CommunityModule';
 import { ProfileModule } from './components/ProfileModule';
 import { InstallAppBanner } from './components/InstallAppBanner';
+import { NewContestsAlertCard } from './components/AlertMe';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
@@ -492,6 +493,7 @@ export default function App() {
               }}
             />
 
+            <NewContestsAlertCard language={language} where="accueil" />
             <InstallAppBanner language={language} />
 
             {/* 3 Main Action Shortcuts, Concours à la une & Smart Match Entry */}
@@ -515,6 +517,9 @@ export default function App() {
         {/* Contests List Tab */}
         {activeTab === 'contests' && (
           <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="-mx-4 mb-5">
+              <NewContestsAlertCard language={language} where="liste" />
+            </div>
             {/* Header row */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
@@ -833,6 +838,9 @@ export default function App() {
       <PasswordRecoveryModal language={language} />
 
       {/* Persistent Mobile Bottom Navigation */}
+      {/* Invitation à installer l'app sur les autres pages (mobile) ; masquée pendant un QCM ou une fiche */}
+      {activeTab !== 'home' && activeTab !== 'admin' && !selectedContest && !qcmRoute.set && <InstallAppBanner language={language} compact />}
+
       <BottomNav
         language={language}
         activeTab={activeTab === 'psycho' ? 'preparation' : activeTab}

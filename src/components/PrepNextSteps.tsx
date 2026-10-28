@@ -5,6 +5,7 @@ import { QcmFolder, QcmProgress, contentType, CONTENT_TYPES } from '../data/qcmA
 import { prepFolderSlugsFor } from '../utils/prepMatch';
 import { TYPE_META } from './prepTypes';
 import { gaEvent } from '../lib/analytics';
+import { NewContestsAlertCard } from './AlertMe';
 
 // Bloc « Et maintenant ? » en fin de QCM ou de sujet : la suite dans la même spécialité,
 // les concours ouverts du même métier, le profil (alertes) et le simulateur de salaire.
@@ -120,6 +121,11 @@ export const PrepNextSteps: React.FC<Props> = ({
         <Sparkles className="w-5 h-5" />
         {L('Et maintenant ?', 'وماذا بعد؟', 'What’s next?')}
       </h3>
+
+      {/* Alertes en un clic : le moment où le candidat est le plus motivé */}
+      <div className="-mx-4 sm:-mx-5">
+        <NewContestsAlertCard language={language} where="fin_qcm" />
+      </div>
 
       {next.length > 0 && (
         <div>

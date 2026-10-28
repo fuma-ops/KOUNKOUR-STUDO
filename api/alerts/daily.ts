@@ -11,10 +11,13 @@
  * et rappel des concours déjà signalés qui ferment dans 3 jours. Chaque envoi
  * est journalisé (alert_log) : un concours n'est jamais signalé deux fois.
  * Les clés VAPID sont lues en base (push_secret, clé robot requise).
+ * Puis les abonnements sans profil (alertes en un clic, sans compte) : rappel avant la date
+ * limite des concours suivis et résumé des nouveaux concours du jour (push_follow_due).
  */
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 import { planFor, renderPush, toContest, type ContestRow, type Subscriber } from '../_lib/alerts.ts';
+import { followPlan, renderFollowPush, type FollowContest, type FollowSub } from '../_lib/follows.ts';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../_lib/supabaseEnv.ts';
 
 const TIME_BUDGET_MS = 50000;
@@ -107,8 +110,44 @@ export default async function handler(req: any, res: any) {
     sent++;
     report.push(entry);
   }
+  // Abonnements « en un clic » (sans compte ou sans profil Smart Match).
+  const follow: any = { abonnes: 0, notifies: 0 };
+  const { data: fd, error: fe } = await supabase.rpc('push_follow_due');
+  if (fe) follow.error = fe.message;
+  else if (fd && !only) {
+    const site = (process.env.SITE_URL || 'https://kounkour.com').replace(/\/$/, '');
+    const fsubs = fd.subs as FollowSub[];
+    const fcontests = fd.contests as FollowContest[];
+    follow.abonnes = fsubs.length;
+    const logRows: any[] = [];
+    const digested: string[] = [];
+    for (const s of fsubs) {
+      if (Date.now() - started > TIME_BUDGET_MS + 5000) break;
+      const plan = followPlan(s, fcontests, fd.today);
+      if (!plan) continue;
+      const push = renderFollowPush(plan, fd.today, site);
+      if (dry) {
+        follow.notifies++;
+        continue;
+      }
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(push), { TTL: 86400, urgency: 'normal', topic: 'alertes' });
+        okEndpoints.push(s.endpoint);
+        follow.notifies++;
+        logRows.push(...plan.reminders.map((c) => ({ endpoint: s.endpoint, contest_id: c.id, kind: 'rappel' })));
+        logRows.push(...plan.fresh.map((c) => ({ endpoint: s.endpoint, contest_id: c.id, kind: 'nouveau' })));
+        if (plan.fresh.length || s.new_contests) digested.push(s.endpoint);
+      } catch (e: any) {
+        if (e?.statusCode === 404 || e?.statusCode === 410) gone.push(s.endpoint);
+      }
+    }
+    if (logRows.length || digested.length) {
+      const { error: e3 } = await supabase.rpc('push_follow_record', { p: logRows, p_digest: digested });
+      if (e3) follow.error = e3.message;
+    }
+  }
   if (!dry && (gone.length || okEndpoints.length)) {
     await supabase.rpc('push_drop', { p_endpoints: gone, p_ok: okEndpoints });
   }
-  res.status(200).json({ ok: true, dry, today, abonnes: subs.length, concours: contests.length, notifies: sent, expires: gone.length, report });
+  res.status(200).json({ ok: true, dry, today, abonnes: subs.length, concours: contests.length, notifies: sent, expires: gone.length, sans_compte: follow, report });
 }

@@ -5,7 +5,7 @@
  * - iPhone / iPad : les notifications ne marchent que si l'app est ajoutée à
  *   l'écran d'accueil (iOS 16.4+) puis ouverte depuis son icône.
  */
-import { removePushSubscription, savePushSubscription } from '../data/matchPrefsApi';
+import { loadPushFollow, removePushFollow, removePushSubscription, savePushFollow, savePushSubscription, type FollowState } from '../data/matchPrefsApi';
 
 // Clé publique VAPID (la clé privée n'existe qu'en base, lue par api/alerts/daily.ts).
 export const VAPID_PUBLIC_KEY = 'BHz26Z-VBX5oOX4BihJ2ME-70Z0qzO0rz8Rrvw4dVpE26IlM1PlapSu79qQcFxDN5m5nEH0QxPvwDhagY6DlRB0';
@@ -117,4 +117,58 @@ export async function disablePushOnThisDevice(): Promise<void> {
   if (!sub) return;
   await removePushSubscription(sub.endpoint).catch(() => {});
   await sub.unsubscribe().catch(() => false);
+}
+
+// ---------------------------------------------------------------------------
+// Alertes « en un clic », sans compte : suivre un concours (convocations, résultats,
+// rappel avant la date limite) et/ou recevoir les nouveaux concours du jour.
+// ---------------------------------------------------------------------------
+let followCache: FollowState | null = null;
+const followListeners = new Set<(s: FollowState | null) => void>();
+const setFollow = (s: FollowState | null) => {
+  followCache = s;
+  followListeners.forEach((cb) => cb(s));
+};
+
+/** Les notifications sont possibles ici (iPhone : seulement dans l'app installée). */
+export const canFollowHere = () => pushSupported() && !(isIOS() && !isStandalone());
+
+/** État de cet appareil (mis en cache) ; null = pas encore abonné. */
+export async function followState(): Promise<FollowState | null> {
+  if (followCache) return followCache;
+  const sub = await currentPushSubscription();
+  if (!sub) return null;
+  const s = await loadPushFollow(sub.endpoint).catch(() => null);
+  setFollow(s);
+  return s;
+}
+
+export function onFollowChange(cb: (s: FollowState | null) => void): () => void {
+  followListeners.add(cb);
+  return () => followListeners.delete(cb);
+}
+
+/** Demande la permission puis abonne cet appareil (aucun compte nécessaire). */
+export async function followOnThisDevice(o: { contestId?: string; newContests?: boolean; lang: 'fr' | 'ar' }): Promise<{ ok: boolean; denied?: boolean; error?: string }> {
+  if (!pushSupported()) return { ok: false, error: 'unsupported' };
+  try {
+    const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    if (perm !== 'granted') return { ok: false, denied: perm === 'denied' };
+    const reg = await registration();
+    const sub =
+      (await reg.pushManager.getSubscription()) ||
+      (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC_KEY) as BufferSource }));
+    const r = await savePushFollow(sub, o);
+    if (r.ok && r.state) setFollow(r.state);
+    return r;
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Erreur' };
+  }
+}
+
+export async function unfollowOnThisDevice(o: { contestId?: string; newContests?: false }): Promise<void> {
+  const sub = await currentPushSubscription();
+  if (!sub) return;
+  const s = await removePushFollow(sub.endpoint, o).catch(() => null);
+  if (s) setFollow(s);
 }
