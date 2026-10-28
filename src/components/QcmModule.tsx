@@ -11,6 +11,7 @@ import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
 import { PrepHome } from './PrepHome';
 import { PsyTrainBanner } from './PsyTrainBanner';
+import { QcmOptionText, QcmQuestionText, hasQcmFigure } from './QcmFigures';
 import { LoadError } from './LoadError';
 import { gaEvent } from '../lib/analytics';
 import type { Contest } from '../types';
@@ -56,7 +57,7 @@ interface QcmModuleProps {
   onOpenSalarySimulator?: (contest?: Contest) => void;
   // Page « tests psychotechniques » d'un recruteur (ONCF, RAM…), depuis le dossier psycho.
   onOpenPsychoRecruiter?: (slug: string) => void;
-  onOpenPsyTrain?: () => void;
+  onOpenPsyTrain?: (cat?: string) => void;
 }
 
 // Ordre dans un dossier : annales QCM, puis sujets écrits, puis entraînement.
@@ -719,7 +720,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 sm:py-6">
+    <div className="max-w-2xl mx-auto px-4 pt-4 pb-28 sm:pt-6 md:pb-6">
       {/* Top action bar: Back to catalog, timer, progress */}
       <div className="bg-white border border-[#F1E5EC] rounded-2xl px-3 py-2.5 sm:p-4 shadow-xs mb-3 sm:mb-6 flex items-center justify-between">
         <button
@@ -752,6 +753,21 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
         <div className="hidden sm:block">
           <ConcoursRef set={selectedSet} language={language} variant="header" />
         </div>
+        {/* Série psycho avec figures (dominos, matrices) : accès à la version interactive dessinée. */}
+        {onOpenPsyTrain && selectedSet.folderSlug === PSYCHO_FOLDER && selectedSet.questions.some((x) => hasQcmFigure(x.text.fr || '')) && (
+          <a
+            href="/tests-psychotechniques/en-ligne/dominos"
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenPsyTrain(selectedSet.questions.some((x) => /\[[0-6?]\|/.test(x.text.fr || '')) ? 'dominos' : 'matrices-de-raven');
+              window.scrollTo({ top: 0 });
+            }}
+            className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-[#FDF2F7] px-3 py-2 text-[12px] font-bold text-[#8D174B] active:scale-95 hover:shadow-md transition-all"
+          >
+            <span>{fr ? 'Version interactive : dominos et matrices dessinés, chronométrés' : 'نسخة تفاعلية (بالفرنسية)'}</span>
+            <NextIcon className="w-4 h-4 shrink-0" />
+          </a>
+        )}
       </div>
 
       {/* Photos du sujet original (annales) : consultables pendant l'entraînement et la correction */}
@@ -852,7 +868,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                     )}
                   </div>
 
-                  <p className="text-[15px] font-bold text-[#242126] leading-snug mb-3 whitespace-pre-line">{q.text[language]}</p>
+                  <p className="text-[15px] font-bold text-[#242126] leading-snug mb-3 whitespace-pre-line"><QcmQuestionText text={q.text[language]} /></p>
 
                   <div className="space-y-2 mb-4">
                     {q.options.map((opt, oi) => {
@@ -870,7 +886,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                         <div key={opt.id} className={`p-3 rounded-xl border text-[13.5px] leading-snug flex items-center justify-between gap-2 ${style}`}>
                           <span className="flex items-start gap-2.5 min-w-0">
                             <OptionLetter i={oi} tone={isRealCorrect ? 'right' : isUserChoice ? 'wrong' : 'idle'} />
-                            <span className="pt-0.5">{opt.text[language]}</span>
+                            <span className="pt-0.5"><QcmOptionText text={opt.text[language]} /></span>
                           </span>
                           {isRealCorrect && selectedSet.multiAnswer && !isUserChoice && (
                             <span className="text-[10px] font-bold text-emerald-700 shrink-0">{language === 'fr' ? 'à cocher' : 'كان يجب التأشير'}</span>
@@ -915,7 +931,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                 {qp.question} {currentQuestionIndex + 1} {qp.of} {selectedSet.questions.length}
               </span>
               <h3 className="text-[16px] sm:text-lg font-bold text-[#242126] leading-snug whitespace-pre-line">
-                {currentQ.text[language]}
+                <QcmQuestionText text={currentQ.text[language]} />
               </h3>
             </div>
           </div>
@@ -944,7 +960,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                 >
                   <span className="flex items-start gap-3 min-w-0">
                     <OptionLetter i={oi} tone={isSelected ? 'selected' : 'idle'} />
-                    <span className="pt-0.5">{opt.text[language]}</span>
+                    <span className="pt-0.5"><QcmOptionText text={opt.text[language]} /></span>
                   </span>
                   <div className={`w-5 h-5 ${selectedSet.multiAnswer ? 'rounded-md' : 'rounded-full'} border flex items-center justify-center shrink-0 ${
                     isSelected ? 'border-[#8D174B] bg-[#8D174B] text-white' : 'border-[#F1E5EC]'
@@ -957,30 +973,32 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
           </div>
 
           {/* Question Navigation */}
-          <div className="flex items-center justify-between pt-4 border-t border-[#F1E5EC]">
+          {/* Téléphone : « précédente » réduite à sa flèche, « suivante » sur toute la largeur restante. */}
+          <div className="flex items-center gap-3 pt-4 border-t border-[#F1E5EC]">
             <button
               disabled={currentQuestionIndex === 0}
               onClick={() => setCurrentQuestionIndex((prev) => prev - 1)}
-              className="px-4 py-2 rounded-xl border border-[#F1E5EC] text-xs font-semibold text-[#6E6773] hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+              aria-label={qp.prevQuestion}
+              className="shrink-0 h-12 px-3.5 sm:px-4 rounded-xl border border-[#F1E5EC] text-xs font-semibold text-[#6E6773] hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95"
             >
               <PrevIcon className="w-4 h-4" />
-              <span>{qp.prevQuestion}</span>
+              <span className="hidden sm:inline">{qp.prevQuestion}</span>
             </button>
 
             {currentQuestionIndex < selectedSet.questions.length - 1 ? (
               <button
                 onClick={() => setCurrentQuestionIndex((prev) => prev + 1)}
-                className="px-5 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="flex-1 sm:flex-none sm:ms-auto h-12 px-5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-sm sm:text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
               >
                 <span>{qp.nextQuestion}</span>
                 <NextIcon className="w-4 h-4" />
               </button>
             ) : (
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex-1 sm:flex-none sm:ms-auto flex flex-col items-stretch sm:items-end gap-1">
                 <button
                   onClick={handleSubmit}
                   disabled={grading}
-                  className="px-6 py-2.5 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold shadow-xs cursor-pointer active:scale-95 disabled:opacity-60"
+                  className="h-12 px-6 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold shadow-xs cursor-pointer active:scale-95 disabled:opacity-60"
                 >
                   {grading ? (en ? 'Grading…' : fr ? 'Correction…' : 'جارٍ التصحيح…') : qp.finishQcm}
                 </button>

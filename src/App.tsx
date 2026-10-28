@@ -677,8 +677,8 @@ export default function App() {
               setSalaryContestTarget(contest || null);
               setIsSalaryModalOpen(true);
             }}
-            onOpenPsyTrain={() => {
-              setPsyCat(null);
+            onOpenPsyTrain={(cat) => {
+              setPsyCat(cat || null);
               setQcmRoute({ folder: null, set: null });
               setActiveTab('psytrain');
             }}
