@@ -57,3 +57,7 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in, .animate-cta-bounce { animation: none; }
 }
+
+/* Rangée de puces qui défile sans barre visible (filtres de la préparation) */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

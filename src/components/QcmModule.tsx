@@ -9,6 +9,7 @@ import { translations } from '../i18n/translations';
 import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
 import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
+import { PrepHome } from './PrepHome';
 import { LoadError } from './LoadError';
 import { gaEvent } from '../lib/analytics';
 import type { Contest } from '../types';
@@ -344,89 +345,11 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   if (!selectedSet && !selectedFolder) {
     const visibleFolders = folders.filter((f) => setsOf(f.slug).length > 0);
     const orphans = allSets.filter((x) => !x.folderSlug || !folders.some((f) => f.slug === x.folderSlug));
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FDF2F7] text-[#8D174B] text-xs font-semibold mb-3 border border-[#8D174B]/15">
-            <GraduationCap className="w-3.5 h-3.5" />
-            <span>{fr ? 'Préparation par concours' : 'التحضير حسب المباراة'}</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#242126] mb-2">{t.preparation.title}</h2>
-          <p className="text-xs sm:text-sm text-[#6E6773] max-w-xl mx-auto">
-            {fr ? 'Choisissez le concours que vous préparez : chaque dossier regroupe ses annales réelles et ses QCM d’entraînement, avec votre progression.' : 'اختر المباراة التي تستعد لها: كل ملف يضم النماذج الحقيقية وتمارين التدريب مع تقدمك.'}
-          </p>
-        </div>
-
-        {loadingSets ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 rounded-3xl bg-[#FAF4F7] animate-pulse" />)}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[...visibleFolders.map((f) => ({ f, sets: setsOf(f.slug) })), ...(orphans.length ? [{ f: { slug: '__autres', title: { fr: 'Autres supports', ar: 'دعامات أخرى' }, organization: '', description: { fr: '', ar: '' }, position: 999 } as QcmFolder, sets: orphans }] : [])].map(({ f, sets }, i) => {
-              const st = statsOf(sets);
-              // Annales réelles = QCM transcrits + sujets écrits.
-              const annales = sets.filter((x) => x.kind === 'annales' || x.kind === 'sujet').length;
-              const specs = new Set(sets.map((x) => x.theme).filter(Boolean)).size;
-              return (
-                <button
-                  key={f.slug}
-                  onClick={() => navigate(f.slug, null)}
-                  className="text-start flex flex-col justify-start bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 rounded-3xl p-5 shadow-xs hover:shadow-md hover-scale active:scale-95 transition-all cursor-pointer animate-fade-in overflow-hidden"
-                  style={{ animationDelay: `${i * 80}ms` }}
-                >
-                  {f.coverImage ? (
-                    <div className="-mx-5 -mt-5 mb-4 h-28 sm:h-32 relative">
-                      <img src={f.coverImage} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-white/70 to-transparent" />
-                    </div>
-                  ) : (
-                    // Par défaut : logo officiel de l'organisme des concours du dossier.
-                    <OrgLogosBand orgs={setOrgs(sets)} className="-mx-5 -mt-5 mb-4 h-28 sm:h-32 border-b border-[#F1E5EC]" />
-                  )}
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <FolderOpen className="w-6 h-6" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-base font-extrabold text-[#242126] leading-snug">{f.title[language] || f.title.fr}</h3>
-                      {f.organization && <p className="text-[11px] text-[#8E8694] mt-0.5">{f.organization}</p>}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] mb-3">
-                    <span className="px-2 py-0.5 rounded-md bg-[#FDF2F7] text-[#8D174B] font-bold">
-                      {sets.length} {fr ? (sets.length > 1 ? 'supports' : 'support') : 'دعامة'}
-                    </span>
-                    {specs > 1 && (
-                      <span className="px-2 py-0.5 rounded-md bg-[#FDF2F7] text-[#8D174B] border border-[#8D174B]/15 font-bold">
-                        {specs} {fr ? 'spécialités' : 'تخصص'}
-                      </span>
-                    )}
-                    {annales > 0 && (
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-                        {annales} {fr ? (annales > 1 ? 'annales réelles' : 'annale réelle') : 'نموذج حقيقي'}
-                      </span>
-                    )}
-                    {st.total > 0 && (
-                      <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-semibold">
-                        {st.total} {fr ? 'questions' : 'سؤال'}
-                      </span>
-                    )}
-                  </div>
-                  {progressBar(st.pct)}
-                  <p className="text-[11px] text-[#6E6773] mt-1.5 flex items-center gap-1">
-                    <Eye className="w-3.5 h-3.5 text-[#8D174B]" />
-                    {st.seen === 0
-                      ? (fr ? 'Pas encore commencé' : 'لم تبدأ بعد')
-                      : fr ? `${st.seen}/${st.total} questions vues (${st.pct} %)` : `${st.seen}/${st.total} سؤال (${st.pct}٪)`}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
+    const rows = [
+      ...visibleFolders.map((f) => ({ f, sets: setsOf(f.slug) })),
+      ...(orphans.length ? [{ f: { slug: '__autres', title: { fr: 'Autres supports', ar: 'دعامات أخرى' }, organization: '', description: { fr: '', ar: '' }, position: 999 } as QcmFolder, sets: orphans }] : []),
+    ].map((r) => ({ ...r, stats: statsOf(r.sets) }));
+    return <PrepHome rows={rows} language={language} loading={loadingSets} contests={contests || []} folders={folders} onOpen={(slug) => navigate(slug, null)} />;
   }
 
   // ─── Écran 2 : les supports d'un dossier, avec la progression ───────────────
