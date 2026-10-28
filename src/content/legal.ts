@@ -3,10 +3,10 @@ import { GA_ID } from '../lib/analytics.ts';
 // Un seul contenu, utilisé par l'application (LegalPage) et par le rendu serveur
 // (api/_lib/seo.ts) pour que Google et la console Google OAuth lisent le texte.
 //
-// Adresse de contact : à renseigner dès qu'elle existe (aucune valeur inventée).
-// Tant qu'elle est vide, les pages renvoient simplement vers l'équipe KounKour.
+// Adresse de contact (donnée par le propriétaire le 28/10/2026).
+// Si elle est vidée, les pages renvoient simplement vers l'équipe KounKour.
 export const LEGAL_INFO = {
-  contactEmail: '', // adresse pour exercer les droits (accès, rectification, suppression)
+  contactEmail: 'fumaops@gmail.com', // adresse pour exercer les droits (accès, rectification, suppression)
   updatedAt: '2026-10-28',
 };
 
