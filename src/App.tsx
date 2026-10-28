@@ -30,6 +30,7 @@ import { useSession } from './lib/useSession';
 import { AuthModal, PasswordRecoveryModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { LegalPage } from './components/LegalPage';
+import { PsychoRecruiterPage } from './components/PsychoRecruiterPage';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { buildMatchFeed } from './utils/matchFeed';
 import { getContestDiscussionCounts } from './data/communityApi';
@@ -54,6 +55,11 @@ export default function App() {
   const [qcmRoute, setQcmRoute] = useState<{ folder: string | null; set: string | null }>(() => {
     const r = parsePath(window.location.pathname);
     return { folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null };
+  });
+  // Page « tests psychotechniques » d'un recruteur (null = page d'ensemble).
+  const [psychoSlug, setPsychoSlug] = useState<string | null>(() => {
+    const r = parsePath(window.location.pathname);
+    return r.name === 'psycho' ? r.slug : null;
   });
   const [contestsLoaded, setContestsLoaded] = useState(false);
   // Chargement des concours impossible (réseau) même après les nouveaux essais.
@@ -252,9 +258,10 @@ export default function App() {
     else if (activeTab === 'profile') r = { name: 'profile' };
     else if (activeTab === 'privacy') r = { name: 'privacy' };
     else if (activeTab === 'terms') r = { name: 'terms' };
+    else if (activeTab === 'psycho') r = { name: 'psycho', slug: psychoSlug };
     else r = { name: 'home' };
     return withLang(routePath(r), language);
-  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, language]);
+  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, psychoSlug, language]);
   const firstSync = React.useRef(true);
   useEffect(() => {
     const here = window.location.pathname + window.location.search;
@@ -278,6 +285,7 @@ export default function App() {
       setLanguage(new URLSearchParams(window.location.search).get('lang') === 'ar' ? 'ar' : 'fr');
       setActiveTab(tabOf(r));
       setQcmRoute({ folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null });
+      setPsychoSlug(r.name === 'psycho' ? r.slug : null);
       setSelectedContest(null);
       setPendingContestSlug(r.name === 'contest' ? r.slug : null);
     };
@@ -461,7 +469,7 @@ export default function App() {
       <Header
         language={language}
         onLanguageChange={setLanguage}
-        activeTab={activeTab}
+        activeTab={activeTab === 'psycho' ? 'preparation' : activeTab}
         setActiveTab={goTab}
         savedCount={bookmarkedIds.length}
         isAuthed={!!session.user}
@@ -656,6 +664,11 @@ export default function App() {
               setSalaryContestTarget(contest || null);
               setIsSalaryModalOpen(true);
             }}
+            onOpenPsychoRecruiter={(slug) => {
+              setPsychoSlug(slug);
+              setQcmRoute({ folder: null, set: null });
+              setActiveTab('psycho');
+            }}
           />
         )}
 
@@ -680,6 +693,34 @@ export default function App() {
             onOpen={(k) => {
               goTab(k);
               window.scrollTo({ top: 0 });
+            }}
+          />
+        )}
+
+        {activeTab === 'psycho' && (
+          <PsychoRecruiterPage
+            slug={psychoSlug}
+            language={language}
+            contests={allActiveContests}
+            contestsLoaded={contestsLoaded || contestsFailed}
+            isAuthed={!!session.user}
+            onOpenRecruiter={(slug) => {
+              setPsychoSlug(slug);
+              window.scrollTo({ top: 0 });
+            }}
+            onOpenFolder={(folder) => {
+              setQcmRoute({ folder, set: null });
+              setActiveTab('preparation');
+            }}
+            onOpenSet={(folder, set) => {
+              setQcmRoute({ folder, set });
+              setActiveTab('preparation');
+            }}
+            onOpenContest={setSelectedContest}
+            onRequestLogin={() => setAuthOpen(true)}
+            onOpenProfile={() => {
+              setProfileInitialTab('recommendations');
+              goTab('profile');
             }}
           />
         )}
@@ -794,7 +835,7 @@ export default function App() {
       {/* Persistent Mobile Bottom Navigation */}
       <BottomNav
         language={language}
-        activeTab={activeTab}
+        activeTab={activeTab === 'psycho' ? 'preparation' : activeTab}
         setActiveTab={goTab}
         isAuthed={!!session.user}
         onAuthClick={() => setAuthOpen(true)}

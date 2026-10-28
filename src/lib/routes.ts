@@ -14,6 +14,7 @@ export type Route =
   | { name: 'admin' }
   | { name: 'privacy' }
   | { name: 'terms' }
+  | { name: 'psycho'; slug: string | null }
   | { name: 'notfound' };
 
 const seg = (s: string) => {
@@ -39,6 +40,8 @@ export function parsePath(pathname: string): Route {
   if (a === 'admin') return { name: 'admin' };
   if (a === 'confidentialite' && parts.length === 1) return { name: 'privacy' };
   if (a === 'conditions' && parts.length === 1) return { name: 'terms' };
+  // Pages « tests psychotechniques » par recruteur (ONCF, RAM…), reliées au dossier d'entraînement.
+  if (a === 'tests-psychotechniques' && parts.length <= 2) return { name: 'psycho', slug: b || null };
   return { name: 'notfound' };
 }
 
@@ -68,6 +71,8 @@ export function routePath(r: Route): string {
       return '/confidentialite';
     case 'terms':
       return '/conditions';
+    case 'psycho':
+      return r.slug ? `/tests-psychotechniques/${e(r.slug)}` : '/tests-psychotechniques';
   }
 }
 
@@ -91,6 +96,8 @@ export function tabOf(r: Route): string {
       return 'privacy';
     case 'terms':
       return 'terms';
+    case 'psycho':
+      return 'psycho';
     default:
       return 'home';
   }

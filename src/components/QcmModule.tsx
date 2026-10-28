@@ -12,6 +12,8 @@ import { PrepNextSteps } from './PrepNextSteps';
 import { LoadError } from './LoadError';
 import { gaEvent } from '../lib/analytics';
 import type { Contest } from '../types';
+import { withLang } from '../lib/routes';
+import { PSYCHO_FOLDER, PSYCHO_RECRUITERS, psychoPath } from '../content/psychoRecruiters';
 import { 
   GraduationCap, Clock, Award, CheckCircle, XCircle, RotateCcw, 
   ArrowRight, ArrowLeft, HelpCircle, BookOpen, AlertCircle, ShieldCheck, FolderOpen, Eye, Trophy, FileText
@@ -50,6 +52,8 @@ interface QcmModuleProps {
   onRequestLogin?: () => void;
   onOpenProfile?: () => void;
   onOpenSalarySimulator?: (contest?: Contest) => void;
+  // Page « tests psychotechniques » d'un recruteur (ONCF, RAM…), depuis le dossier psycho.
+  onOpenPsychoRecruiter?: (slug: string) => void;
 }
 
 // Ordre dans un dossier : annales QCM, puis sujets écrits, puis entraînement.
@@ -106,6 +110,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   onOpenContest,
   onRequestLogin,
   onOpenProfile,
+  onOpenPsychoRecruiter,
   onOpenSalarySimulator,
 }) => {
   const t = translations[language];
@@ -565,6 +570,29 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
             </div>
           </div>
         </div>
+
+        {selectedFolder === PSYCHO_FOLDER && onOpenPsychoRecruiter && (
+          <nav className="mb-6 animate-fade-in" aria-label={fr ? 'Tests psychotechniques par recruteur' : 'الاختبارات النفسية التقنية حسب المؤسسة'}>
+            <p className="text-[12px] font-bold text-[#6E6773] mb-2">{fr ? 'Ce que l’on sait des tests, par recruteur :' : 'ما نعرفه عن الاختبارات حسب المؤسسة:'}</p>
+            <div className="flex flex-wrap gap-2">
+              {PSYCHO_RECRUITERS.map((r) => (
+                <a
+                  key={r.slug}
+                  href={withLang(psychoPath(r.slug), language)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onOpenPsychoRecruiter(r.slug);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#8D174B]/15 bg-[#FDF2F7] px-3 py-1.5 text-[12px] font-bold text-[#8D174B] hover-scale active:scale-95"
+                >
+                  {r.name[language === 'ar' ? 'ar' : 'fr']}
+                  <NextIcon className="w-3.5 h-3.5" />
+                </a>
+              ))}
+            </div>
+          </nav>
+        )}
 
         {sets.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-3xl border border-[#F1E5EC] p-6">

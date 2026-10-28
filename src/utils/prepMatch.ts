@@ -3,6 +3,8 @@
 // rendu serveur (liens internes pour les moteurs de recherche). Règles prudentes : on ne
 // propose un dossier que si le métier ou le grade correspond clairement.
 
+import { PSYCHO_FOLDER, psychoRecruiterFor } from '../content/psychoRecruiters.ts';
+
 export interface PrepMatchInput {
   title?: string | null;
   grade?: string | null;
@@ -17,7 +19,8 @@ const norm = (s: string) =>
     .replace(/[̀-ͯ]/g, '')
     .replace(/[’`]/g, "'");
 
-const SRM = /multiservices|\bsrm\b|\bonee\b|\bradee|\bregie autonome/;
+// « Atlas Multiservices » (groupe Royal Air Maroc) n'est pas une Société régionale multiservices.
+const SRM = /(?<!atlas )multiservices|\bsrm\b|\bonee\b|\bradee|\bregie autonome/;
 const SRM_TECH = /technicien|agents? (d'execution|de maitrise)|ouvriers?|caissier|secretaire|laborantin|plombier|electricien|conducteurs?\b/;
 const SRM_CADRE = /ingenieur|\bcadres?\b|responsables?\b|directeur|juriste|licencie/;
 
@@ -61,5 +64,8 @@ export function prepFolderSlugsFor(c: PrepMatchInput, folders: PrepFolderTerms[]
     const terms = (f.matchTerms || []).map((x) => norm(x).replace(/[^a-z0-9']+/g, ' ').trim()).filter((x) => x.length >= 4);
     if (terms.some((x) => hay.includes(` ${x} `)) && !out.includes(f.slug)) out.push(f.slug);
   }
+  // Recruteurs dont une source publique annonce des tests psychotechniques (ONCF, RAM…) :
+  // dossier général, proposé après les dossiers du métier.
+  if (psychoRecruiterFor(`${t} ${a}`) && !out.includes(PSYCHO_FOLDER)) out.push(PSYCHO_FOLDER);
   return out.slice(0, 3);
 }

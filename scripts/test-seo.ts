@@ -1,5 +1,6 @@
 // Tests du rendu serveur SEO (cahier §15) : npm run test:seo
 import { parsePath, routePath } from '../src/lib/routes.ts';
+import { prepFolderSlugsFor } from '../src/utils/prepMatch.ts';
 import {
   ContestRow,
   contestState,
@@ -9,6 +10,7 @@ import {
   renderDocument,
   renderFolder,
   renderNotFound,
+  renderPsycho,
   renderQcm,
   renderRobots,
   renderSitemap,
@@ -112,10 +114,29 @@ check('pas de lien vers un dossier d’une autre administration', prepFoldersFor
 const longAdmin = renderContest('fr', dgsn, [], BASE, TODAY);
 check('titre : année gardée, administration omise si trop longue', longAdmin.title === "Concours Ingénieur d'Etat 1er grade - Echelle 11 2026 | KounKour", longAdmin.title);
 
+// Pages « tests psychotechniques » par recruteur
+check('route /tests-psychotechniques', JSON.stringify(parsePath('/tests-psychotechniques')) === JSON.stringify({ name: 'psycho', slug: null }));
+check('route /tests-psychotechniques/oncf', routePath(parsePath('/tests-psychotechniques/oncf')) === '/tests-psychotechniques/oncf');
+const oncfC = contest({ slug: 'oncf-100-cadres', title_fr: '100 postes – Cadres Ingénieurs (Bac+5) – ONCF', administrations: { name_fr: 'Office National des chemins de fer', name_ar: null } });
+const oncfClosed = contest({ slug: 'oncf-vieux', title_fr: 'Techniciens – ONCF', deadline_date: '2026-09-01', administrations: { name_fr: 'ONCF', name_ar: null } });
+const po = renderPsycho('fr', 'oncf', BASE, [oncfC, oncfClosed, contest({})], TODAY)!;
+check('psycho ONCF : titre, h1, source citée', po.title.startsWith('Tests psychotechniques ONCF') && po.body.includes('<h1>Tests psychotechniques ONCF</h1>') && po.body.includes('alwadifa-maroc.com/offre/show/id/23197'));
+check('psycho ONCF : concours ouverts du recruteur seulement', po.body.includes('/concours/oncf-100-cadres') && !po.body.includes('/concours/oncf-vieux') && !po.body.includes('/concours/ingenieur-etat-abc'));
+check('psycho ONCF : FAQPage + fil d’Ariane', JSON.stringify(po.jsonLd).includes('"FAQPage"') && JSON.stringify(po.jsonLd).includes('"BreadcrumbList"'));
+check('psycho ONCF : liens entraînement FR + EN, mention non officiel', po.body.includes('/preparation/qcm/test-psychotechnique-blanc-1-fr') && po.body.includes('/preparation/psychometric-tests') && po.body.includes('ne sont pas les sujets officiels'));
+const pi = renderPsycho('ar', null, BASE, [], TODAY)!;
+check('psycho : page d’ensemble AR liste les recruteurs', pi.lang === 'ar' && pi.body.includes('/tests-psychotechniques/royal-air-maroc?lang=ar') && pi.indexable);
+check('psycho : recruteur inconnu = 404', renderPsycho('fr', 'douane', BASE, [], TODAY) === null);
+check('psycho : dossier relié aux pages recruteurs', psyF.body.includes('/tests-psychotechniques/oncf'));
+check('prepMatch : concours ONCF → dossier psycho', prepFolderSlugsFor({ title: 'Techniciens spécialisés', admin: 'Office National des Chemins de Fer' }).includes('tests-psychotechniques'));
+check('prepMatch : Atlas Multiservices (RAM) n’est pas une SRM', !prepFolderSlugsFor({ title: 'Responsable de recrutement – Atlas Multiservices (groupe RAM)', admin: 'Atlas Multiservices' }).some((x) => x.startsWith('concours-srm')));
+check('prepMatch : DGSN sans dossier psycho (non confirmé)', !prepFolderSlugsFor({ title: 'Gardiens de la paix', admin: 'Direction Générale de la Sûreté Nationale' }).includes('tests-psychotechniques'));
+
 // Sitemap et robots
 const sm = renderSitemap(BASE, [contest({})], [{ slug: 'f1', title_fr: 'F', title_ar: null, organization: null, description_fr: null, description_ar: null }], [set]);
 check('sitemap : fiche + lastmod honnête', sm.includes(`<loc>${BASE}/concours/ingenieur-etat-abc</loc><lastmod>2026-10-01</lastmod>`));
 check('sitemap : QCM sans lastmod inventé', sm.includes(`<loc>${BASE}/preparation/qcm/annales-x-2022</loc></url>`));
+check('sitemap : pages psycho', sm.includes(`${BASE}/tests-psychotechniques</loc>`) && sm.includes(`${BASE}/tests-psychotechniques/protection-civile</loc>`));
 check('sitemap : dossier avec annales', sm.includes(`${BASE}/preparation/f1</loc>`));
 const rb = renderRobots(BASE);
 check('robots : sitemap absolu + zones privées exclues', rb.includes(`Sitemap: ${BASE}/sitemap.xml`) && rb.includes('Disallow: /admin') && rb.includes('Disallow: /profil'));

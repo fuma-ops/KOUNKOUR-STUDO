@@ -6,6 +6,7 @@
 
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
+import { PSYCHO_INDEX_PATH, PSYCHO_RECRUITERS, findPsychoRecruiter, psychoIndexDoc, psychoPath, psychoRecruiterDoc, psychoRecruiterFor } from '../../src/content/psychoRecruiters.ts';
 
 export type Lang = 'fr' | 'ar';
 
@@ -593,6 +594,12 @@ export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: 
       openContests.length
         ? `<h2>${esc(t.openNow)} (${openContests.length})</h2><ul>${openContests.map((c) => contestLi(c, lang, today)).join('')}</ul>`
         : ''
+    }${
+      f.slug === PSY_FOLDER
+        ? `<h2>${esc(lang === 'ar' ? 'الاختبارات النفسية التقنية حسب المؤسسة' : 'Tests psychotechniques par recruteur')}</h2><ul>${PSYCHO_RECRUITERS.map(
+            (r) => `<li>${link(psychoPath(r.slug), `${lang === 'ar' ? 'الاختبارات النفسية التقنية' : 'Tests psychotechniques'} ${r.name[lang]}`, lang)}</li>`,
+          ).join('')}</ul>`
+        : ''
     }`
   );
   return {
@@ -687,6 +694,69 @@ export function renderLegal(lang: Lang, kind: LegalKind): Page {
     .map((s) => `<h2>${esc(s.title)}</h2>${s.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}`)
     .join('')}`;
   return { status: 200, lang, title: `${d.title} | KounKour`, description: truncate(d.intro, 160), path: LEGAL_PATH[kind], indexable: true, body: frame(lang, [{ href: '/', text: t.home }, { text: d.title }], inner) };
+}
+
+// Concours ouverts d'un recruteur « tests psychotechniques » (même reconnaissance que l'application).
+export function contestsForPsychoRecruiter(slug: string, contests: ContestRow[], today: string): ContestRow[] {
+  return contests
+    .filter((c) => (c.status === 'publie' || c.status === 'mis_a_jour') && (!c.deadline_date || c.deadline_date >= today))
+    .filter((c) => psychoRecruiterFor(`${c.title_fr || ''} ${c.administrations?.name_fr || ''} ${c.source_org || ''}`)?.slug === slug)
+    .sort((a, b) => (a.deadline_date || '9999').localeCompare(b.deadline_date || '9999'));
+}
+
+const PSY_START = [
+  { set: 'test-psychotechnique-support-methode-fr', fr: 'Fiche méthode : les 7 familles d’exercices', ar: 'البطاقة المنهجية: العائلات السبع للتمارين' },
+  { set: 'test-psychotechnique-suites-numeriques-fr', fr: 'Suites numériques (15 questions corrigées)', ar: 'سلاسل الأعداد (15 سؤالاً مصححاً)' },
+  { set: 'test-psychotechnique-raisonnement-logique-fr', fr: 'Raisonnement logique (15 questions corrigées)', ar: 'الاستدلال المنطقي (15 سؤالاً مصححاً)' },
+  { set: 'test-psychotechnique-blanc-1-fr', fr: 'Test blanc : 30 questions en 20 minutes', ar: 'اختبار تجريبي: 30 سؤالاً في 20 دقيقة' },
+];
+
+// Pages « tests psychotechniques » : ensemble des recruteurs, puis une page par recruteur.
+export function renderPsycho(lang: Lang, slug: string | null, base: string, contests: ContestRow[], today: string): Page | null {
+  const t = L[lang];
+  const fr = lang === 'fr';
+  const rec = slug ? findPsychoRecruiter(slug) : null;
+  if (slug && !rec) return null;
+  const doc = rec ? psychoRecruiterDoc(rec, lang) : psychoIndexDoc(lang);
+  const path = rec ? psychoPath(rec.slug) : PSYCHO_INDEX_PATH;
+  const indexText = fr ? 'Tests psychotechniques' : 'الاختبارات النفسية التقنية';
+  const crumbs: { href: string; text: string }[] = [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { href: PSYCHO_INDEX_PATH, text: indexText }];
+  if (rec) crumbs.push({ href: path, text: rec.name[lang] });
+  const sections = doc.sections
+    .map((sec, i) => {
+      const src =
+        rec && i === 0
+          ? `<p class="muted">${esc(fr ? 'Source : ' : 'المصدر: ')}${
+              rec.sourceUrl.startsWith('/') ? link(rec.sourceUrl, rec.realSet ? rec.realSet.label[lang] : rec.sourceLabel, lang) : `<a href="${esc(rec.sourceUrl)}" rel="noopener">${esc(rec.sourceLabel)}</a>`
+            }</p>`
+          : '';
+      return `<h2>${esc(sec.title)}</h2>${sec.paragraphs.map((x) => `<p>${esc(x)}</p>`).join('')}${sec.bullets ? `<ul>${sec.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}${src}`;
+    })
+    .join('');
+  const start = `<h2>${esc(fr ? "S'entraîner gratuitement" : 'تدرب مجاناً')}</h2><ul>${PSY_START.map((x) => `<li>${link(`/preparation/qcm/${x.set}`, x[lang], lang)}</li>`).join('')}<li>${link(
+    `/preparation/${PSY_FOLDER}`,
+    fr ? 'Toutes les séries corrigées (dossier tests psychotechniques)' : 'كل السلاسل المصححة',
+    lang,
+  )}</li><li><a href="/preparation/${PSY_FOLDER_EN}" hreflang="en">Psychometric tests in English</a></li></ul><p class="muted">${esc(
+    fr ? "Exercices d'entraînement rédigés par KounKour : ce ne sont pas les sujets officiels des recruteurs." : 'تمارين تدريبية من إعداد KounKour، وليست المواضيع الرسمية للمؤسسات.',
+  )}</p>`;
+  const open = rec ? contestsForPsychoRecruiter(rec.slug, contests, today).slice(0, 8) : [];
+  const openHtml = open.length ? `<h2>${esc(t.openNow)} (${open.length})</h2><ul>${open.map((c) => contestLi(c, lang, today)).join('')}</ul>` : '';
+  const recList = rec
+    ? `<h2>${esc(fr ? 'Autres recruteurs' : 'مؤسسات أخرى')}</h2><ul>${PSYCHO_RECRUITERS.filter((r) => r.slug !== rec.slug).map((r) => `<li>${link(psychoPath(r.slug), `${indexText} ${r.name[lang]}`, lang)}</li>`).join('')}</ul>`
+    : `<h2>${esc(fr ? 'Recruteurs (source à l’appui)' : 'المؤسسات (مع المصدر)')}</h2><ul>${PSYCHO_RECRUITERS.map(
+        (r) => `<li>${link(psychoPath(r.slug), `${indexText} ${r.name[lang]}`, lang)} <span class="muted">— ${esc(truncate(r.fact[lang], 150))}</span></li>`,
+      ).join('')}</ul>`;
+  const faq = doc.faq.length ? `<h2>${esc(fr ? 'Questions fréquentes' : 'أسئلة متداولة')}</h2>${doc.faq.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('')}` : '';
+  const jsonLd: object[] = [breadcrumbLd(base, lang, crumbs)];
+  if (doc.faq.length)
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: doc.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+    });
+  const body = frame(lang, crumbs.map((c, i) => (i === crumbs.length - 1 ? { text: c.text } : c)), `<h1>${esc(doc.h1)}</h1><p>${esc(doc.intro)}</p>${rec ? '' : recList}${sections}${start}${openHtml}${faq}${rec ? recList : ''}`);
+  return { status: 200, lang, title: `${truncate(doc.title, 70)} | KounKour`, description: truncate(doc.description, 158), path, indexable: true, jsonLd, body };
 }
 
 export function renderPrivate(lang: Lang, path: string): Page {
@@ -803,6 +873,7 @@ export function renderSitemap(base: string, contests: ContestRow[], folders: Fol
   for (const f of folders) if (sets.some((s) => s.folder_slug === f.slug)) urls.push({ loc: `/preparation/${encodeURIComponent(f.slug)}` });
   // Pas de lastmod pour les QCM : aucune date de modification fiable n'est stockée.
   for (const s of sets) if (hasContent(s)) urls.push({ loc: `/preparation/qcm/${encodeURIComponent(s.slug)}` });
+  urls.push({ loc: PSYCHO_INDEX_PATH }, ...PSYCHO_RECRUITERS.map((r) => ({ loc: psychoPath(r.slug) })));
   const x = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
     .map((u) => `  <url><loc>${x(base + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`)
