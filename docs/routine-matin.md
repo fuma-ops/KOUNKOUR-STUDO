@@ -1,8 +1,9 @@
-# Routine du matin (Claude, 8h45 heure du Maroc) — sans intervention du propriétaire
+# Routine du matin (Claude, 6h00 heure du Maroc) — sans intervention du propriétaire
 
-Depuis le 26/10/2026 (base `kounkour-v2`, projet `aqnxeiylhgxfvhbkftbx`), la routine n'utilise
-**que la clé robot** via `scripts/robot.mjs` (variable `RADAR_KEY`). Jamais le connecteur
-Supabase : il affiche des demandes d'autorisation au propriétaire et bloque la routine.
+Depuis le 26/10/2026 (base `kounkour-v2`, projet `aqnxeiylhgxfvhbkftbx`), la routine passe
+d'abord par la **clé robot** via `scripts/robot.mjs` (variable `RADAR_KEY`). Depuis le 28/10/2026,
+le connecteur Supabase (`execute_sql`) est autorisé sans confirmation (`.claude/settings.json`)
+pour ce que la clé robot ne couvre pas (rouvrir une fiche prolongée, compléter un critère, etc.).
 
 ## Ce qui tourne déjà seul dans Supabase (pg_cron, rien à faire)
 
