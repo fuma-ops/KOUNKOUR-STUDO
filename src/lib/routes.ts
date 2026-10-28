@@ -15,6 +15,7 @@ export type Route =
   | { name: 'privacy' }
   | { name: 'terms' }
   | { name: 'psycho'; slug: string | null }
+  | { name: 'psytrain'; slug: string | null }
   | { name: 'notfound' };
 
 const seg = (s: string) => {
@@ -40,6 +41,8 @@ export function parsePath(pathname: string): Route {
   if (a === 'admin') return { name: 'admin' };
   if (a === 'confidentialite' && parts.length === 1) return { name: 'privacy' };
   if (a === 'conditions' && parts.length === 1) return { name: 'terms' };
+  // Entraînement interactif (matrices, dominos, cubes…) : avant les pages par recruteur.
+  if (a === 'tests-psychotechniques' && b === 'en-ligne' && parts.length <= 3) return { name: 'psytrain', slug: c || null };
   // Pages « tests psychotechniques » par recruteur (ONCF, RAM…), reliées au dossier d'entraînement.
   if (a === 'tests-psychotechniques' && parts.length <= 2) return { name: 'psycho', slug: b || null };
   return { name: 'notfound' };
@@ -73,6 +76,8 @@ export function routePath(r: Route): string {
       return '/conditions';
     case 'psycho':
       return r.slug ? `/tests-psychotechniques/${e(r.slug)}` : '/tests-psychotechniques';
+    case 'psytrain':
+      return r.slug ? `/tests-psychotechniques/en-ligne/${e(r.slug)}` : '/tests-psychotechniques/en-ligne';
   }
 }
 
@@ -98,6 +103,8 @@ export function tabOf(r: Route): string {
       return 'terms';
     case 'psycho':
       return 'psycho';
+    case 'psytrain':
+      return 'psytrain';
     default:
       return 'home';
   }

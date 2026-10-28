@@ -28,6 +28,7 @@ import {
   renderSitemap,
   todayMorocco,
   renderPsycho,
+  renderPsyTrain,
 } from './_lib/seo.ts';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './_lib/supabaseEnv.ts';
 
@@ -134,6 +135,8 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
     }
     case 'psycho':
       return renderPsycho(lang, r.slug, base, await contests(), today) || renderNotFound(lang, pathname);
+    case 'psytrain':
+      return renderPsyTrain(r.slug, base) || renderNotFound(lang, pathname);
     case 'community':
       return renderCommunity(lang);
     case 'privacy':

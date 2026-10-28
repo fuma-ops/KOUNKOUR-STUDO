@@ -10,6 +10,7 @@ import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolder
 import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
 import { PrepHome } from './PrepHome';
+import { PsyTrainBanner } from './PsyTrainBanner';
 import { LoadError } from './LoadError';
 import { gaEvent } from '../lib/analytics';
 import type { Contest } from '../types';
@@ -55,6 +56,7 @@ interface QcmModuleProps {
   onOpenSalarySimulator?: (contest?: Contest) => void;
   // Page « tests psychotechniques » d'un recruteur (ONCF, RAM…), depuis le dossier psycho.
   onOpenPsychoRecruiter?: (slug: string) => void;
+  onOpenPsyTrain?: () => void;
 }
 
 // Ordre dans un dossier : annales QCM, puis sujets écrits, puis entraînement.
@@ -112,6 +114,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   onRequestLogin,
   onOpenProfile,
   onOpenPsychoRecruiter,
+  onOpenPsyTrain,
   onOpenSalarySimulator,
 }) => {
   const t = translations[language];
@@ -349,7 +352,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
       ...visibleFolders.map((f) => ({ f, sets: setsOf(f.slug) })),
       ...(orphans.length ? [{ f: { slug: '__autres', title: { fr: 'Autres supports', ar: 'دعامات أخرى' }, organization: '', description: { fr: '', ar: '' }, position: 999 } as QcmFolder, sets: orphans }] : []),
     ].map((r) => ({ ...r, stats: statsOf(r.sets) }));
-    return <PrepHome rows={rows} language={language} loading={loadingSets} contests={contests || []} folders={folders} onOpen={(slug) => navigate(slug, null)} />;
+    return <PrepHome rows={rows} language={language} loading={loadingSets} contests={contests || []} folders={folders} onOpen={(slug) => navigate(slug, null)} onOpenPsyTrain={onOpenPsyTrain} />;
   }
 
   // ─── Écran 2 : les supports d'un dossier, avec la progression ───────────────
@@ -493,6 +496,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
             </div>
           </div>
         </div>
+
+        {selectedFolder === PSYCHO_FOLDER && onOpenPsyTrain && <PsyTrainBanner language={language} onOpen={onOpenPsyTrain} className="mb-4" />}
 
         {selectedFolder === PSYCHO_FOLDER && onOpenPsychoRecruiter && (
           <nav className="mb-6 animate-fade-in" aria-label={fr ? 'Tests psychotechniques par recruteur' : 'الاختبارات النفسية التقنية حسب المؤسسة'}>

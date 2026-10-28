@@ -11,6 +11,7 @@ import {
   renderFolder,
   renderNotFound,
   renderPsycho,
+  renderPsyTrain,
   renderQcm,
   renderRobots,
   renderSitemap,
@@ -132,11 +133,67 @@ check('prepMatch : concours ONCF → dossier psycho', prepFolderSlugsFor({ title
 check('prepMatch : Atlas Multiservices (RAM) n’est pas une SRM', !prepFolderSlugsFor({ title: 'Responsable de recrutement – Atlas Multiservices (groupe RAM)', admin: 'Atlas Multiservices' }).some((x) => x.startsWith('concours-srm')));
 check('prepMatch : DGSN sans dossier psycho (non confirmé)', !prepFolderSlugsFor({ title: 'Gardiens de la paix', admin: 'Direction Générale de la Sûreté Nationale' }).includes('tests-psychotechniques'));
 
+// Tests psychotechniques interactifs (générateurs, rendu, pages SEO)
+{
+  const { GENERATORS } = await import('../src/psy/generators.ts');
+  const { LEVELS } = await import('../src/psy/core.ts');
+  const { questionHtml, optionHtml } = await import('../src/psy/render.ts');
+  let bad = 0;
+  let total = 0;
+  for (const [cat, g] of Object.entries(GENERATORS))
+    for (const l of LEVELS)
+      for (let k = 0; k < 150; k++) {
+        const q = g(k, l);
+        total++;
+        const vals = new Set(q.options.map((o) => JSON.stringify(o.value)));
+        const ok =
+          q.category === cat &&
+          q.options.length === (l === 'difficile' ? 5 : 4) &&
+          vals.size === q.options.length &&
+          q.options.some((o) => o.id === q.correct_option_id) &&
+          q.time_limit > 0 &&
+          q.explanation.length > 20 &&
+          JSON.stringify(g(k, l)) === JSON.stringify(q) && // même graine = même question (serveur et client)
+          !/undefined|NaN/.test(questionHtml(q, 'u') + q.options.map((o) => optionHtml(q, o.value, 'u' + o.id)).join(''));
+        if (!ok) bad++;
+      }
+  check(`psy : ${total} questions générées valides (4 à 5 réponses distinctes, bonne réponse présente, rendu sans NaN)`, bad === 0, `${bad} invalides`);
+  // Mécanique : sens et vitesse recalculés indépendamment.
+  let mecaBad = 0;
+  for (let k = 0; k < 200; k++) {
+    const q = GENERATORS.mecanique(k, 'difficile');
+    const { wheels, links, start } = q.question_data;
+    const inv = links.filter((x: string) => x !== 'courroie').length % 2 === 1;
+    const want = { dir: inv ? 'antihoraire' : 'horaire', rpm: (start.rpm * wheels[0].teeth) / wheels[wheels.length - 1].teeth };
+    if (JSON.stringify(q.options.find((o) => o.id === q.correct_option_id)!.value) !== JSON.stringify(want)) mecaBad++;
+  }
+  check('psy : engrenages, bonne réponse recalculée', mecaBad === 0, `${mecaBad} erreurs`);
+  // Barrage : le nombre annoncé est bien le nombre de figures identiques aux modèles.
+  let attBad = 0;
+  for (let k = 0; k < 200; k++) {
+    const q = GENERATORS.attention(k, 'moyen');
+    const n = q.question_data.grid.filter((x: string) => q.question_data.targets.includes(x)).length;
+    if (q.options.find((o) => o.id === q.correct_option_id)!.value !== n) attBad++;
+  }
+  check('psy : barrage, comptage exact', attBad === 0, `${attBad} erreurs`);
+}
+check('route /tests-psychotechniques/en-ligne', JSON.stringify(parsePath('/tests-psychotechniques/en-ligne')) === JSON.stringify({ name: 'psytrain', slug: null }));
+check('route /tests-psychotechniques/en-ligne/dominos', routePath(parsePath('/tests-psychotechniques/en-ligne/dominos')) === '/tests-psychotechniques/en-ligne/dominos');
+const pt = renderPsyTrain('matrices-de-raven', BASE)!;
+check('psy : page famille indexable, FR seule (pas de hreflang ar)', pt.indexable && pt.frOnly === true && !renderDocument(fallbackTemplate(), pt, BASE).includes('hreflang="ar"'));
+check('psy : 3 exemples dessinés + réponse repliée', (pt.body.match(/class="psy-ex"/g) || []).length === 3 && pt.body.includes('<details><summary>Voir la réponse'));
+check('psy : JSON-LD fil d’Ariane + FAQ + Quiz', ['BreadcrumbList', 'FAQPage', 'Quiz'].every((t) => JSON.stringify(pt.jsonLd).includes(`"${t}"`)));
+check('psy : mention « pas les tests officiels »', pt.body.includes('ce ne sont pas les tests officiels'));
+check('psy : aucune image externe', !/<img\b/.test(pt.body) && !/<img\b/.test(renderPsyTrain(null, BASE)!.body));
+check('psy : famille inconnue → 404', renderPsyTrain('inconnu', BASE) === null);
+check('psy : page d’accueil des tests liée aux 6 familles', ['matrices-de-raven', 'dominos', 'cubes-aptitude-spatiale', 'logique-mecanique', 'test-de-barrage', 'suites-numeriques'].every((x) => renderPsyTrain(null, BASE)!.body.includes(`/tests-psychotechniques/en-ligne/${x}"`)));
+
 // Sitemap et robots
 const sm = renderSitemap(BASE, [contest({})], [{ slug: 'f1', title_fr: 'F', title_ar: null, organization: null, description_fr: null, description_ar: null }], [set]);
 check('sitemap : fiche + lastmod honnête', sm.includes(`<loc>${BASE}/concours/ingenieur-etat-abc</loc><lastmod>2026-10-01</lastmod>`));
 check('sitemap : QCM sans lastmod inventé', sm.includes(`<loc>${BASE}/preparation/qcm/annales-x-2022</loc></url>`));
 check('sitemap : pages psycho', sm.includes(`${BASE}/tests-psychotechniques</loc>`) && sm.includes(`${BASE}/tests-psychotechniques/protection-civile</loc>`));
+check('sitemap : tests psychotechniques en ligne', sm.includes(`${BASE}/tests-psychotechniques/en-ligne</loc>`) && sm.includes(`${BASE}/tests-psychotechniques/en-ligne/test-de-barrage</loc>`));
 check('sitemap : dossier avec annales', sm.includes(`${BASE}/preparation/f1</loc>`));
 const rb = renderRobots(BASE);
 check('robots : sitemap absolu + zones privées exclues', rb.includes(`Sitemap: ${BASE}/sitemap.xml`) && rb.includes('Disallow: /admin') && rb.includes('Disallow: /profil'));

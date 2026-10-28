@@ -11,6 +11,7 @@ import {
   psychoRecruiterFor,
 } from '../content/psychoRecruiters';
 import { gaEvent } from '../lib/analytics';
+import { PsyTrainBanner } from './PsyTrainBanner';
 
 interface Props {
   slug: string | null;
@@ -24,11 +25,12 @@ interface Props {
   onOpenContest: (c: Contest) => void;
   onRequestLogin: () => void;
   onOpenProfile: () => void;
+  onOpenTrainer?: () => void;
 }
 
 // Tests psychotechniques par recruteur (ONCF, RAM, Protection civile…) : la source, les concours
 // ouverts du recruteur et l'accès direct à l'entraînement (même texte que le rendu serveur).
-export const PsychoRecruiterPage: React.FC<Props> = ({ slug, language, contests, contestsLoaded, isAuthed, onOpenRecruiter, onOpenFolder, onOpenSet, onOpenContest, onRequestLogin, onOpenProfile }) => {
+export const PsychoRecruiterPage: React.FC<Props> = ({ slug, language, contests, contestsLoaded, isAuthed, onOpenRecruiter, onOpenFolder, onOpenSet, onOpenContest, onRequestLogin, onOpenProfile, onOpenTrainer }) => {
   const lang = language === 'ar' ? 'ar' : 'fr';
   const fr = lang === 'fr';
   const rec = slug ? findPsychoRecruiter(slug) : null;
@@ -96,6 +98,8 @@ export const PsychoRecruiterPage: React.FC<Props> = ({ slug, language, contests,
           </button>
         </div>
       </header>
+
+      {onOpenTrainer && <PsyTrainBanner language={language} onOpen={start('interactif', onOpenTrainer)} className="mb-6" />}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="lg:col-span-3 space-y-4">

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { PsyTrainBanner } from './PsyTrainBanner';
 import { ArrowLeft, ArrowRight, Brain, Briefcase, Building2, CalendarClock, Cpu, FolderOpen, GraduationCap, HardHat, HeartPulse, PlayCircle, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import type { Contest, Language, QcmSet } from '../types';
 import type { QcmFolder } from '../data/qcmApi';
@@ -53,9 +54,10 @@ interface Props {
   contests: Contest[];
   folders: QcmFolder[];
   onOpen: (slug: string) => void;
+  onOpenPsyTrain?: () => void;
 }
 
-export const PrepHome: React.FC<Props> = ({ rows, language, loading, contests, folders, onOpen }) => {
+export const PrepHome: React.FC<Props> = ({ rows, language, loading, contests, folders, onOpen, onOpenPsyTrain }) => {
   const fr = language === 'fr';
   const Next = fr ? ArrowRight : ArrowLeft;
   const [q, setQ] = useState('');
@@ -155,6 +157,8 @@ export const PrepHome: React.FC<Props> = ({ rows, language, loading, contests, f
           {fr ? 'Annales réelles, QCM corrigés et votre progression, par métier.' : 'نماذج حقيقية وتمارين مصححة وتقدمك، حسب المهنة.'}
         </p>
       </div>
+
+      {onOpenPsyTrain && <PsyTrainBanner language={language} onOpen={onOpenPsyTrain} className="mb-3" />}
 
       {/* Recherche : métier, organisme ou concours ouvert */}
       <div className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-[#FFFDFE]/95 backdrop-blur-sm">

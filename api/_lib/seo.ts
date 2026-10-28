@@ -6,6 +6,10 @@
 
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
+import { PSY_CATS, PSY_HUB, PSY_TRAIN_PATH, psyCatBySlug, psyTrainPath, type PsyCatDoc } from '../../src/psy/content.ts';
+import { generate } from '../../src/psy/generators.ts';
+import { PSY_CSS, optionHtml, questionHtml } from '../../src/psy/render.ts';
+import type { PsyQuestion } from '../../src/psy/core.ts';
 import { PSYCHO_INDEX_PATH, PSYCHO_RECRUITERS, findPsychoRecruiter, psychoIndexDoc, psychoPath, psychoRecruiterDoc, psychoRecruiterFor } from '../../src/content/psychoRecruiters.ts';
 
 export type Lang = 'fr' | 'ar';
@@ -84,6 +88,7 @@ export interface Page {
   image?: string | null; // image de partage (URL absolue) ; sinon image du site
   body: string;
   redirect?: string; // chemin cible d'une redirection permanente (ancienne adresse)
+  frOnly?: boolean; // page en français seulement : pas de version ?lang=ar
 }
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
@@ -733,7 +738,7 @@ export function renderPsycho(lang: Lang, slug: string | null, base: string, cont
       return `<h2>${esc(sec.title)}</h2>${sec.paragraphs.map((x) => `<p>${esc(x)}</p>`).join('')}${sec.bullets ? `<ul>${sec.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}${src}`;
     })
     .join('');
-  const start = `<h2>${esc(fr ? "S'entraîner gratuitement" : 'تدرب مجاناً')}</h2><ul>${PSY_START.map((x) => `<li>${link(`/preparation/qcm/${x.set}`, x[lang], lang)}</li>`).join('')}<li>${link(
+  const start = `<h2>${esc(fr ? "S'entraîner gratuitement" : 'تدرب مجاناً')}</h2><ul><li>${link(PSY_TRAIN_PATH, fr ? 'Tests psychotechniques interactifs : matrices de Raven, dominos, cubes, logique mécanique, barrage, suites' : 'اختبارات تفاعلية (بالفرنسية)', 'fr')}</li>${PSY_START.map((x) => `<li>${link(`/preparation/qcm/${x.set}`, x[lang], lang)}</li>`).join('')}<li>${link(
     `/preparation/${PSY_FOLDER}`,
     fr ? 'Toutes les séries corrigées (dossier tests psychotechniques)' : 'كل السلاسل المصححة',
     lang,
@@ -757,6 +762,83 @@ export function renderPsycho(lang: Lang, slug: string | null, base: string, cont
     });
   const body = frame(lang, crumbs.map((c, i) => (i === crumbs.length - 1 ? { text: c.text } : c)), `<h1>${esc(doc.h1)}</h1><p>${esc(doc.intro)}</p>${rec ? '' : recList}${sections}${start}${openHtml}${faq}${rec ? recList : ''}`);
   return { status: 200, lang, title: `${truncate(doc.title, 72)} | KounKour`, description: truncate(doc.description, 158), path, indexable: true, jsonLd, body };
+}
+
+// ─── Tests psychotechniques interactifs (français) ───────────────────────────
+const LEVEL_FR = { facile: 'facile', moyen: 'moyen', difficile: 'difficile' } as const;
+const PSY_SSR_CSS = `<style>${PSY_CSS}.psy-ex{border:1px solid #F1E5EC;border-radius:16px;padding:14px;margin:14px 0;background:#fff}.psy-ex-fig{margin:10px 0}.psy-ex-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:10px 0}.psy-ex-opts>div{border:2px solid #EDE6EF;border-radius:14px;padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;gap:4px}.psy-ex-opts>div>b{font-size:12px;color:#8E8694;align-self:flex-start;text-transform:uppercase}.psy-ex details{background:#F4FBF6;border-radius:12px;padding:8px 12px}.psy-ex summary{cursor:pointer;font-weight:700;color:#1F8A4C}.psy-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:0;list-style:none}.psy-cats li{border:1px solid #F1E5EC;border-radius:14px;padding:12px;margin:0}</style>`;
+
+function psyExample(q: PsyQuestion, uid: string, n: number): string {
+  const right = q.options.find((o) => o.id === q.correct_option_id)!;
+  return `<div class="psy-ex"><h3>Exemple ${n} (niveau ${LEVEL_FR[q.difficulty]}, ${q.time_limit} s)</h3><p><strong>${esc(q.prompt)}</strong></p><div class="psy-ex-fig">${questionHtml(q, uid)}</div><div class="psy-ex-opts">${q.options
+    .map((o) => `<div><b>${o.id}</b>${optionHtml(q, o.value, `${uid}-${o.id}`)}</div>`)
+    .join('')}</div><details><summary>Voir la réponse : ${right.id.toUpperCase()}</summary><div class="psy-ex-fig">${questionHtml(q, `${uid}r`, true)}</div><p>${esc(q.explanation)}</p></details></div>`;
+}
+const psyQuizLd = (name: string, about: string, qs: PsyQuestion[]) => ({
+  '@context': 'https://schema.org',
+  '@type': 'Quiz',
+  name,
+  about: { '@type': 'Thing', name: about },
+  inLanguage: 'fr',
+  isAccessibleForFree: true,
+  learningResourceType: 'Practice problem',
+  hasPart: qs.map((q) => ({
+    '@type': 'Question',
+    eduQuestionType: 'Multiple choice',
+    text: q.prompt,
+    acceptedAnswer: { '@type': 'Answer', text: `Réponse ${q.correct_option_id.toUpperCase()}`, answerExplanation: { '@type': 'Comment', text: q.explanation } },
+  })),
+});
+
+export function renderPsyTrain(slug: string | null, base: string): Page | null {
+  const doc: PsyCatDoc | null = slug ? psyCatBySlug(slug) : null;
+  if (slug && !doc) return null;
+  const lang: Lang = 'fr';
+  const path = psyTrainPath(doc?.slug);
+  const crumbs: { href: string; text: string }[] = [
+    { href: '/', text: L.fr.home },
+    { href: '/preparation', text: L.fr.prep },
+    { href: PSYCHO_INDEX_PATH, text: 'Tests psychotechniques' },
+    { href: PSY_TRAIN_PATH, text: 'En ligne' },
+  ];
+  if (doc) crumbs.push({ href: path, text: doc.name });
+  const faq = doc ? doc.faq : PSY_HUB.faq;
+  const faqHtml = `<h2>Questions fréquentes</h2>${faq.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('')}`;
+  const note = `<p class="muted">Exercices d'entraînement générés par KounKour sur les formats classiques des tests psychotechniques : ce ne sont pas les tests officiels des recruteurs.</p>`;
+  const recruiters = `<h2>Tests psychotechniques par recruteur</h2><ul>${PSYCHO_RECRUITERS.map((r) => `<li>${link(psychoPath(r.slug), `Tests psychotechniques ${r.name.fr}`, lang)}</li>`).join('')}<li>${link(`/preparation/${PSY_FOLDER}`, 'Séries QCM psychotechniques corrigées', lang)}</li></ul>`;
+  let inner: string;
+  let qs: PsyQuestion[];
+  if (doc) {
+    // Exemples fixes (même graine à chaque rendu) : un par niveau.
+    qs = (['facile', 'moyen', 'difficile'] as const).map((l, i) => generate(doc.cat, `seo-${doc.slug}-${i}`, l));
+    const others = PSY_CATS.filter((c) => c.cat !== doc.cat);
+    inner =
+      `<h1>${esc(doc.h1)}</h1><p>${esc(doc.intro)}</p>` +
+      `<p><strong>${link(path, `Commencer l'entraînement : 10 questions chronométrées, 3 niveaux`, lang)}</strong></p>` +
+      `<h2>${esc(doc.method.title)}</h2><ol>${doc.method.steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` +
+      `<h2>3 exemples corrigés</h2>${qs.map((q, i) => psyExample(q, `s${i}`, i + 1)).join('')}` +
+      `<h2>Conseils</h2><ul>${doc.tips.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` +
+      faqHtml +
+      `<h2>Autres tests psychotechniques en ligne</h2><ul>${others.map((c) => `<li>${link(psyTrainPath(c.slug), c.name, lang)} <span class="muted">— ${esc(c.tagline)}</span></li>`).join('')}</ul>` +
+      recruiters +
+      note;
+  } else {
+    qs = PSY_CATS.map((c, i) => generate(c.cat, `seo-hub-${i}`, 'moyen'));
+    inner =
+      `<h1>${esc(PSY_HUB.h1)}</h1><p>${esc(PSY_HUB.intro)}</p>` +
+      `<h2>Les 6 familles d'exercices</h2><ul class="psy-cats">${PSY_CATS.map((c) => `<li><strong>${link(psyTrainPath(c.slug), c.name, lang)}</strong><br><span class="muted">${esc(c.tagline)}</span></li>`).join('')}</ul>` +
+      `<h2>Un exemple corrigé par famille</h2>${qs.map((q, i) => psyExample(q, `h${i}`, i + 1)).join('')}` +
+      faqHtml +
+      recruiters +
+      note;
+  }
+  const jsonLd: object[] = [
+    breadcrumbLd(base, lang, crumbs),
+    { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
+    psyQuizLd(doc ? doc.h1 : PSY_HUB.h1, doc ? doc.name : 'Tests psychotechniques', qs),
+  ];
+  const body = frame(lang, crumbs.map((c, i) => (i === crumbs.length - 1 ? { text: c.text } : c)), PSY_SSR_CSS + inner);
+  return { status: 200, lang, title: `${truncate(doc ? doc.title : PSY_HUB.title, 70)} | KounKour`, description: truncate(doc ? doc.description : PSY_HUB.description, 158), path, indexable: true, jsonLd, body, frOnly: true };
 }
 
 export function renderPrivate(lang: Lang, path: string): Page {
@@ -787,7 +869,7 @@ export function headTags(p: Page, base: string): string {
     tags.push(
       `<link rel="canonical" href="${esc(self)}" />`,
       `<link rel="alternate" hreflang="fr" href="${esc(base + p.path)}" />`,
-      `<link rel="alternate" hreflang="ar" href="${esc(base + withLangPath(p.path, 'ar'))}" />`,
+      p.frOnly ? '' : `<link rel="alternate" hreflang="ar" href="${esc(base + withLangPath(p.path, 'ar'))}" />`,
       `<link rel="alternate" hreflang="x-default" href="${esc(base + p.path)}" />`
     );
   }
@@ -878,6 +960,7 @@ export function renderSitemap(base: string, contests: ContestRow[], folders: Fol
   // Pas de lastmod pour les QCM : aucune date de modification fiable n'est stockée.
   for (const s of sets) if (hasContent(s)) urls.push({ loc: `/preparation/qcm/${encodeURIComponent(s.slug)}` });
   urls.push({ loc: PSYCHO_INDEX_PATH }, ...PSYCHO_RECRUITERS.map((r) => ({ loc: psychoPath(r.slug) })));
+  urls.push({ loc: PSY_TRAIN_PATH }, ...PSY_CATS.map((c) => ({ loc: psyTrainPath(c.slug) })));
   const x = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
     .map((u) => `  <url><loc>${x(base + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`)

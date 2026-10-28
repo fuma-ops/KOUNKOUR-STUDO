@@ -32,6 +32,7 @@ import { AuthModal, PasswordRecoveryModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { LegalPage } from './components/LegalPage';
 import { PsychoRecruiterPage } from './components/PsychoRecruiterPage';
+import { PsyTrainer } from './components/PsyTrainer';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { buildMatchFeed } from './utils/matchFeed';
 import { getContestDiscussionCounts } from './data/communityApi';
@@ -61,6 +62,11 @@ export default function App() {
   const [psychoSlug, setPsychoSlug] = useState<string | null>(() => {
     const r = parsePath(window.location.pathname);
     return r.name === 'psycho' ? r.slug : null;
+  });
+  // Entraînement interactif : famille ouverte (null = accueil des tests).
+  const [psyCat, setPsyCat] = useState<string | null>(() => {
+    const r = parsePath(window.location.pathname);
+    return r.name === 'psytrain' ? r.slug : null;
   });
   const [contestsLoaded, setContestsLoaded] = useState(false);
   // Chargement des concours impossible (réseau) même après les nouveaux essais.
@@ -260,9 +266,10 @@ export default function App() {
     else if (activeTab === 'privacy') r = { name: 'privacy' };
     else if (activeTab === 'terms') r = { name: 'terms' };
     else if (activeTab === 'psycho') r = { name: 'psycho', slug: psychoSlug };
+    else if (activeTab === 'psytrain') r = { name: 'psytrain', slug: psyCat };
     else r = { name: 'home' };
     return withLang(routePath(r), language);
-  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, psychoSlug, language]);
+  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, psychoSlug, psyCat, language]);
   const firstSync = React.useRef(true);
   useEffect(() => {
     const here = window.location.pathname + window.location.search;
@@ -287,6 +294,7 @@ export default function App() {
       setActiveTab(tabOf(r));
       setQcmRoute({ folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null });
       setPsychoSlug(r.name === 'psycho' ? r.slug : null);
+      setPsyCat(r.name === 'psytrain' ? r.slug : null);
       setSelectedContest(null);
       setPendingContestSlug(r.name === 'contest' ? r.slug : null);
     };
@@ -470,7 +478,7 @@ export default function App() {
       <Header
         language={language}
         onLanguageChange={setLanguage}
-        activeTab={activeTab === 'psycho' ? 'preparation' : activeTab}
+        activeTab={activeTab === 'psycho' || activeTab === 'psytrain' ? 'preparation' : activeTab}
         setActiveTab={goTab}
         savedCount={bookmarkedIds.length}
         isAuthed={!!session.user}
@@ -669,6 +677,11 @@ export default function App() {
               setSalaryContestTarget(contest || null);
               setIsSalaryModalOpen(true);
             }}
+            onOpenPsyTrain={() => {
+              setPsyCat(null);
+              setQcmRoute({ folder: null, set: null });
+              setActiveTab('psytrain');
+            }}
             onOpenPsychoRecruiter={(slug) => {
               setPsychoSlug(slug);
               setQcmRoute({ folder: null, set: null });
@@ -726,6 +739,28 @@ export default function App() {
             onOpenProfile={() => {
               setProfileInitialTab('recommendations');
               goTab('profile');
+            }}
+            onOpenTrainer={() => {
+              setPsyCat(null);
+              setActiveTab('psytrain');
+            }}
+          />
+        )}
+
+        {activeTab === 'psytrain' && (
+          <PsyTrainer
+            language={language}
+            slug={psyCat}
+            onOpenCat={setPsyCat}
+            onOpenRecruiters={() => {
+              setPsychoSlug(null);
+              setActiveTab('psycho');
+              window.scrollTo({ top: 0 });
+            }}
+            onOpenFolder={() => {
+              setQcmRoute({ folder: 'tests-psychotechniques', set: null });
+              setActiveTab('preparation');
+              window.scrollTo({ top: 0 });
             }}
           />
         )}
@@ -843,7 +878,7 @@ export default function App() {
 
       <BottomNav
         language={language}
-        activeTab={activeTab === 'psycho' ? 'preparation' : activeTab}
+        activeTab={activeTab === 'psycho' || activeTab === 'psytrain' ? 'preparation' : activeTab}
         setActiveTab={goTab}
         isAuthed={!!session.user}
         onAuthClick={() => setAuthOpen(true)}
