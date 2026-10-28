@@ -811,6 +811,9 @@ export function headTags(p: Page, base: string): string {
 
 // Balise Google Analytics (aussi dans index.html) : ajoutée par le serveur si le gabarit
 // en cache ne l'a pas encore. Les pages vues sont envoyées par l'application.
+// Google AdSense : même compte que Bloomzein (fichier public/ads.txt).
+const ADSENSE_TAG = `    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8156754023993120" crossorigin="anonymous"></script>
+`;
 const GA_TAG = `    <!-- Google tag (gtag.js) : les pages vues sont envoyées par l'application (src/lib/analytics.ts),
          hors robots et hors espace admin ; aucun signal publicitaire. -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-YK6392SLTQ"></script>
@@ -828,7 +831,8 @@ export function renderDocument(template: string, p: Page, base: string): string 
     .replace(/<title>[\s\S]*?<\/title>\s*/i, '')
     .replace(/<meta\s+(name|property)="(description|robots|og:[^"]*|twitter:[^"]*)"[^>]*>\s*/gi, '')
     .replace(/<link\s+rel="(canonical|alternate)"[^>]*>\s*/gi, '');
-  const withGa = cleaned.includes('googletagmanager.com/gtag/js') ? cleaned : cleaned.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${GA_TAG}`);
+  const withGa0 = cleaned.includes('googletagmanager.com/gtag/js') ? cleaned : cleaned.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${GA_TAG}`);
+  const withGa = withGa0.includes('adsbygoogle.js') ? withGa0 : withGa0.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${ADSENSE_TAG}`);
   return withGa
     .replace(/<html[^>]*>/i, `<html lang="${p.lang}" dir="${p.lang === 'ar' ? 'rtl' : 'ltr'}">`)
     .replace(/<\/head>/i, `    ${headTags(p, base)}\n  </head>`)

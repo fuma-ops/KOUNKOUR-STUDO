@@ -7,7 +7,7 @@ import { GA_ID } from '../lib/analytics.ts';
 // Tant qu'elle est vide, les pages renvoient simplement vers l'équipe KounKour.
 export const LEGAL_INFO = {
   contactEmail: '', // adresse pour exercer les droits (accès, rectification, suppression)
-  updatedAt: '2026-10-12',
+  updatedAt: '2026-10-28',
 };
 
 export type LegalKind = 'privacy' | 'terms';
@@ -74,7 +74,8 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
         {
           title: 'Stockage local et cookies',
           paragraphs: [
-            'KounKour n\'utilise pas de cookies publicitaires. Le stockage local du navigateur sert à garder votre session ouverte et vos préférences.',
+            'Le stockage local du navigateur sert à garder votre session ouverte et vos préférences.',
+            'Publicité : KounKour affiche des annonces fournies par Google AdSense (Google Ireland Ltd). Google et ses partenaires peuvent utiliser des cookies pour diffuser des annonces en fonction de vos visites sur ce site et sur d\'autres sites. Vous pouvez refuser la personnalisation des annonces dans les paramètres des annonces de Google (adssettings.google.com) ou sur www.aboutads.info.',
             ...(GA_ID
               ? ['Mesure d\'audience : Google Analytics (Google Ireland Ltd) dépose des cookies de mesure pour compter les pages vues et les visites de façon statistique. Les signaux publicitaires et la personnalisation des annonces sont désactivés. Vous pouvez bloquer ces cookies dans les réglages de votre navigateur ou avec le module de désactivation de Google Analytics.']
               : []),
@@ -125,7 +126,8 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
         {
           title: 'التخزين المحلي وملفات تعريف الارتباط',
           paragraphs: [
-            'لا يستعمل كونكور ملفات تعريف ارتباط إشهارية. يُستعمل التخزين المحلي للمتصفح للإبقاء على جلستك وتفضيلاتك.',
+            'يُستعمل التخزين المحلي للمتصفح للإبقاء على جلستك وتفضيلاتك.',
+            'الإشهار: يعرض كونكور إعلانات يقدمها Google AdSense. قد يستعمل Google وشركاؤه ملفات تعريف الارتباط لعرض إعلانات حسب زياراتك لهذا الموقع ولمواقع أخرى. يمكنك رفض تخصيص الإعلانات من إعدادات إعلانات Google (adssettings.google.com).',
             ...(GA_ID ? ['قياس الزيارات: يستعمل Google Analytics ملفات تعريف ارتباط لإحصاء الصفحات المزارة والزيارات إحصائيا، مع تعطيل الإشارات الإشهارية. يمكنك حظرها من إعدادات متصفحك.'] : []),
           ],
         },
