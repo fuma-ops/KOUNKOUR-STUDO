@@ -125,13 +125,6 @@ export const isWrittenSet = (s: Pick<QcmSet, 'kind' | 'statement' | 'questions'>
 // Déduite du type en base et du slug (les slugs KounKour portent « concours-blanc », « support-preparation »…).
 export type ContentType = 'support' | 'annale' | 'blanc' | 'qcm' | 'sujet';
 export const CONTENT_TYPES: ContentType[] = ['support', 'annale', 'blanc', 'qcm', 'sujet'];
-// Thèmes trilingues « FR · AR · EN » (banque psychotechnique) : n'en garder que la langue demandée.
-export function themeIn(theme: string, lang?: string | null): string {
-  const parts = theme.split(' · ');
-  const i = lang === 'fr' ? 0 : lang === 'ar' ? 1 : lang === 'en' ? 2 : -1;
-  return parts.length === 3 && i >= 0 ? parts[i] : theme;
-}
-
 export function contentType(s: Pick<QcmSet, 'kind' | 'slug' | 'questions'>): ContentType {
   if (s.kind === 'annales' || s.kind === 'sujet') return 'annale';
   if (/concours-blanc/.test(s.slug || '')) return 'blanc';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight, ArrowLeft, CalendarClock, BellRing, Calculator, Sparkles, UserPlus } from 'lucide-react';
 import type { Contest, Language, QcmSet } from '../types';
-import { QcmFolder, QcmProgress, contentType, CONTENT_TYPES, themeIn } from '../data/qcmApi';
+import { QcmFolder, QcmProgress, contentType, CONTENT_TYPES } from '../data/qcmApi';
 import { prepFolderSlugsFor } from '../utils/prepMatch';
 import { TYPE_META } from './prepTypes';
 import { gaEvent } from '../lib/analytics';
@@ -60,6 +60,9 @@ export const PrepNextSteps: React.FC<Props> = ({
   onOpenSalarySimulator,
 }) => {
   const fr = language === 'fr';
+  // Série en anglais : bloc en anglais, sans le simulateur de salaire (grilles marocaines).
+  const en = set.contentLanguage === 'en';
+  const L = (f: string, a: string, e: string) => (en ? e : fr ? f : a);
   const Arrow = fr ? ArrowRight : ArrowLeft;
   const current = contentType(set);
   const done = (s: QcmSet) => !!progress[s.id]?.attempts || (progress[s.id]?.seen?.length || 0) > 0;
@@ -115,13 +118,13 @@ export const PrepNextSteps: React.FC<Props> = ({
     <section className="rounded-3xl border border-[#F1E5EC] bg-gradient-to-b from-[#FDF2F7] to-[#FFFDFE] p-4 sm:p-5 space-y-5 animate-fade-in">
       <h3 className="flex items-center gap-2 text-base font-extrabold text-[#8D174B]">
         <Sparkles className="w-5 h-5" />
-        {fr ? 'Et maintenant ?' : 'وماذا بعد؟'}
+        {L('Et maintenant ?', 'وماذا بعد؟', 'What’s next?')}
       </h3>
 
       {next.length > 0 && (
         <div>
           <p dir="auto" className="text-[12px] font-extrabold text-[#242126] mb-2">
-            {fr ? `Continuer${set.theme ? ` en ${themeIn(set.theme, set.contentLanguage)}` : ''}` : 'تابع في نفس التخصص'}
+            {L(`Continuer${set.theme ? ` en ${set.theme}` : ''}`, 'تابع في نفس التخصص', set.theme ? `Keep practising: ${set.theme}` : 'Keep practising')}
           </p>
           <div className="space-y-2">
             {next.map((s, i) => {
@@ -133,7 +136,7 @@ export const PrepNextSteps: React.FC<Props> = ({
                     <I className="w-4 h-4" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[10.5px] font-bold text-[#6E6773]">{fr ? M.frOne : M.ar}</span>
+                    <span className="block text-[10.5px] font-bold text-[#6E6773]">{L(M.frOne, M.ar, M.enOne)}</span>
                     <span dir="auto" className="block text-[13px] font-bold text-[#242126] leading-snug line-clamp-2">{s.title[language] || s.title.fr}</span>
                   </span>
                   <Arrow className="w-4 h-4 text-[#8D174B] shrink-0" />
@@ -183,20 +186,24 @@ export const PrepNextSteps: React.FC<Props> = ({
           >
             <span className="flex items-center gap-2 text-[14px] font-extrabold">
               {isAuthed ? <BellRing className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
-              {isAuthed ? (fr ? 'Mes alertes concours' : 'تنبيهاتي') : fr ? 'Créer mon profil gratuit' : 'أنشئ ملفك مجاناً'}
+              {isAuthed ? L('Mes alertes concours', 'تنبيهاتي', 'My exam alerts') : L('Créer mon profil gratuit', 'أنشئ ملفك مجاناً', 'Create my free profile')}
             </span>
             <span className="block text-[12px] text-white/90 mt-1 leading-snug">
               {isAuthed
-                ? fr
-                  ? 'Choisissez vos spécialités : nouveaux concours, convocations et résultats rien que pour vous.'
-                  : 'اختر تخصصاتك لتصلك المباريات والاستدعاءات والنتائج.'
-                : fr
-                ? 'Gardez votre progression et recevez les nouveaux concours, convocations et résultats de votre spécialité.'
-                : 'احفظ تقدمك وتوصل بالمباريات والاستدعاءات والنتائج.'}
+                ? L(
+                    'Choisissez vos spécialités : nouveaux concours, convocations et résultats rien que pour vous.',
+                    'اختر تخصصاتك لتصلك المباريات والاستدعاءات والنتائج.',
+                    'Choose your fields to get new exams, notices and results.',
+                  )
+                : L(
+                    'Gardez votre progression et recevez les nouveaux concours, convocations et résultats de votre spécialité.',
+                    'احفظ تقدمك وتوصل بالمباريات والاستدعاءات والنتائج.',
+                    'Save your progress across devices and get alerts for new exams in your field.',
+                  )}
             </span>
           </button>
         )}
-        {onOpenSalarySimulator && (
+        {onOpenSalarySimulator && !en && (
           <button
             onClick={() => {
               gaEvent('next_step', { kind: 'salaire' });

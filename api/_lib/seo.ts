@@ -531,6 +531,8 @@ const withCorrige = (name: string, lang: Lang) => {
 // « Concours … » en tête du titre : c'est le premier mot tapé par les candidats sur Google.
 // La banque psychotechnique universelle ne prépare pas un concours précis : pas de préfixe « Concours ».
 const PSY_FOLDER = 'tests-psychotechniques';
+const PSY_FOLDER_EN = 'psychometric-tests';
+const isPsyFolder = (slug: string | null | undefined) => slug === PSY_FOLDER || slug === PSY_FOLDER_EN;
 const withConcours = (name: string, lang: Lang) => (lang === 'fr' && !/^concours/i.test(name) ? `Concours ${name}` : name);
 const kindLabel = (s: QcmSetRow, t: (typeof L)[Lang]) =>
   s.kind === 'sujet' ? t.writtenExam : s.kind === 'annales' ? t.realExam : isSujet(s) ? t.writtenTraining : t.training;
@@ -597,7 +599,9 @@ export function renderFolder(lang: Lang, f: FolderRow, sets: QcmSetRow[], base: 
     status: 200,
     lang,
     title: `${truncate(
-      f.slug === PSY_FOLDER
+      f.slug === PSY_FOLDER_EN
+        ? `${name}: free practice tests with answers`
+        : f.slug === PSY_FOLDER
         ? lang === 'ar' ? `${name}: تمارين مصححة وبطاقات منهجية` : `${name} : QCM corrigés et fiches méthode`
         : lang === 'ar' ? `${name}: نماذج حقيقية` : `${withConcours(name, lang)} : annales et QCM corrigés`,
       62,
@@ -656,7 +660,7 @@ export function renderQcm(
     status: 200,
     lang,
     // Un sujet avec corrigé KounKour l'annonce dès le titre (« sujet et corrigé » est la recherche des candidats).
-    title: `${s.corrige && isSujet(s) ? withCorrige(name, lang) : truncate(s.folder_slug === PSY_FOLDER ? name : withConcours(name, lang), 70)} | KounKour`,
+    title: `${s.corrige && isSujet(s) ? withCorrige(name, lang) : truncate(isPsyFolder(s.folder_slug) ? name : withConcours(name, lang), 70)} | KounKour`,
     description: truncate(desc || `${name} — ${meta.join(' · ')}`, 158),
     path: `/preparation/qcm/${encodeURIComponent(s.slug)}`,
     indexable: hasContent(s),

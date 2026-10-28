@@ -252,6 +252,8 @@ interface Props {
 // Écran d'un sujet d'examen écrit (pas de QCM) : sujet transcrit + photos de la copie originale.
 export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onImages, footer }) => {
   const fr = language === 'fr';
+  // Support en anglais (banque psychotechnique anglaise) : libellés en anglais.
+  const en = set.contentLanguage === 'en';
   const [showCorrige, setShowCorrige] = useState(false);
   const PrevIcon = fr ? ArrowLeft : ArrowRight;
   const duration = set.durationMinutes
@@ -266,7 +268,7 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
         className="mb-4 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF4F7] text-[#8D174B] border border-[#8D174B]/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95"
       >
         <PrevIcon className="w-4 h-4" />
-        {fr ? 'Retour au dossier' : 'الرجوع إلى الملف'}
+        {en ? 'Back to the folder' : fr ? 'Retour au dossier' : 'الرجوع إلى الملف'}
       </button>
 
       <header className="bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#F1E5EC] p-5 mb-4">
@@ -274,7 +276,7 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
           <FileText className="w-3.5 h-3.5" />
           {set.kind === 'sujet'
             ? fr ? 'Sujet d’examen écrit (réel)' : 'موضوع امتحان كتابي (حقيقي)'
-            : fr ? 'Sujet d’entraînement rédigé par KounKour (pas un sujet réel)' : 'موضوع تدريبي من إعداد KounKour (ليس موضوعاً حقيقياً)'}
+            : en ? 'Written by KounKour (not an official exam)' : fr ? 'Sujet d’entraînement rédigé par KounKour (pas un sujet réel)' : 'موضوع تدريبي من إعداد KounKour (ليس موضوعاً حقيقياً)'}
         </span>
         <h2 dir="auto" className="text-lg sm:text-xl font-extrabold text-[#242126] leading-snug mb-3">{set.title[language] || set.title.fr}</h2>
         <ConcoursRef set={set} language={language} variant="header" />
@@ -336,7 +338,9 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
           <Info className="w-3.5 h-3.5 text-[#8D174B] shrink-0 mt-0.5" />
           <span>
             {set.kind !== 'sujet'
-              ? fr
+              ? en
+                ? 'Written by the KounKour team: this is not an official exam paper.'
+                : fr
                 ? 'Sujet d’entraînement rédigé par l’équipe KounKour, ce n’est pas un sujet de concours réel. Traitez-le dans les conditions de l’examen, puis comparez avec le corrigé.'
                 : 'موضوع تدريبي من إعداد فريق KounKour، وليس موضوع مباراة حقيقياً.'
               : fr

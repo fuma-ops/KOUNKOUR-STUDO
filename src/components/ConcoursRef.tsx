@@ -10,6 +10,7 @@ import { OrgLogo } from './OrgLogo';
 export const ConcoursRef: React.FC<{ set: QcmSet; language: Language; variant?: 'card' | 'header' }> = ({ set, language, variant = 'card' }) => {
   const fr = language === 'fr';
   const real = set.kind === 'annales' || set.kind === 'sujet';
+  const en = set.contentLanguage === 'en';
   const label = set.concoursLabel || set.orgName || '';
   if (!label) return null;
   const big = variant === 'header';
@@ -21,7 +22,7 @@ export const ConcoursRef: React.FC<{ set: QcmSet; language: Language; variant?: 
       <div className="min-w-[9rem] flex-1">
         <p className={`flex items-center gap-1 font-extrabold uppercase tracking-wide ${big ? 'text-[11px]' : 'text-[10px]'} ${real ? 'text-emerald-800' : 'text-[#6E6773]'}`}>
           {real ? <ShieldCheck className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
-          {real ? (fr ? 'Concours réel' : 'مباراة حقيقية') : fr ? 'Préparation au concours' : 'تحضير لمباراة'}
+          {real ? (fr ? 'Concours réel' : 'مباراة حقيقية') : en ? 'Practice for' : fr ? 'Préparation au concours' : 'تحضير لمباراة'}
         </p>
         <p dir="auto" className={`font-bold text-[#242126] leading-snug ${big ? 'text-sm' : 'text-[12px]'}`}>{label}</p>
       </div>

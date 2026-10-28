@@ -6,7 +6,7 @@ import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
-import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType, themeIn } from '../data/qcmApi';
+import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
 import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
 import { LoadError } from './LoadError';
@@ -70,9 +70,10 @@ const OptionLetter: React.FC<{ i: number; tone: 'idle' | 'selected' | 'right' | 
 );
 
 // Clé d'URL d'un support : son slug en base.
-// Libellés du lecteur pour les séries en anglais (l'interface du site n'existe qu'en français et en arabe).
+// Libellés du lecteur et du dossier pour les séries en anglais (l'interface du site n'existe qu'en français et en arabe).
 const EN_PLAYER = {
   question: 'Question', of: 'of', nextQuestion: 'Next question', prevQuestion: 'Previous question',
+  minutes: 'minutes', questions: 'questions', startQcm: 'Start this test',
   finishQcm: 'Submit and see the answers', qcmResult: 'Test result', yourScore: 'Your score',
   congratulations: 'Excellent result! Keep practising.', goodEffort: 'Good work, review the detailed explanations below.',
   needsWork: 'Review the key ideas and try again to improve.', explanation: 'Explanation:', restart: 'Restart this test',
@@ -314,7 +315,10 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   };
 
   const fr = language === 'fr';
-  const en = selectedSet?.contentLanguage === 'en';
+  // Série ou dossier entièrement en anglais : libellés en anglais (le site n'existe qu'en français et en arabe).
+  const folderSets = selectedFolder ? setsOf(selectedFolder) : [];
+  const en = selectedSet ? selectedSet.contentLanguage === 'en' : folderSets.length > 0 && folderSets.every((x) => x.contentLanguage === 'en');
+  const L = (f: string, a: string, e: string) => (en ? e : fr ? f : a);
   const qp = en ? { ...t.preparation, ...EN_PLAYER } : t.preparation;
   const progressBar = (pct: number) => (
     <div className="w-full h-1.5 bg-[#F1E5EC] rounded-full overflow-hidden">
@@ -437,7 +441,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                   >
                     <div>
                       <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3 gap-2">
-                        <TypeBadge set={set} fr={fr} />
+                        <TypeBadge set={set} fr={fr} en={en} />
                         {set.examYear && <span className="font-bold text-[#8D174B]">{set.examYear}</span>}
                       </div>
                       <h3 dir="auto" className="text-base font-bold text-[#242126] mb-2">{set.title[language]}</h3>
@@ -445,21 +449,21 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                       {!!set.sourceImages?.length && (
                         <p className="text-[11px] font-bold text-emerald-800 mb-2 flex items-center gap-1">
                           <Eye className="w-3.5 h-3.5" />
-                          {fr ? `Photo du sujet original incluse (${set.sourceImages.length} p.)` : `صورة الموضوع الأصلي مرفقة (${set.sourceImages.length} ص)`}
+                          {L(`Photo du sujet original incluse (${set.sourceImages.length} p.)`, `صورة الموضوع الأصلي مرفقة (${set.sourceImages.length} ص)`, `Photo of the original paper included (${set.sourceImages.length} p.)`)}
                         </p>
                       )}
                     </div>
                     <div className="pt-3 border-t border-[#F1E5EC] flex items-center justify-between gap-2">
                       <span className="text-[11px] text-[#6E6773]">
                         {set.corrige
-                          ? fr ? 'Énoncé complet + corrigé KounKour' : 'نص كامل + تصحيح KounKour'
-                          : fr ? 'Énoncé complet, sans corrigé officiel' : 'نص كامل، بدون تصحيح رسمي'}
+                          ? L('Énoncé complet + corrigé KounKour', 'نص كامل + تصحيح KounKour', 'Full paper + KounKour answers')
+                          : L('Énoncé complet, sans corrigé officiel', 'نص كامل، بدون تصحيح رسمي', 'Full paper, no official answers')}
                       </span>
                       <button
                         onClick={() => handleStartSet(set)}
                         className="px-4 py-2 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
                       >
-                        {fr ? 'Lire le sujet' : 'قراءة الموضوع'}
+                        {L('Lire le sujet', 'قراءة الموضوع', 'Read the paper')}
                         <NextIcon className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -478,10 +482,10 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                 >
                   <div>
                     <div className="flex items-center justify-between text-xs text-[#6E6773] mb-3 gap-2">
-                      <TypeBadge set={set} fr={fr} />
+                      <TypeBadge set={set} fr={fr} en={en} />
                       <div className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{set.durationMinutes} {t.preparation.minutes}</span>
+                        <span>{set.durationMinutes} {qp.minutes}</span>
                       </div>
                     </div>
                     <h3 className="text-base font-bold text-[#242126] mb-2">{set.title[language]}</h3>
@@ -489,7 +493,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                     {!!set.sourceImages?.length && (
                       <p className="text-[11px] font-bold text-emerald-800 mb-2 flex items-center gap-1">
                         <Eye className="w-3.5 h-3.5" />
-                        {fr ? `Photo du sujet original incluse (${set.sourceImages.length} p.)` : `صورة الموضوع الأصلي مرفقة (${set.sourceImages.length} ص)`}
+                        {L(`Photo du sujet original incluse (${set.sourceImages.length} p.)`, `صورة الموضوع الأصلي مرفقة (${set.sourceImages.length} ص)`, `Photo of the original paper included (${set.sourceImages.length} p.)`)}
                       </p>
                     )}
                     <p className="text-xs text-[#6E6773] leading-relaxed mb-4 line-clamp-3">{set.description[language]}</p>
@@ -500,23 +504,23 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                     <div className="flex items-center justify-between text-[11px] text-[#6E6773] gap-2 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Eye className="w-3.5 h-3.5 text-[#8D174B]" />
-                        {seen === 0 ? (fr ? 'Non consulté' : 'لم تطلع عليه') : fr ? `${seen}/${total} questions vues (${pct} %)` : `${seen}/${total} (${pct}٪)`}
+                        {seen === 0 ? L('Non consulté', 'لم تطلع عليه', 'Not started') : L(`${seen}/${total} questions vues (${pct} %)`, `${seen}/${total} (${pct}٪)`, `${seen}/${total} questions seen (${pct}%)`)}
                       </span>
                       {p?.bestScore !== null && p?.bestScore !== undefined && (
                         <span className="flex items-center gap-1 font-bold text-[#242126]">
                           <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                          {fr ? `Meilleur score ${p.bestScore}/${total}` : `أفضل نتيجة ${p.bestScore}/${total}`}
+                          {L(`Meilleur score ${p.bestScore}/${total}`, `أفضل نتيجة ${p.bestScore}/${total}`, `Best score ${p.bestScore}/${total}`)}
                         </span>
                       )}
                     </div>
                     <div className="pt-2 border-t border-[#F1E5EC] flex items-center justify-between">
-                      <span className="text-xs font-medium text-[#242126]">{total} {t.preparation.questions}</span>
+                      <span className="text-xs font-medium text-[#242126]">{total} {qp.questions}</span>
                       <button
                         onClick={() => handleStartSet(set)}
                         className="px-4 py-2 rounded-xl bg-[#8D174B] hover:bg-[#75123E] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                       >
                         <span>
-                          {seen === 0 ? t.preparation.startQcm : (p?.attempts ? (fr ? 'Refaire' : 'إعادة') : (fr ? 'Continuer' : 'متابعة'))}
+                          {seen === 0 ? qp.startQcm : p?.attempts ? L('Refaire', 'إعادة', 'Retake') : L('Continuer', 'متابعة', 'Continue')}
                         </span>
                         <NextIcon className="w-3.5 h-3.5" />
                       </button>
@@ -532,7 +536,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
           className="mb-4 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF4F7] text-[#8D174B] border border-[#8D174B]/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
           <PrevIcon className="w-4 h-4" />
-          {fr ? 'Tous les concours' : 'كل المباريات'}
+          {L('Tous les concours', 'كل المباريات', 'All exams')}
         </button>
 
         {folder?.coverImage ? (
@@ -555,7 +559,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
               <div className="mt-3 max-w-sm">
                 {progressBar(st.pct)}
                 <p className="text-[11px] text-[#6E6773] mt-1">
-                  {fr ? `Progression du dossier : ${st.seen}/${st.total} questions vues (${st.pct} %)` : `تقدم الملف: ${st.seen}/${st.total} (${st.pct}٪)`}
+                  {L(`Progression du dossier : ${st.seen}/${st.total} questions vues (${st.pct} %)`, `تقدم الملف: ${st.seen}/${st.total} (${st.pct}٪)`, `Your progress: ${st.seen}/${st.total} questions seen (${st.pct}%)`)}
                 </p>
               </div>
             </div>
@@ -612,8 +616,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                 {hasSpecs && (
                   <section className="animate-fade-in">
                     <div className="flex items-center justify-between gap-2 mb-3">
-                      <h3 className="text-sm sm:text-base font-extrabold text-[#242126]">{fr ? 'Choisissez votre spécialité' : 'اختر تخصصك'}</h3>
-                      <span className="text-[11px] text-[#6E6773]">{groups.length} {fr ? 'spécialités' : 'تخصص'}</span>
+                      <h3 className="text-sm sm:text-base font-extrabold text-[#242126]">{L('Choisissez votre spécialité', 'اختر تخصصك', 'Choose a question type')}</h3>
+                      <span className="text-[11px] text-[#6E6773]">{groups.length} {L('spécialités', 'تخصص', 'types')}</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                       {groups.map((g, gi) => {
@@ -630,16 +634,16 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                           >
                             <span dir="auto" className="flex items-start gap-1.5 text-[13px] font-extrabold text-[#242126] leading-snug">
                               <FolderOpen className="w-4 h-4 text-[#8D174B] shrink-0 mt-0.5" />
-                              {g.theme && themeIn(g.theme, langFilter)}
+                              {g.theme}
                             </span>
                             <span className="mt-2 flex flex-wrap gap-1">
                               {countBy(g.sets).map(([ct, n]) => {
                                 const M = TYPE_META[ct];
                                 const I = M.icon;
                                 return (
-                                  <span key={ct} title={fr ? M.fr : M.ar} className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10.5px] font-bold ${M.cls}`}>
+                                  <span key={ct} title={L(M.fr, M.ar, M.en)} className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10.5px] font-bold ${M.cls}`}>
                                     <I className="w-3 h-3" />
-                                    {n} {fr ? M.short[n > 1 ? 1 : 0] : M.short[2]}
+                                    {n} {en ? M.enShort[n > 1 ? 1 : 0] : fr ? M.short[n > 1 ? 1 : 0] : M.short[2]}
                                   </span>
                                 );
                               })}
@@ -662,14 +666,14 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                         onClick={() => pickSpec(null)}
                         className="shrink-0 text-[11px] font-bold text-[#8D174B] bg-white border border-[#8D174B]/20 rounded-lg px-2.5 py-1 cursor-pointer active:scale-95"
                       >
-                        {fr ? 'Toutes les spécialités' : 'كل التخصصات'}
+                        {L('Toutes les spécialités', 'كل التخصصات', 'All types')}
                       </button>
                     </div>
                   )}
                   {types.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 mb-5">
                       <button onClick={() => setTypeFilter(null)} className={chip(!typeFilter, 'bg-white text-[#6E6773] border-[#F1E5EC]')}>
-                        {fr ? 'Tout' : 'الكل'} · {pool.length}
+                        {L('Tout', 'الكل', 'All')} · {pool.length}
                       </button>
                       {types.map(([ct, n]) => {
                         const M = TYPE_META[ct];
@@ -677,7 +681,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                         return (
                           <button key={ct} onClick={() => setTypeFilter(typeFilter === ct ? null : ct)} className={chip(typeFilter === ct, M.cls)}>
                             <I className="w-3.5 h-3.5" />
-                            {fr ? M.fr : M.ar} · {n}
+                            {L(M.fr, M.ar, M.en)} · {n}
                           </button>
                         );
                       })}
@@ -694,7 +698,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                           {g.theme && !specFilter && (
                             <div className="flex items-center gap-2 mb-3">
                               <span className="w-1.5 h-5 rounded-full bg-gradient-to-b from-[#8D174B] to-[#C73578]" />
-                              <h3 dir="auto" className="text-sm sm:text-base font-extrabold text-[#242126]">{themeIn(g.theme, langFilter)}</h3>
+                              <h3 dir="auto" className="text-sm sm:text-base font-extrabold text-[#242126]">{g.theme}</h3>
                               <span className="text-[11px] font-bold text-[#8D174B] bg-[#FDF2F7] border border-[#8D174B]/15 px-2 py-0.5 rounded-full">{g.sets.length}</span>
                             </div>
                           )}
@@ -706,7 +710,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
                                 <div key={ct}>
                                   <p className={`inline-flex items-center gap-1.5 text-[12px] font-extrabold rounded-lg border px-2.5 py-1 mb-2.5 ${M.cls}`}>
                                     <I className="w-3.5 h-3.5" />
-                                    {fr ? M.fr : M.ar} · {list.length}
+                                    {L(M.fr, M.ar, M.en)} · {list.length}
                                   </p>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{list.map((set, i) => renderSetCard(set, i))}</div>
                                 </div>
@@ -767,7 +771,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
           className="text-xs font-semibold text-[#8D174B] hover:underline flex items-center gap-1 cursor-pointer"
         >
           <PrevIcon className="w-4 h-4" />
-          <span>{language === 'fr' ? 'Retour au dossier' : 'الرجوع إلى الملف'}</span>
+          <span>{L('Retour au dossier', 'الرجوع إلى الملف', 'Back to the folder')}</span>
         </button>
 
         <div className="flex items-center gap-3">
