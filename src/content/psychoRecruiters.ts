@@ -9,6 +9,8 @@ type T = { fr: string; ar: string };
 export interface PsychoRecruiter {
   slug: string;
   name: T;
+  /** Nom court pour le titre de la page (onglet et Google), si le nom complet est long. */
+  short?: T;
   /** Expression (texte normalisé sans accents, en minuscules) qui reconnaît ses concours. */
   match: string;
   /** Ce que dit la source, sans rien ajouter. */
@@ -30,6 +32,7 @@ export const PSYCHO_RECRUITERS: PsychoRecruiter[] = [
   {
     slug: 'oncf',
     name: { fr: 'ONCF', ar: 'المكتب الوطني للسكك الحديدية' },
+    short: { fr: 'ONCF', ar: 'ONCF' },
     match: '\\boncf\\b|chemins? de fer',
     fact: {
       fr: "En 2026, l'ONCF a publié des listes de candidats retenus pour les « tests psychotechniques et visite médicale » : en juin pour le concours de 150 encadrants (Licence, Bac+3), et en mars pour les tests « psycho & médic » des 580 techniciens spécialisés (Bac+2).",
@@ -66,6 +69,7 @@ export const PSYCHO_RECRUITERS: PsychoRecruiter[] = [
   {
     slug: 'far-academie-royale-militaire',
     name: { fr: 'Forces armées royales (Académie royale militaire)', ar: 'القوات المسلحة الملكية (الأكاديمية الملكية العسكرية)' },
+    short: { fr: 'FAR', ar: 'القوات المسلحة الملكية' },
     match: 'forces armees royales|academie royale militaire|\\bfar\\b',
     fact: {
       fr: "Le concours des élèves officiers de l'Académie royale militaire (2026) comprend une visite médicale, des tests physiques, psychotechniques et psychologiques, ainsi qu'un entretien oral.",
@@ -78,6 +82,7 @@ export const PSYCHO_RECRUITERS: PsychoRecruiter[] = [
   {
     slug: 'srm',
     name: { fr: 'Sociétés régionales multiservices (SRM)', ar: 'الشركات الجهوية متعددة الخدمات' },
+    short: { fr: 'SRM', ar: 'الشركات الجهوية' },
     match: 'multiservices|\\bsrm\\b',
     fact: {
       fr: "Dans le sujet réel des techniciens électricité de la SRM Casablanca-Settat (2025), le « test n° 2 : connaissances générales » est fait de questions de type psychotechnique : suites de nombres et de lettres, codage, problèmes de calcul et suites de figures. Ce sujet est transcrit sur KounKour.",
@@ -91,6 +96,7 @@ export const PSYCHO_RECRUITERS: PsychoRecruiter[] = [
   {
     slug: 'ocp',
     name: { fr: 'OCP', ar: 'المكتب الشريف للفوسفاط' },
+    short: { fr: 'OCP', ar: 'OCP' },
     match: '\\bocp\\b|cherifien des phosphates',
     fact: {
       fr: "Pour le recrutement de jeunes ingénieurs de l'OCP (2014), l'annonce précisait que les candidats sélectionnés seraient invités à passer un test d'aptitude ainsi qu'un test de personnalité, avant des entretiens.",
@@ -159,7 +165,7 @@ export function psychoRecruiterDoc(r: PsychoRecruiter, lang: Lang): PsychoDoc {
   const fr = lang === 'fr';
   const n = r.name[lang];
   return {
-    title: fr ? `Tests psychotechniques ${n} : préparation et exercices corrigés` : `الاختبارات النفسية التقنية ${n}: التحضير وتمارين مصححة`,
+    title: fr ? `Tests psychotechniques ${(r.short || r.name).fr} : exercices corrigés gratuits` : `الاختبارات النفسية التقنية ${(r.short || r.name).ar}: تمارين مصححة`,
     h1: fr ? `Tests psychotechniques ${n}` : `الاختبارات النفسية التقنية: ${n}`,
     description: fr
       ? `Ce que l'on sait des tests psychotechniques ${n} (source à l'appui) et entraînement gratuit : suites, logique, codage, calcul, dominos, avec corrigés.`

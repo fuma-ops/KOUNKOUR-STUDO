@@ -756,7 +756,7 @@ export function renderPsycho(lang: Lang, slug: string | null, base: string, cont
       mainEntity: doc.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
     });
   const body = frame(lang, crumbs.map((c, i) => (i === crumbs.length - 1 ? { text: c.text } : c)), `<h1>${esc(doc.h1)}</h1><p>${esc(doc.intro)}</p>${rec ? '' : recList}${sections}${start}${openHtml}${faq}${rec ? recList : ''}`);
-  return { status: 200, lang, title: `${truncate(doc.title, 70)} | KounKour`, description: truncate(doc.description, 158), path, indexable: true, jsonLd, body };
+  return { status: 200, lang, title: `${truncate(doc.title, 72)} | KounKour`, description: truncate(doc.description, 158), path, indexable: true, jsonLd, body };
 }
 
 export function renderPrivate(lang: Lang, path: string): Page {
