@@ -193,9 +193,18 @@ const n = Math.max(1, Math.min(10, Number(a1) || 3));
 const outDir = a2 || join(HERE, '..', '..', '.social-out');
 mkdirSync(outDir, { recursive: true });
 // Priorité aux derniers jours (1 au plus), puis les nouveaux concours.
-const last = await pick('dernier', 1);
-const fresh = await pick('nouveau', n - last.length);
-const items = [...last.map((c) => ({ c, kind: 'dernier' })), ...fresh.map((c) => ({ c, kind: 'nouveau' }))];
+// SOCIAL_SLUG=<slug> : un seul concours précis (post de test).
+const only = process.env.SOCIAL_SLUG;
+let items;
+if (only) {
+  const [c] = await rest(`/contests?select=${COLS}&slug=eq.${encodeURIComponent(only)}`);
+  if (!c) throw new Error(`concours introuvable : ${only}`);
+  items = [{ c, kind: daysLeft(c.deadline_date) <= 2 ? 'dernier' : 'nouveau' }];
+} else {
+  const last = await pick('dernier', 1);
+  const fresh = await pick('nouveau', n - last.length);
+  items = [...last.map((c) => ({ c, kind: 'dernier' })), ...fresh.map((c) => ({ c, kind: 'nouveau' }))];
+}
 const done = await render(items, outDir);
 if (cmd === 'apercu') {
   console.log(JSON.stringify(done.map((x) => ({ type: x.kind, concours: x.c.title_fr, image: x.png })), null, 2));
