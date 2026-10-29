@@ -135,6 +135,23 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   const [gradeError, setGradeError] = useState(false);
   // Questions dont le candidat a demandé la correction (affichée tout de suite sous la question).
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  // Mode choisi par le candidat (gardé sur l'appareil) : entraînement = correction après chaque
+  // question ; examen = chronomètre (compte à rebours si la durée est connue), corrections à la fin.
+  const [mode, setModeState] = useState<'train' | 'exam'>(() => {
+    try {
+      return localStorage.getItem('kk-qcm-mode') === 'exam' ? 'exam' : 'train';
+    } catch {
+      return 'train';
+    }
+  });
+  const setMode = (m: 'train' | 'exam') => {
+    setModeState(m);
+    try {
+      localStorage.setItem('kk-qcm-mode', m);
+    } catch {
+      /* navigation privée */
+    }
+  };
 
   // Supports : annales réelles (Supabase) puis entraînement KounKour, rangés par dossier.
   const [realSets, setRealSets] = useState<QcmSet[]>([]);
@@ -242,6 +259,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
     setCorrections(null);
     setGradeError(false);
     setChecked({});
+    autoSubmitted.current = false;
   };
   const handleStartSet = (set: QcmSet) => {
     initQuiz(set);
@@ -313,6 +331,16 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
     }
     setChecked((prev) => ({ ...prev, [qid]: true }));
   };
+
+  // Examen : à la fin du temps imparti, la copie est rendue automatiquement.
+  const examLimit = mode === 'exam' && selectedSet?.durationMinutes ? selectedSet.durationMinutes * 60 : 0;
+  const autoSubmitted = React.useRef(false);
+  useEffect(() => {
+    if (!examLimit || isSubmitted || timerSeconds < examLimit || autoSubmitted.current) return;
+    autoSubmitted.current = true;
+    handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerSeconds, examLimit, isSubmitted]);
 
   const handleSubmit = async () => {
     if (!selectedSet || grading) return;
@@ -753,10 +781,20 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
         </button>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-[#242126] bg-[#F8F2F5] px-3 py-1.5 rounded-lg">
-            <Clock className="w-3.5 h-3.5 text-[#8D174B]" />
-            <span>{formatTime(timerSeconds)}</span>
-          </div>
+          {examLimit && !isSubmitted ? (
+            <div
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg ${examLimit - timerSeconds <= 60 ? 'bg-rose-50 text-rose-700 animate-pulse' : 'bg-[#F8F2F5] text-[#242126]'}`}
+              aria-label={L('Temps restant', 'الوقت المتبقي', 'Time left')}
+            >
+              <Clock className="w-3.5 h-3.5 text-[#8D174B]" />
+              <span>{formatTime(Math.max(0, examLimit - timerSeconds))}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#242126] bg-[#F8F2F5] px-3 py-1.5 rounded-lg">
+              <Clock className="w-3.5 h-3.5 text-[#8D174B]" />
+              <span>{formatTime(timerSeconds)}</span>
+            </div>
+          )}
 
           <span className="text-xs font-semibold text-[#6E6773]">
             {currentQuestionIndex + 1} / {selectedSet.questions.length}
@@ -935,6 +973,30 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
       ) : (
         /* Active Single Question View */
         <div className="bg-white border border-[#F1E5EC] rounded-3xl p-4 sm:p-8 shadow-sm">
+          {/* Choix du mode : correction immédiate ou test chronométré */}
+          <div role="radiogroup" aria-label={L('Mode du QCM', 'طريقة الاختبار', 'Test mode')} className="grid grid-cols-2 gap-1 p-1 mb-4 rounded-2xl bg-[#F8F2F5]">
+            {(
+              [
+                ['train', L('Entraînement', 'تدريب', 'Practice'), L('Réponse après chaque question', 'الجواب بعد كل سؤال', 'Answer after each question')],
+                ['exam', L('Test chronométré', 'اختبار بالتوقيت', 'Timed test'), selectedSet.durationMinutes ? L(`${selectedSet.durationMinutes} min · corrections à la fin`, `${selectedSet.durationMinutes} دقيقة · التصحيح في النهاية`, `${selectedSet.durationMinutes} min · answers at the end`) : L('Corrections à la fin', 'التصحيح في النهاية', 'Answers at the end')],
+              ] as const
+            ).map(([m, t, d]) => (
+              <button
+                key={m}
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(m)}
+                className={`rounded-xl px-2.5 py-2 text-start transition-all active:scale-95 ${mode === m ? 'bg-white shadow-sm ring-1 ring-[#8D174B]/20' : 'hover:bg-white/60'}`}
+              >
+                <span className={`flex items-center gap-1.5 text-[12.5px] font-extrabold ${mode === m ? 'text-[#8D174B]' : 'text-[#6E6773]'}`}>
+                  {m === 'train' ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <Clock className="w-3.5 h-3.5 shrink-0" />}
+                  {t}
+                </span>
+                <span className="block text-[10.5px] font-semibold text-[#6E6773] leading-tight mt-0.5">{d}</span>
+              </button>
+            ))}
+          </div>
+
           {/* Progress bar */}
           <div className="w-full bg-[#F1E5EC] h-1.5 rounded-full overflow-hidden mb-5">
             <div
@@ -1002,7 +1064,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
           </div>
 
           {/* Correction immédiate de la question */}
-          {checked[currentQ.id] ? (
+          {mode === 'exam' && !checked[currentQ.id] ? null : checked[currentQ.id] ? (
             (() => {
               const corr = correctionOf(currentQ);
               const ok = !!corr.correctOptionId && userAnswers[currentQ.id] === corr.correctOptionId;
