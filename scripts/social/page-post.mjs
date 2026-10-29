@@ -5,7 +5,7 @@
 //
 // Le texte Instagram (hashtags plus nombreux, « lien en bio ») est facultatif : sans lui, le
 // texte Facebook est repris. Jetons lus en base avec la clé robot, jamais affichés.
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
 const ANON = 'sb_publishable_4tlFDcDCPj4lfV92NARBLg_VdBLPInr';
@@ -35,6 +35,17 @@ async function facebookReel(page, file, text) {
   const uj = await up.json();
   if (!up.ok || !uj.success) throw new Error(`envoi vidéo : ${JSON.stringify(uj).slice(0, 200)}`);
   await graph(`/${page.page_id}/video_reels`, page.token, { upload_phase: 'finish', video_id, video_state: 'PUBLISHED', description: text }, 'POST');
+  // Miniature : <fichier>.cover.png à côté de la vidéo, s'il existe.
+  const cover = file.replace(/\.(mp4|mov)$/i, '.cover.png');
+  if (existsSync(cover)) {
+    const fd = new FormData();
+    fd.append('source', new Blob([readFileSync(cover)], { type: 'image/png' }), 'cover.png');
+    fd.append('is_preferred', 'true');
+    fd.append('access_token', page.token);
+    const r = await fetch(`${GRAPH}/${video_id}/thumbnails`, { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok || j.error) console.error(`miniature : ${j.error?.message || r.status}`);
+  }
   return video_id;
 }
 async function facebookPhoto(page, file, text) {

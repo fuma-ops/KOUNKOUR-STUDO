@@ -458,7 +458,7 @@ const T=${T}, D=${dur}, N=${cards.length};
 const ease=(x)=>1-Math.pow(1-Math.min(1,Math.max(0,x)),3);
 window.setT=(t)=>{
   const spans=[[0,2.4]];for(let i=0;i<N;i++)spans.push([2.4+i*D,2.4+(i+1)*D]);spans.push([2.4+N*D,T]);
-  spans.forEach(([a,b],i)=>{const el=document.getElementById('s'+i);const inn=ease((t-a)/0.45), out=i===spans.length-1?0:ease((t-(b-0.35))/0.35);
+  spans.forEach(([a,b],i)=>{const el=document.getElementById('s'+i);const inn=i===0?1:ease((t-a)/0.45), out=i===spans.length-1?0:ease((t-(b-0.35))/0.35);
     el.style.opacity=Math.max(0,inn-out);el.style.transform='translateY('+((1-inn)*90-out*60)+'px) scale('+(0.96+0.04*inn)+')';});
   document.getElementById('bar').style.width=(t/T*100)+'%';
 };
@@ -471,6 +471,9 @@ window.setT=(t)=>{
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   await page.goto(`file://${resolve(f)}.html`, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
+  // Couverture (miniature) = première image : l'intro « Les concours du jour » complète.
+  await page.evaluate(() => window.setT(0));
+  await page.screenshot({ path: `${f}.cover.png` });
   const fps = 30;
   const frames = Math.round(T * fps);
   for (let i = 0; i < frames; i++) {
@@ -493,7 +496,7 @@ window.setT=(t)=>{
     TAGS + ' #reels',
   ]);
   writeFileSync(`${f}.txt`, text);
-  return { kind: 'reel', key: REEL_KEY, mp4: `${f}.mp4`, text };
+  return { kind: 'reel', key: REEL_KEY, mp4: `${f}.mp4`, cover: `${f}.cover.png`, text };
 }
 
 // ---------------------------------------------------------------------------
@@ -527,6 +530,16 @@ async function publishReel(item, secret, when) {
   const uj = await up.json();
   if (!up.ok || !uj.success) throw new Error(`envoi vidéo : ${JSON.stringify(uj).slice(0, 200)}`);
   await graph(`/${secret.page_id}/video_reels`, { upload_phase: 'finish', video_id, description: item.text, ...(when ? { video_state: 'SCHEDULED', scheduled_publish_time: String(when) } : { video_state: 'PUBLISHED' }) }, secret);
+  // Miniature Facebook = la couverture (sinon une image prise au hasard dans la vidéo).
+  if (item.cover && existsSync(item.cover)) {
+    const fd = new FormData();
+    fd.append('source', new Blob([readFileSync(item.cover)], { type: 'image/png' }), 'cover.png');
+    fd.append('is_preferred', 'true');
+    fd.append('access_token', secret.token);
+    const r = await fetch(`${GRAPH}/${video_id}/thumbnails`, { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok || j.error) console.error(`miniature : ${j.error?.message || r.status}`);
+  }
   return video_id;
 }
 
