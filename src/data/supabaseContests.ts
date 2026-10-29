@@ -111,6 +111,7 @@ function mapRow(row: any): Contest {
     location: { fr: regionFr, ar: regionAr },
     publicationDate: formatFr(row.publication_date),
     deadlineDate: formatFr(row.deadline_date),
+    deadlineISO: row.deadline_date || undefined,
     daysRemaining: daysFromISO(row.deadline_date),
     contestDate: formatFr(row.exam_date),
     isVerifiedSource: true,

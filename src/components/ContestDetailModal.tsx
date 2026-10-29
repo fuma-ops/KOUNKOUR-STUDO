@@ -7,13 +7,14 @@ import {
   X, ArrowLeft, ArrowRight, Bookmark, Share2, Calendar, MapPin, 
   GraduationCap, Users, ShieldCheck, Download, ExternalLink, 
   FileText, Clock, Award, MessageCircle, AlertCircle, Sparkles, Check,
-  CheckCircle2, Tag, AlertTriangle, Eye, DollarSign, Building2
+  CheckCircle2, Tag, AlertTriangle, Eye, DollarSign, Building2, BellRing
 } from 'lucide-react';
 import { PdfViewerModal } from './PdfViewerModal';
 import { ContestComments } from './ContestComments';
 import { ContestPrepLinks } from './ContestPrepLinks';
 import { ContestStageTracker } from './ContestStageTracker';
 import { ContestAlertButton } from './AlertMe';
+import { SimilarContests } from './SimilarContests';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
 import { OrgLogo } from './OrgLogo';
@@ -31,6 +32,10 @@ interface ContestDetailModalProps {
   onOpenSalarySimulator?: (contest: Contest) => void;
   onRequestLogin?: () => void;
   onOpenPrepFolder?: (folderSlug: string) => void;
+  onOpenPrepHome?: () => void;
+  onOpenPsyTrain?: () => void;
+  allContests?: Contest[];
+  onOpenContest?: (c: Contest) => void;
 }
 
 // Identifiant du concours SUR emploi-public.ma (pour l'arrêté et les listes officielles).
@@ -52,6 +57,10 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
   onOpenSalarySimulator,
   onRequestLogin,
   onOpenPrepFolder,
+  onOpenPrepHome,
+  onOpenPsyTrain,
+  allContests = [],
+  onOpenContest,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'apply' | 'exams' | 'docs'>('info');
   const [commentCount, setCommentCount] = useState(0);
@@ -100,7 +109,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
   const orgName = contest.administration?.name?.[language] || contest.administration?.name?.fr || 'Administration';
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex justify-center items-start sm:items-center p-0 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/60 backdrop-blur-xs flex justify-center items-start sm:items-center p-0 sm:p-4 animate-fade-in">
       <div className="bg-white w-full max-w-3xl min-h-screen sm:min-h-0 sm:max-h-[92vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col justify-between my-auto border border-[#F1E5EC]">
         
         {/* Sticky Top App Bar */}
@@ -163,7 +172,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
         </div>
 
         {/* Scrollable Modal Body */}
-        <div className="flex-1 overflow-y-auto">
+        <div id="kk-contest-scroll" className="flex-1 overflow-y-auto">
           
           {/* ========================================================================= */}
           {/* 1. HERO IDENTITY & MOROCCAN BANNER (IMMEDIATE VISUAL SCAN IN 5 SECONDS) */}
@@ -226,7 +235,15 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
             {/* Suivi après la clôture : convoqués écrit / oral, résultats (listes officielles) */}
             {/* Alerte en un clic, sans inscription : rappel, convoqués, résultats */}
             {/^[0-9a-f-]{36}$/.test(contest.id) && (
-              <ContestAlertButton contestId={contest.id} language={language} closed={['closed', 'in_progress', 'results'].includes(contest.status)} />
+              <div id="kk-contest-alert" className="scroll-mt-24">
+                <ContestAlertButton
+                  contestId={contest.id}
+                  language={language}
+                  closed={['closed', 'in_progress', 'results'].includes(contest.status)}
+                  deadlineISO={contest.deadlineISO}
+                  onCalendar={() => downloadContestIcs(contest, language)}
+                />
+              </div>
             )}
             <ContestStageTracker contest={contest} language={language} />
 
@@ -758,7 +775,22 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
               contest={contest}
               language={language}
               onOpenFolder={onOpenPrepFolder ? (slug) => { onClose(); onOpenPrepFolder(slug); } : undefined}
+              onOpenPrep={onOpenPrepHome ? () => { onClose(); onOpenPrepHome(); } : undefined}
+              onOpenPsy={onOpenPsyTrain ? () => { onClose(); onOpenPsyTrain(); } : undefined}
             />
+
+            {/* Concours similaires encore ouverts : suite naturelle de la visite */}
+            {onOpenContest && (
+              <SimilarContests
+                contest={contest}
+                all={allContests}
+                language={language}
+                onOpen={(c) => {
+                  onOpenContest(c);
+                  document.getElementById('kk-contest-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            )}
 
             {/* Commentaires des candidats : toujours visibles sous le concours */}
             <ContestComments
@@ -801,6 +833,18 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
               className="flex-1 py-3 px-4 rounded-xl bg-gray-100 text-gray-700 font-bold text-xs"
             >
               <span>{language === 'fr' ? 'Fermer la fiche' : 'إغلاق'}</span>
+            </button>
+          )}
+          {/* Rappel avant la date limite, toujours à portée du pouce */}
+          {!['closed', 'in_progress', 'results'].includes(contest.status) && (
+            <button
+              type="button"
+              onClick={() => document.getElementById('kk-contest-alert')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              aria-label={language === 'fr' ? 'Me rappeler avant la date limite' : 'ذكّرني قبل آخر أجل'}
+              className="shrink-0 py-3 px-3.5 rounded-xl bg-[#FDF2F7] text-[#8D174B] border border-[#8D174B]/20 font-extrabold text-xs flex items-center gap-1.5 active:scale-95"
+            >
+              <BellRing className="w-4 h-4" />
+              <span>{language === 'fr' ? 'Rappel' : 'تذكير'}</span>
             </button>
           )}
         </div>

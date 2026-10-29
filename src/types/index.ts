@@ -83,6 +83,7 @@ export interface Contest {
   };
   publicationDate: string;
   deadlineDate: string;
+  deadlineISO?: string; // AAAA-MM-JJ (date limite brute, pour les rappels)
   daysRemaining: number;
   contestDate?: string;
   isVerifiedSource: boolean;

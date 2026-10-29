@@ -845,6 +845,20 @@ export default function App() {
           setIsSalaryModalOpen(true);
         }}
         onRequestLogin={() => setAuthOpen(true)}
+        allContests={allActiveContests}
+        onOpenContest={setSelectedContest}
+        onOpenPrepHome={() => {
+          setSelectedContest(null);
+          setPendingContestSlug(null);
+          setQcmRoute({ folder: null, set: null });
+          setActiveTab('preparation');
+        }}
+        onOpenPsyTrain={() => {
+          setSelectedContest(null);
+          setPendingContestSlug(null);
+          setPsyCat(null);
+          setActiveTab('psytrain');
+        }}
         onOpenPrepFolder={(slug) => {
           setSelectedContest(null);
           setPendingContestSlug(null);

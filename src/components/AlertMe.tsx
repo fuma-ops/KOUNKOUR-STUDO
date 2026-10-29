@@ -56,14 +56,74 @@ const InstallNudge: React.FC<{ fr: boolean; where: string }> = ({ fr, where }) =
 );
 
 /** Fiche concours : « M'alerter » (convocations, résultats, date limite). */
-export const ContestAlertButton: React.FC<{ contestId: string; language: Language; closed?: boolean }> = ({ contestId, language, closed }) => {
+// Navigateurs intégrés (Facebook, Instagram, WhatsApp…) : pas de notifications possibles.
+const inAppBrowser = () => typeof navigator !== 'undefined' && /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|TikTok/i.test(navigator.userAgent);
+const REMIND_DAYS = 3; // même délai que le rappel envoyé (api/_lib/follows.ts)
+
+// Date du rappel (JJ/MM) = date limite − 3 jours, comme l'envoi serveur ; null si c'est déjà passé.
+function reminderDay(deadlineISO?: string): string | null {
+  if (!deadlineISO || !/^\d{4}-\d{2}-\d{2}/.test(deadlineISO)) return null;
+  const d = new Date(`${deadlineISO.slice(0, 10)}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - REMIND_DAYS);
+  const iso = d.toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+  if (iso < today) return null;
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+}
+
+export const ContestAlertButton: React.FC<{ contestId: string; language: Language; closed?: boolean; deadlineISO?: string; onCalendar?: () => void }> = ({
+  contestId,
+  language,
+  closed,
+  deadlineISO,
+  onCalendar,
+}) => {
   const fr = language === 'fr';
   const { state, installable } = useFollow();
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
   const [steps, setSteps] = useState(false);
   const [err, setErr] = useState('');
-  if (!pushSupported() && !isIOS()) return null;
+  const [copied, setCopied] = useState(false);
+  const remind = closed ? null : reminderDay(deadlineISO);
+  if (inAppBrowser() || (!pushSupported() && !isIOS())) {
+    // Ouvert depuis Facebook / WhatsApp : expliquer comment activer le rappel, ou l'ajouter à l'agenda.
+    if (!inAppBrowser() && !onCalendar) return null;
+    return (
+      <div className="rounded-2xl border border-[#8D174B]/25 bg-white p-3.5 shadow-sm animate-fade-in">
+        <p className="text-[13px] font-extrabold text-[#242126] flex items-center gap-2">
+          <BellRing className="w-5 h-5 text-[#8D174B] shrink-0" />
+          {remind ? (fr ? `Ne ratez pas la date limite : rappel le ${remind}` : `لا تفوّت آخر أجل: تذكير يوم ${remind}`) : fr ? 'Être prévenu des convoqués et des résultats' : 'توصل بلوائح المدعوين والنتائج'}
+        </p>
+        {inAppBrowser() && (
+          <p className="mt-1.5 text-[12px] text-[#4A4250] leading-snug">
+            {fr
+              ? 'Les alertes ne marchent pas dans le navigateur de Facebook ou WhatsApp : ouvrez cette page dans Chrome (menu ⋮ → « Ouvrir dans le navigateur »), puis touchez « M’alerter ».'
+              : 'التنبيهات لا تعمل داخل متصفح فيسبوك أو واتساب: افتح الصفحة في Chrome (القائمة ⋮ ← «فتح في المتصفح») ثم اضغط «نبّهني».'}
+          </p>
+        )}
+        <div className="mt-2.5 grid grid-cols-2 gap-2">
+          {inAppBrowser() && (
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard?.writeText(window.location.href).then(() => setCopied(true)).catch(() => {});
+                gaEvent('push_inapp_copy', { where: 'concours' });
+              }}
+              className="rounded-xl bg-[#8D174B] text-white px-3 py-2.5 text-[12.5px] font-extrabold active:scale-95 cursor-pointer"
+            >
+              {copied ? (fr ? 'Lien copié ✓' : 'تم النسخ ✓') : fr ? 'Copier le lien' : 'نسخ الرابط'}
+            </button>
+          )}
+          {onCalendar && !closed && (
+            <button type="button" onClick={onCalendar} className={`rounded-xl bg-[#FDF2F7] text-[#8D174B] px-3 py-2.5 text-[12.5px] font-extrabold active:scale-95 cursor-pointer ${inAppBrowser() ? '' : 'col-span-2'}`}>
+              {fr ? 'Ajouter à mon agenda' : 'أضف إلى المفكرة'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
   const on = !!state?.follows?.includes(contestId);
 
   const enable = async () => {
@@ -88,7 +148,7 @@ export const ContestAlertButton: React.FC<{ contestId: string; language: Languag
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 text-[13px] font-extrabold text-emerald-900">
             <Check className="w-5 h-5 shrink-0" />
-            {fr ? 'Alertes activées pour ce concours' : 'التنبيهات مفعّلة لهذه المباراة'}
+            {remind ? (fr ? `Rappel prévu le ${remind}, puis convoqués et résultats` : `تذكير يوم ${remind} ثم المدعوون والنتائج`) : fr ? 'Alertes activées pour ce concours' : 'التنبيهات مفعّلة لهذه المباراة'}
           </span>
           <button type="button" onClick={() => unfollowOnThisDevice({ contestId })} className="text-[11px] font-bold text-emerald-800 underline cursor-pointer shrink-0">
             {fr ? 'Arrêter' : 'إيقاف'}
@@ -107,7 +167,7 @@ export const ContestAlertButton: React.FC<{ contestId: string; language: Languag
         className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#8D174B] hover:bg-[#75123E] disabled:opacity-60 text-white px-4 py-3 text-[14px] font-extrabold shadow-md active:scale-95 transition-all cursor-pointer animate-selected-glow"
       >
         {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <BellRing className="w-5 h-5" />}
-        {fr ? 'M’alerter pour ce concours' : 'نبّهني بخصوص هذه المباراة'}
+        {remind ? (fr ? `Me rappeler le ${remind} (3 jours avant)` : `ذكّرني يوم ${remind} (قبل 3 أيام)`) : fr ? 'M’alerter pour ce concours' : 'نبّهني بخصوص هذه المباراة'}
       </button>
       <p className="mt-2 text-[11.5px] text-[#6E6773] text-center leading-snug">
         {closed
@@ -115,7 +175,7 @@ export const ContestAlertButton: React.FC<{ contestId: string; language: Languag
             ? 'Notification dès la publication des convoqués et des résultats. Gratuit, sans inscription.'
             : 'إشعار فور نشر لوائح المدعوين والنتائج. مجاناً وبدون تسجيل.'
           : fr
-            ? 'Rappel avant la date limite, puis convoqués et résultats dès leur publication. Gratuit, sans inscription.'
+            ? 'Un rappel sur votre téléphone avant la clôture, puis les convoqués et les résultats dès leur publication. Gratuit, sans inscription, en un clic.'
             : 'تذكير قبل آخر أجل، ثم لوائح المدعوين والنتائج فور نشرها. مجاناً وبدون تسجيل.'}
       </p>
       {denied && (
