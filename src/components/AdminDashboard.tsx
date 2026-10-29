@@ -20,6 +20,7 @@ import { PdfViewerModal } from './PdfViewerModal';
 import { ContestEditModal } from './ContestEditModal';
 import { AdminCommunityRequestsModal } from './AdminCommunityRequestsModal';
 import { AdminOverview } from './AdminOverview';
+import { AdminNotifications } from './AdminNotifications';
 import { RadarAttachDocs } from './RadarAttachDocs';
 import { listAccessRequests } from '../data/communityApi';
 import { getAllActiveContests, deleteContestFromSystem, updateContestInSystem } from '../utils/radarStorage';
@@ -237,6 +238,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             {/* User Profile & Notification icons */}
             <div className="flex items-center gap-3">
+              {/* Nouveaux messages et commentaires de la communauté */}
+              <AdminNotifications language={language} />
               {/* Private Circle Requests Button */}
               <button
                 onClick={() => setIsCommunityRequestsModalOpen(true)}
