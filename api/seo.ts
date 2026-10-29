@@ -37,27 +37,74 @@ const CONTEST_COLS =
   'id,slug,title_fr,title_ar,title_original,status,summary_fr,summary_ar,diploma_fr,positions,region_fr,deadline_date,exam_date,apply_url,source_url,source_org,publication_date,published_at,verified_at,updated_at,grade_fr,reference,administration_id,administrations(name_fr,name_ar),contest_positions(position,province,category,diploma,specialty,count,note),stage,contest_documents(doc_type,title_fr,title_ar,url,position)';
 const SET_COLS =
   'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,statement,corrige,position,theme,old_slugs,qcm_questions(id,position,source_number,question,options)';
+// Listes de séries (accueil, fiches, dossiers, sitemap) : sans énoncés, corrigés ni texte des questions.
+const SET_LIGHT_COLS =
+  'id,slug,folder_slug,title_fr,title_ar,description_fr,description_ar,language,kind,concours_label,exam_year,source_note,position,theme,old_slugs,qcm_questions(id)';
 
 const CANONICAL_ORIGIN = 'https://kounkour.com';
 const OLD_HOSTS = ['kounkour-studo.vercel.app', 'www.kounkour.com'];
 
 const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
-async function contests(): Promise<ContestRow[]> {
-  const { data, error } = await sb().from('contests').select(CONTEST_COLS).order('deadline_date', { ascending: false, nullsFirst: false });
-  if (error) throw new Error(error.message);
-  return (data || []) as unknown as ContestRow[];
+// Cache en mémoire de la fonction (réutilisée entre requêtes) : une vague de visites (aperçus
+// Facebook, robots) ne relance pas les mêmes grosses lectures ; en cas d'erreur, la dernière
+// version connue est servie.
+const TTL = 5 * 60 * 1000;
+const memo = new Map<string, { at: number; value?: unknown; pending?: Promise<unknown> }>();
+function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const e = memo.get(key) || { at: 0 };
+  memo.set(key, e);
+  if (e.value !== undefined && Date.now() - e.at < TTL) return Promise.resolve(e.value as T);
+  if (!e.pending) {
+    e.pending = load()
+      .then((v) => {
+        e.value = v;
+        e.at = Date.now();
+        return v;
+      })
+      .catch((err) => {
+        if (e.value !== undefined) return e.value;
+        throw err;
+      })
+      .finally(() => {
+        e.pending = undefined;
+      });
+  }
+  return e.pending as Promise<T>;
 }
-async function folders(): Promise<FolderRow[]> {
-  const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image,old_slugs,match_terms').eq('status', 'published').order('position');
-  if (error) throw new Error(error.message);
-  return (data || []) as FolderRow[];
-}
-async function sets(): Promise<QcmSetRow[]> {
-  const { data, error } = await sb().from('qcm_sets').select(SET_COLS).eq('status', 'published').order('position');
-  if (error) throw new Error(error.message);
-  return (data || []) as unknown as QcmSetRow[];
-}
+
+const contests = () =>
+  cached('contests', async (): Promise<ContestRow[]> => {
+    const { data, error } = await sb().from('contests').select(CONTEST_COLS).order('deadline_date', { ascending: false, nullsFirst: false });
+    if (error) throw new Error(error.message);
+    return (data || []) as unknown as ContestRow[];
+  });
+const folders = () =>
+  cached('folders', async (): Promise<FolderRow[]> => {
+    const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image,old_slugs,match_terms').eq('status', 'published').order('position');
+    if (error) throw new Error(error.message);
+    return (data || []) as FolderRow[];
+  });
+// Séries publiées, en version légère. `statement` vaut « 1 » quand la série a un énoncé : seuls
+// les tests « a un contenu / est un sujet » s'en servent hors de la page de la série.
+const sets = () =>
+  cached('sets', async (): Promise<QcmSetRow[]> => {
+    const [all, withStatement] = await Promise.all([
+      sb().from('qcm_sets').select(SET_LIGHT_COLS).eq('status', 'published').order('position'),
+      sb().from('qcm_sets').select('id').eq('status', 'published').not('statement', 'is', null).neq('statement', ''),
+    ]);
+    if (all.error) throw new Error(all.error.message);
+    if (withStatement.error) throw new Error(withStatement.error.message);
+    const has = new Set((withStatement.data || []).map((x: { id: string }) => x.id));
+    return ((all.data || []) as unknown as QcmSetRow[]).map((x) => ({ ...x, statement: has.has(x.id) ? '1' : null }));
+  });
+// Une série complète (énoncé, corrigé, questions) pour sa propre page.
+const fullSet = (id: string) =>
+  cached(`set:${id}`, async (): Promise<QcmSetRow | null> => {
+    const { data, error } = await sb().from('qcm_sets').select(SET_COLS).eq('id', id).maybeSingle();
+    if (error) throw new Error(error.message);
+    return (data || null) as unknown as QcmSetRow | null;
+  });
 
 // Gabarit = app.html produit par le build (scripts et styles de l'application).
 let templateCache: string | null = null;
@@ -117,7 +164,8 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
     }
     case 'qcm': {
       const [f, s] = await Promise.all([folders(), sets()]);
-      const set = s.find((x) => x.slug === r.slug);
+      const light = s.find((x) => x.slug === r.slug);
+      const set = light ? await fullSet(light.id) : null;
       if (!set) {
         const moved = s.find((x) => x.old_slugs?.includes(r.slug));
         return moved ? redirectTo(lang, `/preparation/qcm/${encodeURIComponent(moved.slug)}`) : renderNotFound(lang, pathname);
