@@ -445,9 +445,13 @@ h1{margin-top:38px;font-size:56px;line-height:1.14;font-weight:800;color:#8D174B
 .num{position:absolute;top:300px;font-size:34px;font-weight:800;letter-spacing:3px;opacity:.85}
 .bar{position:absolute;left:0;bottom:0;height:12px;background:#F4C2D7}
 .s .ar{font-size:44px;font-weight:700;margin-top:30px;opacity:.9}
+.cvb{font-size:60px;margin-bottom:46px}.cvb .k{width:96px;height:96px;font-size:62px;border-radius:26px}
+.logos{display:flex;gap:22px;justify-content:center;margin-top:40px}.logos .logo{width:150px;height:150px;border-radius:32px;border:none;box-shadow:0 14px 34px rgba(0,0,0,.25)}
+.logos .logo img{max-width:124px;max-height:124px}.logos .logo .ini{font-size:40px}
 </style></head><body><div class="pattern"></div>
 <div class="top"><div class="brand"><div class="k">K</div>KounKour</div></div>
-<div class="s" id="s0"><div class="big">Les concours<br>du jour</div><div class="sub">${esc(dateFr(today))}</div>
+<div class="s" id="s0"><div class="brand cvb"><div class="k">K</div>KounKour</div><div class="big">Les concours<br>du jour</div><div class="sub">${esc(dateFr(today))}</div>
+<div class="logos">${cards.slice(0, 4).map((k) => logoBox(k.org, k.logo)).join('')}</div>
 <div class="pill">${nOpen} concours ouverts${lists ? ` · ${lists} liste${lists > 1 ? 's' : ''} publiée${lists > 1 ? 's' : ''}` : ''}</div><div class="ar">مباريات اليوم</div></div>
 ${cards.map((k, i) => `<div class="s" id="s${i + 1}"><div class="num">${i + 1} / ${cards.length}</div><div class="card"><div class="org">${logoBox(k.org, k.logo)}<div class="orgname">${esc(k.org)}</div></div><h1>${esc(k.title)}</h1>
 <div class="stats"><div class="stat"><div class="l">Postes</div><div class="v">${k.postes ?? '—'}</div></div><div class="stat"><div class="l">Date limite</div><div class="v">${esc(k.deadline.replace(/ \d{4}$/, ''))}</div></div></div></div></div>`).join('')}
@@ -462,6 +466,8 @@ window.setT=(t)=>{
   spans.forEach(([a,b],i)=>{const el=document.getElementById('s'+i);const inn=i===0?1:ease((t-a)/0.45), out=i===spans.length-1?0:ease((t-(b-0.35))/0.35);
     el.style.opacity=Math.max(0,inn-out);el.style.transform='translateY('+((1-inn)*90-out*60)+'px) scale('+(0.96+0.04*inn)+')';});
   document.getElementById('bar').style.width=(t/T*100)+'%';
+  // Le logo du haut n'apparaît qu'après la couverture (elle a déjà le sien, au centre).
+  document.querySelector('.top').style.opacity=ease((t-2.0)/0.4);
 };
 </script></body></html>`;
   const dir = join(outDir, 'reel-frames');
@@ -600,7 +606,8 @@ if (only) {
 const { chromium } = await import(PW);
 const browser = await chromium.launch();
 await render(items, outDir, browser);
-const reelDone = only || process.env.SOCIAL_REEL === '0' || (await posted('reel')).has(REEL_KEY);
+// SOCIAL_REEL=0 : sans reel ; SOCIAL_REEL=force : reel fabriqué même s'il est déjà publié (aperçu).
+const reelDone = process.env.SOCIAL_REEL === 'force' && cmd === 'apercu' ? false : only || process.env.SOCIAL_REEL === '0' || (await posted('reel')).has(REEL_KEY);
 const film = reelDone ? null : await reel(items, outDir, browser);
 await browser.close();
 
