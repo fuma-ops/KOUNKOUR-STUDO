@@ -72,6 +72,8 @@ for (const x of todo) {
       const v = await graph(`/${x.post_id}`, secret.token, { fields: 'source,description' });
       if (!v.source) throw new Error('vidéo Facebook pas encore disponible');
       media = { media_type: 'REELS', video_url: v.source, caption: igCaption(v.description), share_to_feed: 'true' };
+      // Instagram refuse souvent l'adresse de la copie Facebook : le fichier est envoyé directement.
+      media.file = Buffer.from(await (await fetch(v.source)).arrayBuffer());
     } else {
       const p = await graph(`/${x.post_id}`, secret.token, { fields: 'images,name' });
       const img = (p.images || []).sort((a, b) => b.width - a.width)[0];
@@ -82,7 +84,13 @@ for (const x of todo) {
       out.push({ type: x.kind, facebook: x.post_id, texte: media.caption.split('\n').slice(0, 3).join(' / ') });
       continue;
     }
-    const c = await graph(`/${IG_USER}/media`, secret.token, media, 'POST');
+    let c;
+    if (media.file) {
+      c = await graph(`/${IG_USER}/media`, secret.token, { media_type: 'REELS', upload_type: 'resumable', caption: media.caption, share_to_feed: 'true' }, 'POST');
+      const up = await fetch(c.uri, { method: 'POST', headers: { Authorization: `OAuth ${secret.token}`, offset: '0', file_size: String(media.file.length) }, body: media.file });
+      const uj = await up.json();
+      if (!up.ok || !uj.success) throw new Error(`envoi Instagram : ${JSON.stringify(uj).slice(0, 200)}`);
+    } else c = await graph(`/${IG_USER}/media`, secret.token, media, 'POST');
     await waitReady(c.id, secret.token);
     const pub = await graph(`/${IG_USER}/media_publish`, secret.token, { creation_id: c.id }, 'POST');
     for (const k of x.keys) await rest('/rpc/social_record', { p_contest: k, p_kind: x.kind, p_post: pub.id, p_network: 'instagram' });
