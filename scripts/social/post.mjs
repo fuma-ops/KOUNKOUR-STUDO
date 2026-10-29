@@ -165,7 +165,8 @@ async function pickPrep(n, exclude) {
 async function dataUri(url) {
   if (!url) return null;
   try {
-    const r = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } });
+    // logo_url est relatif au site (« /api/logo?a=<organisme> ») : on le résout sur kounkour.com.
+    const r = await fetch(new globalThis.URL(url, SITE), { headers: { 'user-agent': 'Mozilla/5.0' } });
     if (!r.ok) return null;
     const type = r.headers.get('content-type') || 'image/png';
     if (!type.startsWith('image/')) return null;
