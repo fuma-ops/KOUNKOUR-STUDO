@@ -52,3 +52,27 @@ du disque du 22/10/2026 ne peut plus se reproduire.
    (ce sont les concours similaires) ; sans correspondance exacte, pas de logo.
 8. `bilan` puis court rapport en français : publiés (dont page seule), complétés, rejetés,
    consignes traitées, sans spécialité, préparations ajoutées, liste « À traiter ».
+
+## Publications Facebook du jour (tâche planifiée, 11h37 heure du Maroc)
+
+`node scripts/social/post.mjs publier 30` (clé robot en variable d'environnement, jeton de page lu
+en base via `social_secret`, jamais affiché). Une seule commande, rien n'est publié deux fois
+(`social_posts`) :
+
+- **derniers jours** : concours qui ferment dans 0 à 2 jours (2 au plus) ;
+- **nouveau concours** : un post par concours publié depuis moins de 72 h (un organisme qui en
+  publie 3 ou plus : un post récapitulatif avec chaque lien) ;
+- **listes** : un post par nouvelle liste de convoqués (écrit, oral) ou de résultats
+  (`contest_documents`, récapitulatif par organisme dès 3 listes du même type) ;
+- **préparation** : 3 concours ouverts par jour avec une vraie question QCM du dossier relié
+  (mêmes règles que la fiche, `prepFolderSlugsFor`) ; la réponse est sur le site ; une question
+  d'entraînement est toujours présentée comme « pas un sujet officiel » ;
+- **reel** « Les concours du jour » (vidéo 1080 × 1920, ~20 s), programmé à 19 h.
+
+Le premier post part tout de suite, les suivants sont programmés sur Facebook et répartis jusqu'à
+22 h. Ce qui ne trouve pas de place passe le lendemain. Aperçu sans publier :
+`node scripts/social/post.mjs apercu 30 <dossier>`.
+
+**Préparation pour chaque concours** : un concours ouvert sans dossier relié contenant des QCM
+n'aura pas de post « préparation ». L'étape 6 doit donc d'abord combler ces trous (y compris les
+dossiers qui n'ont que des sujets écrits et aucun QCM).
