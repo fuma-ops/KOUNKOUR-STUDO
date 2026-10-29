@@ -29,13 +29,31 @@ async function graph(path, token, params, method = 'GET') {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Texte Instagram : les adresses deviennent « lien en bio », hashtags complétés.
-function igCaption(text) {
+// Référencement Instagram : la recherche lit surtout les mots de la légende. Première ligne =
+// ligne de mots-clés tapés par les candidats, puis 5 à 7 hashtags ciblés (pas 20).
+const IG_KEYWORDS = {
+  nouveau: 'Concours Maroc 2026 · Emploi public · مباريات التوظيف 2026',
+  dernier: 'Concours Maroc 2026 · Date limite · آخر أجل للترشح',
+  liste: 'Liste des convoqués · Résultats concours Maroc · لوائح المترشحين',
+  preparation: 'Préparation concours · QCM corrigé · تحضير المباريات',
+  reel: 'Concours Maroc 2026 · Emploi public · مباريات التوظيف',
+};
+const IG_TAGS = {
+  nouveau: '#concoursmaroc #emploipublic #مباريات_التوظيف #توظيف #KounKour',
+  dernier: '#concoursmaroc #emploipublic #مباريات_التوظيف #آخر_أجل #KounKour',
+  liste: '#concoursmaroc #convocation #resultats #لوائح_المترشحين #KounKour',
+  preparation: '#concoursmaroc #QCM #preparation #تحضير_المباريات #KounKour',
+  reel: '#concoursmaroc #emploipublic #مباريات_التوظيف #reels #KounKour',
+};
+// Texte alternatif d'une image (lu par Instagram et les moteurs de recherche).
+const altText = (caption) => `Affiche KounKour : ${caption.split('\n').filter((l) => l.trim()).slice(1, 3).join(' – ').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').trim()}`.slice(0, 500);
+
+// Texte Instagram : les adresses deviennent « lien en bio », hashtags ciblés.
+function igCaption(text, kind = 'nouveau') {
   const lines = (text || '').split('\n').filter((l) => !/^👉\s*https?:\/\//.test(l.trim()));
   // Les liens kounkour.com deviennent « lien en bio » ; le crédit musical (Uppbeat) garde son adresse.
   const out = lines.map((l) => (/uppbeat/i.test(l) ? l : l.replace(/\s*:\s*https?:\/\/\S+/g, '').replace(/https?:\/\/\S+/g, 'kounkour.com'))).join('\n');
-  const tags = '#concours #emploi #maroc #emploipublic #concoursmaroc #fonctionpublique #recrutement #مباراة #توظيف #مباريات_التوظيف #KounKour';
-  return `${out.replace(/\n#.*$/s, '').trim()}\n\n🔗 Lien en bio : kounkour.com\n\n${tags}`.slice(0, 2200);
+  return `${IG_KEYWORDS[kind] || IG_KEYWORDS.nouveau}\n\n${out.replace(/\n#.*$/s, '').trim()}\n\n🔗 Lien en bio : kounkour.com\n\n${IG_TAGS[kind] || IG_TAGS.nouveau}`.slice(0, 2200);
 }
 
 async function waitReady(id, token) {
@@ -72,14 +90,15 @@ for (const x of todo) {
     if (x.kind === 'reel') {
       const v = await graph(`/${x.post_id}`, secret.token, { fields: 'source,description' });
       if (!v.source) throw new Error('vidéo Facebook pas encore disponible');
-      media = { media_type: 'REELS', video_url: v.source, caption: igCaption(v.description), share_to_feed: 'true' };
+      media = { media_type: 'REELS', video_url: v.source, caption: igCaption(v.description, 'reel'), share_to_feed: 'true' };
       // Instagram refuse souvent l'adresse de la copie Facebook : le fichier est envoyé directement.
       media.file = Buffer.from(await (await fetch(v.source)).arrayBuffer());
     } else {
       const p = await graph(`/${x.post_id}`, secret.token, { fields: 'images,name' });
       const img = (p.images || []).sort((a, b) => b.width - a.width)[0];
       if (!img) throw new Error('image Facebook introuvable');
-      media = { image_url: img.source, caption: igCaption(p.name) };
+      media = { image_url: img.source, caption: igCaption(p.name, x.kind) };
+      media.alt_text = altText(media.caption);
     }
     if (cmd === 'apercu') {
       out.push({ type: x.kind, facebook: x.post_id, texte: media.caption.split('\n').slice(0, 3).join(' / ') });
@@ -91,7 +110,16 @@ for (const x of todo) {
       const up = await fetch(c.uri, { method: 'POST', headers: { Authorization: `OAuth ${secret.token}`, offset: '0', file_size: String(media.file.length) }, body: media.file });
       const uj = await up.json();
       if (!up.ok || !uj.success) throw new Error(`envoi Instagram : ${JSON.stringify(uj).slice(0, 200)}`);
-    } else c = await graph(`/${IG_USER}/media`, secret.token, media, 'POST');
+    } else {
+      try {
+        c = await graph(`/${IG_USER}/media`, secret.token, media, 'POST');
+      } catch (e) {
+        // Texte alternatif refusé par cette version de l'API : on publie sans.
+        if (!media.alt_text) throw e;
+        delete media.alt_text;
+        c = await graph(`/${IG_USER}/media`, secret.token, media, 'POST');
+      }
+    }
     await waitReady(c.id, secret.token);
     const pub = await graph(`/${IG_USER}/media_publish`, secret.token, { creation_id: c.id }, 'POST');
     for (const k of x.keys) await rest('/rpc/social_record', { p_contest: k, p_kind: x.kind, p_post: pub.id, p_network: 'instagram' });

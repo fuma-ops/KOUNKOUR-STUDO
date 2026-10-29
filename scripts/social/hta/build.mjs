@@ -104,14 +104,34 @@ for(let i=0;i<N;i++){const w=document.getElementById('w'+i);const k=ease((t-O-4.
 
 // ───────── textes (référencement) ─────────
 const TAGS_FB = '#حين_تعرف_الله #قرآن #دعاء #ذكر_الله #تذكير #Quran #Dua #IslamicReminder #WhenYouKnowAllah';
-const TAGS_IG = '#حين_تعرف_الله #قرآن #القرآن_الكريم #آيات_قرآنية #دعاء #أدعية #ذكر_الله #تذكير #اسلام #إيمان #طمأنينة #راحة_نفسية #يارب #الحمد_لله #Quran #QuranVerses #Dua #IslamicReminder #Islam #Muslim #Allah #Deen #WhenYouKnowAllah';
+// Instagram : 6 à 7 hashtags ciblés selon le type (la recherche lit surtout la légende).
+const TAGS_IG_BY = {
+  reel: '#قرآن #آيات_قرآنية #تدبر #QuranVerses #IslamicReminder #حين_تعرف_الله #WhenYouKnowAllah',
+  dua: '#دعاء #أدعية #دعاء_مستجاب #Dua #IslamicReminder #حين_تعرف_الله #WhenYouKnowAllah',
+  info: '#فضل_القرآن #السنة_النبوية #تذكير #Sunnah #IslamicReminder #حين_تعرف_الله #WhenYouKnowAllah',
+  question: '#تذكير #قرآن #دعاء #IslamicReminder #Quran #حين_تعرف_الله #WhenYouKnowAllah',
+};
+// Mots-clés anglais des invocations (ce que les gens tapent dans la recherche).
+const DUA_EN = {
+  'دعاء قضاء الحاجة': 'Dua for needs', 'دعاء القلق': 'Dua for anxiety', 'دعاء الكرب': 'Dua for distress',
+  'دعاء للوالدين': 'Dua for parents', 'دعاء الثبات': 'Dua for steadfastness', 'سيّد الاستغفار': 'Sayyid al-Istighfar, dua for forgiveness',
+  'دعاء العلم': 'Dua for knowledge', 'دعاء الهمّ والحزن': 'Dua for worry and grief',
+};
+// Première ligne Instagram = mots-clés recherchés (arabe · anglais).
+function keywordLine(x) {
+  const tag = (x.tag || '').replace(/^[^\p{L}]+/u, '').trim();
+  if (x.type === 'reel') return `${x.ref.replace(' · ', ' ')} · ${x.tr_ref.split(' · ')[0]} · Quran`;
+  if (x.type === 'dua') return `${tag} · ${DUA_EN[tag] || 'Dua'}`;
+  if (x.type === 'info') return `${tag} · ${x.title_en}`;
+  return 'سؤال اليوم · Question of the day · تذكير';
+}
 function caption(x, ig) {
-  const L = [];
+  const L = ig ? [keywordLine(x), ''] : [];
   if (x.type === 'reel') {
     L.push(plain(x.hook_ar) + ' 🤍', '', `﴿${x.lines.join(' ')}﴾ [${x.ref.replace(' · ', ': ')}]`, '', plain(x.refl_ar), '', plain(x.hook_en), plain(x.tr) + ` (${x.tr_ref.split(' · ')[0]})`, plain(x.refl_en));
   } else if (x.type === 'dua') {
     L.push(plain(x.hook_ar), '', x.quran ? `﴿${x.quran}﴾ [${x.ref.replace(' · ', ': ')}]` : `«${x.hadith}» (${x.ref})`);
-    if (x.box_ar) L.push('', `${x.box_ar}${x.box_ref ? ` (${x.box_ref})` : ''}`);
+    if (x.box_ar) L.push('', `${x.box_ar}${x.box_ref ? ` · ${x.box_ref}` : ''}`);
     L.push('', plain(x.hook_en), x.en || '');
     if (x.box_en) L.push(x.box_en);
     L.push('', 'قل: آمين 🤲 · Say Ameen');
@@ -124,7 +144,7 @@ function caption(x, ig) {
     L.push(plain(x.q_ar), plain(x.sub_ar), '', x.q_en, '', '👇 اكتب في التعليقات · Comment below');
   }
   if (x.type === 'reel') L.push('', TRACK_CREDIT);
-  L.push('', ig ? '🤍 احفظ المنشور وشاركه · Save & share' : '🤍 شارك مع من يحتاجها · Share with someone who needs it', ig ? '🔔 تابع @whenyouknowallah' : '🔔 تابع « حين تعرف الله » لتذكير يومي', '', ig ? `.\n${TAGS_IG}` : TAGS_FB);
+  L.push('', ig ? '🤍 احفظ المنشور وشاركه · Save & share' : '🤍 شارك مع من يحتاجها · Share with someone who needs it', ig ? '🔔 تابع @whenyouknowallah' : '🔔 تابع « حين تعرف الله » لتذكير يومي', '', ig ? `.\n${TAGS_IG_BY[x.type]}` : TAGS_FB);
   return L.filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n');
 }
 

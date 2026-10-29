@@ -112,7 +112,13 @@ async function instagram(page) {
         const p = await graph(`/${q.fb_post_id}`, page.token, { fields: 'images' });
         const img = (p.images || []).sort((a, b) => b.width - a.width)[0];
         if (!img) throw new Error('image Facebook introuvable');
-        c = await graph(`/${page.ig_user_id}/media`, page.token, { image_url: img.source, caption: q.caption }, 'POST');
+        // Texte alternatif = les deux premières lignes de la légende (sans emoji).
+        const alt = q.caption.split('\n').filter((l) => l.trim() && !l.startsWith('#')).slice(0, 2).join(' – ').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').trim().slice(0, 500);
+        try {
+          c = await graph(`/${page.ig_user_id}/media`, page.token, { image_url: img.source, caption: q.caption, alt_text: alt }, 'POST');
+        } catch {
+          c = await graph(`/${page.ig_user_id}/media`, page.token, { image_url: img.source, caption: q.caption }, 'POST');
+        }
       }
       for (let i = 0; i < 60; i++) {
         const s = await graph(`/${c.id}`, page.token, { fields: 'status_code' });
