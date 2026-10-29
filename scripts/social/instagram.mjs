@@ -32,7 +32,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Texte Instagram : les adresses deviennent « lien en bio », hashtags complétés.
 function igCaption(text) {
   const lines = (text || '').split('\n').filter((l) => !/^👉\s*https?:\/\//.test(l.trim()));
-  const out = lines.map((l) => l.replace(/\s*:\s*https?:\/\/\S+/g, '').replace(/https?:\/\/\S+/g, 'kounkour.com')).join('\n');
+  // Les liens kounkour.com deviennent « lien en bio » ; le crédit musical (Uppbeat) garde son adresse.
+  const out = lines.map((l) => (/uppbeat/i.test(l) ? l : l.replace(/\s*:\s*https?:\/\/\S+/g, '').replace(/https?:\/\/\S+/g, 'kounkour.com'))).join('\n');
   const tags = '#concours #emploi #maroc #emploipublic #concoursmaroc #fonctionpublique #recrutement #مباراة #توظيف #مباريات_التوظيف #KounKour';
   return `${out.replace(/\n#.*$/s, '').trim()}\n\n🔗 Lien en bio : kounkour.com\n\n${tags}`.slice(0, 2200);
 }

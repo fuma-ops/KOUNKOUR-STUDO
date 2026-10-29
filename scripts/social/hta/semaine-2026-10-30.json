@@ -1,0 +1,427 @@
+[
+ {
+  "day": "2026-10-30",
+  "slot": "09",
+  "type": "dua",
+  "tag": "🤲 دعاء قضاء الحاجة",
+  "hook_ar": "عندك حاجة تتمنّاها؟<br>ادعُ بدعوة يونس عليه السلام",
+  "hook_en": "Hoping for something? Make the dua of Prophet Yunus",
+  "quran": "أَن لَّآ إِلَٰهَ إِلَّآ أَنتَ سُبْحَٰنَكَ إِنِّى كُنتُ مِنَ ٱلظَّٰلِمِينَ",
+  "ref": "سورة الأنبياء · 87",
+  "en": "“There is no deity except You; exalted are You. Indeed, I have been of the wrongdoers.” (21:87)",
+  "box_ar": "«فإنه لم يدعُ بها رجلٌ مسلمٌ في شيءٍ قطّ إلا استجاب الله له»",
+  "box_ref": "الترمذي (3505)",
+  "box_en": "No Muslim ever calls upon Allah with it for anything, except that He answers him."
+ },
+ {
+  "day": "2026-10-30",
+  "slot": "14",
+  "type": "info",
+  "tag": "🕌 يوم الجمعة",
+  "title_ar": "لا تفوّت ساعة الإجابة اليوم",
+  "title_en": "Friday: don't miss the hour of answered prayers",
+  "items": [
+   [
+    "«فيه ساعة لا يوافقها عبد مسلم وهو قائم يصلي يسأل الله شيئًا إلا أعطاه إياه»",
+    "البخاري (935) · مسلم (852)",
+    "There is an hour on Friday: no Muslim asks Allah for anything in it while praying, except that He gives it to him."
+   ],
+   [
+    "«فأكثروا عليّ من الصلاة فيه»",
+    "أبو داود (1047)",
+    "Send abundant blessings upon the Prophet ﷺ on Friday."
+   ]
+  ]
+ },
+ {
+  "day": "2026-10-30",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "تعبت من الضيق؟",
+  "hook_en": "Tired of hardship?",
+  "lines": [
+   "فَإِنَّ مَعَ ٱلْعُسْرِ يُسْرًا",
+   "إِنَّ مَعَ ٱلْعُسْرِ يُسْرًۭا"
+  ],
+  "ref": "سورة الشرح · 5-6",
+  "tr": "“For indeed, with hardship [will be] ease.<br>Indeed, with hardship [will be] ease.”",
+  "tr_ref": "Ash-Sharh 94:5-6 · Saheeh International",
+  "refl_ar": "كل ضيق يمرّ بك يحمل معه يسرًا…<br>الله لا يتركك 🤍",
+  "refl_en": "Every hardship carries ease within it. Allah never leaves you."
+ },
+ {
+  "day": "2026-10-30",
+  "slot": "21",
+  "type": "question",
+  "q_ar": "ما السورة التي تشعر<br>أنها غيّرت شيئًا<br>في حياتك؟ 📖",
+  "q_en": "Which surah do you feel changed something in your life?",
+  "sub_ar": "آية أبكتك، أو سورة كانت سببًا في فرج…<br>احكِ لنا قصتك"
+ },
+ {
+  "day": "2026-10-31",
+  "slot": "09",
+  "type": "dua",
+  "tag": "🤲 دعاء القلق",
+  "hook_ar": "قلقٌ من شيء؟<br>قلها من قلبك",
+  "hook_en": "Worried about something? Say it from your heart",
+  "quran": "حَسْبُنَا ٱللَّهُ وَنِعْمَ ٱلْوَكِيلُ",
+  "ref": "سورة آل عمران · 173",
+  "en": "“Sufficient for us is Allah, and [He is] the best Disposer of affairs.” (3:173)",
+  "box_ar": "قالها إبراهيم عليه السلام حين أُلقي في النار",
+  "box_ref": "البخاري (4563)",
+  "box_en": "Ibrahim (Abraham) said it when he was thrown into the fire."
+ },
+ {
+  "day": "2026-10-31",
+  "slot": "14",
+  "type": "info",
+  "tag": "📿 كيف تدعو الله؟",
+  "title_ar": "5 آداب للدعاء من السنّة",
+  "title_en": "5 etiquettes of dua from the Sunnah",
+  "small": true,
+  "items": [
+   [
+    "ابدأ بحمد الله والصلاة على النبي ﷺ",
+    "الترمذي (3477)",
+    "Begin by praising Allah and sending blessings on the Prophet ﷺ"
+   ],
+   [
+    "ادعُ وأنت موقن بالإجابة",
+    "الترمذي (3479)",
+    "Ask with certainty that He will answer"
+   ],
+   [
+    "ارفع يديك، فإن ربك حييّ كريم",
+    "أبو داود (1488)",
+    "Raise your hands: your Lord is Modest and Generous"
+   ],
+   [
+    "لا تستعجل: «يُستجاب لأحدكم ما لم يَعجَل»",
+    "البخاري (6340) · مسلم (2735)",
+    "Don't be hasty: you are answered as long as you don't rush"
+   ],
+   [
+    "تحرَّ أوقات الإجابة: السجود، والثلث الأخير من الليل",
+    "مسلم (482) · البخاري (1145)",
+    "Seek the best times: in sujood and the last third of the night"
+   ]
+  ]
+ },
+ {
+  "day": "2026-10-31",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "تظن أن الله بعيد عنك؟",
+  "hook_en": "Do you think Allah is far from you?",
+  "lines": [
+   "وَإِذَا سَأَلَكَ عِبَادِى عَنِّى فَإِنِّى قَرِيبٌ ۖ",
+   "أُجِيبُ دَعْوَةَ ٱلدَّاعِ إِذَا دَعَانِ"
+  ],
+  "ref": "سورة البقرة · 186",
+  "tr": "“And when My servants ask you concerning Me,<br>indeed I am near. I respond to the invocation<br>of the supplicant when he calls upon Me.”",
+  "tr_ref": "Al-Baqarah 2:186 · Saheeh International",
+  "refl_ar": "هو أقرب إليك مما تظن…<br>فقط ادعُه 🤍",
+  "refl_en": "He is closer than you think. Just call upon Him."
+ },
+ {
+  "day": "2026-10-31",
+  "slot": "21",
+  "type": "question",
+  "q_ar": "ما الدعاء الذي<br>استجاب الله لك؟ 🤲",
+  "q_en": "Which dua did Allah answer for you?",
+  "sub_ar": "شاركنا قصتك… لعلها تكون سببًا في أمل غيرك"
+ },
+ {
+  "day": "2026-11-01",
+  "slot": "09",
+  "type": "dua",
+  "tag": "🤲 دعاء الكرب",
+  "hook_ar": "في لحظة ضيق شديد…<br>قل هذا الدعاء",
+  "hook_en": "In a moment of deep distress, say this",
+  "hadith": "لا إله إلا الله العظيم الحليم، لا إله إلا الله ربّ العرش العظيم، لا إله إلا الله ربّ السماوات وربّ الأرض وربّ العرش الكريم",
+  "ref": "البخاري (6346) · مسلم (2730)",
+  "en": "There is no god but Allah, the Mighty, the Forbearing. There is no god but Allah, Lord of the Mighty Throne. There is no god but Allah, Lord of the heavens, Lord of the earth and Lord of the Noble Throne.",
+  "box_ar": "كان النبي ﷺ يقوله عند الكرب",
+  "box_en": "The Prophet ﷺ used to say it in times of distress."
+ },
+ {
+  "day": "2026-11-01",
+  "slot": "14",
+  "type": "info",
+  "tag": "📖 فضل سورة البقرة",
+  "title_ar": "لماذا تقرأ سورة البقرة؟",
+  "title_en": "The virtues of Surah Al-Baqarah",
+  "items": [
+   [
+    "«اقرؤوا سورة البقرة، فإن أخذها بركة، وتركها حسرة»",
+    "مسلم (804)",
+    "Recite Al-Baqarah: taking it is a blessing, leaving it is a regret."
+   ],
+   [
+    "«إن الشيطان ينفر من البيت الذي تُقرأ فيه سورة البقرة»",
+    "مسلم (780)",
+    "Shaytan flees from the house in which Al-Baqarah is recited."
+   ],
+   [
+    "«من قرأ بالآيتين من آخر سورة البقرة في ليلة كفتاه»",
+    "البخاري (5009) · مسلم (807)",
+    "Whoever recites the last two verses of Al-Baqarah at night, they will suffice him."
+   ]
+  ]
+ },
+ {
+  "day": "2026-11-01",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "قلبك قلِق؟",
+  "hook_en": "Is your heart restless?",
+  "lines": [
+   "أَلَا بِذِكْرِ ٱللَّهِ تَطْمَئِنُّ ٱلْقُلُوبُ"
+  ],
+  "ref": "سورة الرعد · 28",
+  "tr": "“Unquestionably, by the remembrance<br>of Allah hearts are assured.”",
+  "tr_ref": "Ar-Ra'd 13:28 · Saheeh International",
+  "refl_ar": "سبحان الله… الحمد لله… الله أكبر<br>واشعر بالسكينة 🤍",
+  "refl_en": "SubhanAllah, Alhamdulillah, Allahu Akbar… and feel the calm."
+ },
+ {
+  "day": "2026-11-01",
+  "slot": "21",
+  "type": "question",
+  "q_ar": "ما الآية التي تبكيك<br>كلما سمعتها؟ 💧",
+  "q_en": "Which verse moves you to tears every time you hear it?",
+  "sub_ar": "اكتبها لنا… لعل أحدًا يحتاجها اليوم"
+ },
+ {
+  "day": "2026-11-02",
+  "slot": "09",
+  "type": "dua",
+  "tag": "🤲 دعاء للوالدين",
+  "hook_ar": "والداك يستحقّان<br>دعوة منك اليوم 🤍",
+  "hook_en": "Your parents deserve a dua from you today",
+  "quran": "رَّبِّ ٱرْحَمْهُمَا كَمَا رَبَّيَانِى صَغِيرًۭا",
+  "ref": "سورة الإسراء · 24",
+  "en": "“My Lord, have mercy upon them as they brought me up [when I was] small.” (17:24)",
+  "box_ar": "سواء كانا معك أو رحلا إلى الله… ادعُ لهما",
+  "box_en": "Whether they are with you or have returned to Allah, pray for them."
+ },
+ {
+  "day": "2026-11-02",
+  "slot": "14",
+  "type": "info",
+  "tag": "✨ آية الكرسي",
+  "title_ar": "أعظم آية في القرآن",
+  "title_en": "Ayat al-Kursi: the greatest verse in the Quran",
+  "quran": "ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ",
+  "items": [
+   [
+    "أخبر النبي ﷺ أنها أعظم آية في كتاب الله",
+    "مسلم (810)",
+    "The Prophet ﷺ said it is the greatest verse in the Book of Allah."
+   ],
+   [
+    "من قرأها عند النوم لم يزل عليه من الله حافظ، ولا يقربه شيطان حتى يصبح",
+    "البخاري (2311)",
+    "Recite it before sleep: a guardian from Allah stays with you until morning."
+   ]
+  ]
+ },
+ {
+  "day": "2026-11-02",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "تظن أن ذنوبك أكبر<br>من رحمة الله؟",
+  "hook_en": "Think your sins are bigger than Allah's mercy?",
+  "lines": [
+   "لَا تَقْنَطُوا۟ مِن رَّحْمَةِ ٱللَّهِ ۚ",
+   "إِنَّ ٱللَّهَ يَغْفِرُ ٱلذُّنُوبَ جَمِيعًا"
+  ],
+  "ref": "سورة الزمر · 53",
+  "tr": "“Do not despair of the mercy of Allah.<br>Indeed, Allah forgives all sins.”",
+  "tr_ref": "Az-Zumar 39:53 · Saheeh International",
+  "refl_ar": "باب التوبة مفتوح…<br>عُد إليه الآن 🤍",
+  "refl_en": "The door of repentance is open. Return to Him now."
+ },
+ {
+  "day": "2026-11-02",
+  "slot": "21",
+  "type": "question",
+  "q_ar": "ما الذكر الذي تحب<br>أن تردّده أكثر؟ 📿",
+  "q_en": "Which dhikr do you love repeating the most?",
+  "sub_ar": "سبحان الله؟ الحمد لله؟ أستغفر الله؟<br>اكتبه لنا"
+ },
+ {
+  "day": "2026-11-03",
+  "slot": "09",
+  "type": "dua",
+  "tag": "🤲 دعاء الثبات",
+  "hook_ar": "تخاف أن يضعف إيمانك؟",
+  "hook_en": "Afraid your faith might weaken?",
+  "hadith": "يا مقلّب القلوب، ثبّت قلبي على دينك",
+  "ref": "الترمذي (2140)",
+  "en": "O Turner of hearts, make my heart firm upon Your religion.",
+  "box_ar": "كان النبي ﷺ يُكثر أن يقول هذا الدعاء",
+  "box_en": "The Prophet ﷺ used to say it often."
+ },
+ {
+  "day": "2026-11-03",
+  "slot": "14",
+  "type": "dua",
+  "tag": "🤲 سيّد الاستغفار",
+  "hook_ar": "أفضل صيغة للاستغفار",
+  "hook_en": "The master supplication for forgiveness",
+  "hadith": "اللهم أنت ربي لا إله إلا أنت، خلقتني وأنا عبدك، وأنا على عهدك ووعدك ما استطعت، أعوذ بك من شرّ ما صنعت، أبوء لك بنعمتك عليّ، وأبوء بذنبي، فاغفر لي، فإنه لا يغفر الذنوب إلا أنت",
+  "ref": "البخاري (6306)",
+  "small": true,
+  "box_ar": "من قالها من النهار موقنًا بها فمات من يومه قبل أن يمسي فهو من أهل الجنة",
+  "box_en": "Whoever says it with conviction during the day and dies before evening is among the people of Paradise."
+ },
+ {
+  "day": "2026-11-03",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "أمٌّ ألقت رضيعها في اليمّ…<br>ثم ردّه الله إليها",
+  "hook_en": "A mother placed her baby in the river… and Allah returned him to her",
+  "lines": [
+   "وَلَا تَخَافِى وَلَا تَحْزَنِىٓ ۖ",
+   "إِنَّا رَآدُّوهُ إِلَيْكِ"
+  ],
+  "ref": "سورة القصص · 7",
+  "tr": "“Do not fear and do not grieve.<br>Indeed, We will return him to you.”",
+  "tr_ref": "Al-Qasas 28:7 · Saheeh International",
+  "refl_ar": "ما تودعه عند الله<br>لا يضيع أبدًا 🤍",
+  "refl_en": "What you entrust to Allah is never lost."
+ },
+ {
+  "day": "2026-11-03",
+  "slot": "21",
+  "type": "question",
+  "q_ar": "لو كان لك دعاء واحد الآن،<br>ماذا تطلب من الله؟ 🤲",
+  "q_en": "If you could make one dua right now, what would you ask Allah for?",
+  "sub_ar": "اكتبه في التعليقات… وسنؤمّن على دعائك"
+ },
+ {
+  "day": "2026-11-04",
+  "slot": "09",
+  "type": "dua",
+  "tag": "🤲 دعاء العلم",
+  "hook_ar": "قبل أن تدرس أو تعمل…<br>ادعُ بهذا",
+  "hook_en": "Before you study or work, make this dua",
+  "quran": "رَّبِّ زِدْنِى عِلْمًۭا",
+  "ref": "سورة طه · 114",
+  "en": "“My Lord, increase me in knowledge.” (20:114)"
+ },
+ {
+  "day": "2026-11-04",
+  "slot": "14",
+  "type": "info",
+  "tag": "💛 صدقات بلا مال",
+  "title_ar": "صدقات لا تكلّفك شيئًا",
+  "title_en": "Charity that costs you nothing",
+  "items": [
+   [
+    "«والكلمة الطيبة صدقة»",
+    "البخاري (2989) · مسلم (1009)",
+    "A good word is charity."
+   ],
+   [
+    "«تبسّمك في وجه أخيك لك صدقة»",
+    "الترمذي (1956)",
+    "Your smile in your brother's face is charity."
+   ]
+  ]
+ },
+ {
+  "day": "2026-11-04",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "من البئر إلى القصر…",
+  "hook_en": "From the well to the palace…",
+  "lines": [
+   "إِنَّهُۥ مَن يَتَّقِ وَيَصْبِرْ",
+   "فَإِنَّ ٱللَّهَ لَا يُضِيعُ أَجْرَ ٱلْمُحْسِنِينَ"
+  ],
+  "ref": "سورة يوسف · 90",
+  "tr": "“Indeed, he who fears Allah and is patient,<br>then indeed, Allah does not allow to be lost<br>the reward of those who do good.”",
+  "tr_ref": "Yusuf 12:90 · Saheeh International",
+  "refl_ar": "صبر يوسف عليه السلام سنوات…<br>فجاءه الفرج 🤍",
+  "refl_en": "Yusuf was patient for years, and relief came."
+ },
+ {
+  "day": "2026-11-04",
+  "slot": "21",
+  "type": "question",
+  "q_ar": "ما أجمل شيء فعله لك<br>أحدٌ لوجه الله؟ 💛",
+  "q_en": "What's the most beautiful thing someone did for you for the sake of Allah?",
+  "sub_ar": "ادعُ له في التعليقات 🤍"
+ },
+ {
+  "day": "2026-11-05",
+  "slot": "09",
+  "type": "dua",
+  "tag": "🤲 دعاء الهمّ والحزن",
+  "hook_ar": "همّ يثقل صدرك؟",
+  "hook_en": "A worry weighing on your chest?",
+  "hadith": "اللهم إني أعوذ بك من الهمّ والحزن، والعجز والكسل، والجبن والبخل، وضَلَع الدَّين، وغلبة الرجال",
+  "ref": "البخاري (6369)",
+  "en": "O Allah, I seek refuge in You from worry and grief, from weakness and laziness, from cowardice and miserliness, from the burden of debt and from being overpowered by men."
+ },
+ {
+  "day": "2026-11-05",
+  "slot": "14",
+  "type": "info",
+  "tag": "🌱 الاستمرار",
+  "title_ar": "قليلٌ دائم… أحبّ إلى الله",
+  "title_en": "Small deeds, done consistently",
+  "items": [
+   [
+    "«أحبّ الأعمال إلى الله أدومها وإن قلّ»",
+    "البخاري (6464) · مسلم (783)",
+    "The most beloved deeds to Allah are the most consistent, even if small."
+   ],
+   [
+    "أفكار: صفحة من القرآن كل يوم، أذكار الصباح والمساء، ركعتان في الليل",
+    "",
+    "Ideas: one page of Quran a day, morning and evening adhkar, two rak'ahs at night."
+   ]
+  ]
+ },
+ {
+  "day": "2026-11-05",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "خائف من الغد؟",
+  "hook_en": "Afraid of tomorrow?",
+  "lines": [
+   "وَمَن يَتَوَكَّلْ عَلَى ٱللَّهِ فَهُوَ حَسْبُهُۥٓ"
+  ],
+  "ref": "سورة الطلاق · 3",
+  "tr": "“And whoever relies upon Allah,<br>then He is sufficient for him.”",
+  "tr_ref": "At-Talaq 65:3 · Saheeh International",
+  "refl_ar": "افعل ما عليك…<br>وتوكّل على الله في الباقي 🤍",
+  "refl_en": "Do your part, and trust Allah with the rest."
+ },
+ {
+  "day": "2026-11-05",
+  "slot": "21",
+  "type": "question",
+  "q_ar": "ما العادة الصغيرة التي<br>تحافظ عليها مع الله؟ 🌱",
+  "q_en": "What small habit do you keep with Allah?",
+  "sub_ar": "شاركنا… لعلك تُلهم غيرك"
+ },
+ {
+  "day": "2026-10-29",
+  "slot": "19",
+  "type": "reel",
+  "hook_ar": "هل شعرت يومًا<br>أن دعاءك لم يُسمع؟",
+  "hook_en": "Do you ever feel your prayers go unheard?",
+  "lines": [
+   "وَمَا كَانَ رَبُّكَ نَسِيًّۭا"
+  ],
+  "ref": "سورة مريم · الآية 64",
+  "tr": "“And never is<br>your Lord forgetful.”",
+  "tr_ref": "Maryam 19:64 · Saheeh International",
+  "refl_ar": "كل دعاء، كل دمعة، كل صبر…<br>لا يضيع عند ربك 🤍",
+  "refl_en": "Every prayer, every tear, every patience… nothing is forgotten."
+ }
+]

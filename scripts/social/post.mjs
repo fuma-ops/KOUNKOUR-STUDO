@@ -20,7 +20,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
-import { withTrack } from './sounds.mjs';
+import { withTrack, TRACK_CREDIT } from './sounds.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
@@ -495,6 +495,8 @@ window.setT=(t)=>{
     '',
     `👉 ${nOpen} concours ouverts, conditions et préparation gratuite : ${link('/', 'reel')}`,
     '🇲🇦 مباريات اليوم : الشروط والملف والتحضير المجاني على KounKour',
+    '',
+    TRACK_CREDIT,
     '',
     TAGS + ' #reels',
   ]);

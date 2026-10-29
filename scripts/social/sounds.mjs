@@ -24,6 +24,9 @@ export function withCristal(videoIn, videoOut, seconds) {
   return videoOut;
 }
 
+// Crédit obligatoire (licence Uppbeat) : à mettre dans la description de chaque reel.
+export const TRACK_CREDIT = "🎵 Music: 'Floats' by Swoop on #Uppbeat https://uppbeat.io/c/swoop\nLicense code: JYKFZEH7WZ7VWMFI";
+
 // Morceau choisi par le propriétaire (extrait de 90 s rangé dans scripts/social/audio).
 const TRACK = new URL('./audio/floats-swoop.mp3', import.meta.url).pathname;
 
