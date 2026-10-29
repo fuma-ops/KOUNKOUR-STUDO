@@ -20,6 +20,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
+import { withTrack } from './sounds.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
@@ -481,9 +482,11 @@ window.setT=(t)=>{
     await page.screenshot({ path: join(dir, `f${String(i).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 88 });
   }
   await page.close();
-  // Piste audio silencieuse : certains lecteurs refusent une vidéo sans audio.
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', join(dir, 'f%04d.jpg'), '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-    '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', `${f}.mp4`]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', join(dir, 'f%04d.jpg'),
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-crf', '20', '-movflags', '+faststart', `${f}-muet.mp4`]);
+  // Fond sonore : le morceau choisi par le propriétaire (sounds.mjs).
+  withTrack(`${f}-muet.mp4`, `${f}.mp4`, T);
+  rmSync(`${f}-muet.mp4`, { force: true });
   rmSync(dir, { recursive: true, force: true });
   const text = tidy([
     `🎬 Les concours du jour – ${dateFr(today)}`,
