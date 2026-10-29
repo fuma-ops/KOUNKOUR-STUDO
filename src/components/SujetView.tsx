@@ -5,6 +5,7 @@ import { AnnaleImages } from './AnnaleImages';
 import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { ConcoursRef } from './ConcoursRef';
 import { isArabic, layoutStatement } from '../utils/statementLayout';
+import { Answer, Item, Pairing, exoKey, group, pairCorrige } from '../utils/corrigePairing';
 
 // Texte d'un sujet écrit ou d'un corrigé (texte brut en base), mis en forme pour la lecture
 // sur téléphone par src/utils/statementLayout.ts : questions numérotées, calculs ligne par
@@ -27,36 +28,6 @@ const Label: React.FC<{ text?: string }> = ({ text }) =>
 type Seg = ReturnType<typeof layoutStatement>[number][number];
 // « 10 697 000 » ne doit jamais être coupé en fin de ligne : espace fine insécable entre les groupes de chiffres.
 const nb = (t: string) => t.replace(/(\d) (?=\d{3}(?!\d))/g, '$1\u202F');
-// Une carte = une question et tout ce qui la suit (choix, calculs, tableaux) jusqu'à la suivante.
-type Item = { kind: 'seg'; seg: Seg } | { kind: 'card'; head: Extract<Seg, { kind: 'question' }>; body: Seg[] } | { kind: 'answers'; rows: Extract<Seg, { kind: 'answer' }>[] };
-
-function group(blocks: Seg[][]): Item[] {
-  const items: Item[] = [];
-  let card: Extract<Item, { kind: 'card' }> | null = null;
-  blocks.forEach((block) => {
-    block.forEach((seg, j) => {
-      if (seg.kind === 'question') {
-        card = { kind: 'card', head: seg, body: [] };
-        items.push(card);
-      } else if (seg.kind === 'answer') {
-        card = null;
-        const last = items[items.length - 1];
-        if (last?.kind === 'answers') last.rows.push(seg);
-        else items.push({ kind: 'answers', rows: [seg] });
-      } else if (seg.kind === 'h2' || seg.kind === 'h3' || seg.kind === 'header') {
-        card = null;
-        items.push({ kind: 'seg', seg });
-      } else if (card && (j > 0 || seg.kind === 'option' || seg.kind === 'table' || seg.kind === 'calc' || seg.kind === 'code')) {
-        // Un paragraphe isolé après une ligne vide ouvre une nouvelle partie : il sort de la carte.
-        card.body.push(seg);
-      } else {
-        card = null;
-        items.push({ kind: 'seg', seg });
-      }
-    });
-  });
-  return items;
-}
 
 const Table: React.FC<{ rows: string[][] }> = ({ rows }) => (
   <div className="overflow-x-auto rounded-xl border border-[#E9DCE4]">
@@ -181,9 +152,8 @@ const Segs: React.FC<{ segs: Seg[] }> = ({ segs }) => {
   return <>{out}</>;
 };
 
-export const SujetStatement: React.FC<{ text: string; header?: boolean }> = ({ text, header }) => (
-  <div className="space-y-3.5 text-[15px] leading-[1.65] text-[#36303A] [font-variant-numeric:lining-nums_tabular-nums]">
-    {group(layoutStatement(text, { header })).map((item, i) => {
+// Rendu d'un élément (carte de question, grille de réponses, titre, paragraphe).
+function ItemView({ item, i }: { item: Item; i: number }) {
       const anim = { animationDelay: `${Math.min(i, 10) * 40}ms` };
       if (item.kind === 'card') {
         return (
@@ -235,9 +205,103 @@ export const SujetStatement: React.FC<{ text: string; header?: boolean }> = ({ t
           <SegView seg={item.seg} />
         </div>
       );
-    })}
+}
+
+const Reveal: React.FC<{ open: boolean; label: string; children: React.ReactNode }> = ({ open: all, label, children }) => {
+  const [own, setOwn] = useState(false);
+  const open = all || own;
+  return (
+    <div className="animate-fade-in">
+      {!open ? (
+        <button
+          onClick={() => setOwn(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[12.5px] font-extrabold text-emerald-800 hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all"
+        >
+          <BookOpenCheck className="w-4 h-4" />
+          {label}
+        </button>
+      ) : (
+        <div className="rounded-2xl border-2 border-emerald-200 bg-white p-3 sm:p-4 space-y-2 animate-scale-in">{children}</div>
+      )}
+    </div>
+  );
+};
+
+const AnswerRow: React.FC<{ a: Answer }> = ({ a }) => (
+  <div dir={isArabic(a.text) ? 'rtl' : undefined} className="flex items-start gap-2.5">
+    {a.letters && <span className="px-2 py-0.5 rounded-lg bg-emerald-600 text-white font-black text-[14px] whitespace-nowrap shrink-0">{a.letters}</span>}
+    <div className="min-w-0 pt-0.5">
+      {a.text && <span dir="auto" className="text-[14.5px] text-[#242126] whitespace-pre-line">{inline(a.text)}</span>}
+      {a.src && <span className="ms-1.5 inline-block rounded-md bg-[#F4EEF2] px-1.5 text-[11px] font-semibold text-[#6E6773]">{a.src}</span>}
+    </div>
   </div>
 );
+
+export const SujetStatement: React.FC<{ text: string; header?: boolean; pairing?: Pairing | null; showAll?: boolean; fr?: boolean }> = ({ text, header, pairing, showAll = false, fr = true }) => {
+  const items = group(layoutStatement(text, { header }));
+  const out: React.ReactNode[] = [];
+  const queue = new Map([...(pairing?.answers || new Map<string, Answer[]>())].map(([k, v]) => [k, [...v]]));
+  let exo: string | null = null;
+  // Corrigé de l'exercice en cours, découpé par numéro de sous-question (« 1. », « 2) »…).
+  let parts = new Map<string, string>();
+  let extra: string[] = [];
+  const openExo = (k: string) => {
+    exo = k;
+    parts = new Map();
+    extra = [];
+    const body = pairing?.exos.get(k);
+    if (!body) return;
+    let cur: string | null = null;
+    for (const line of body.split('\n')) {
+      const m = /^(\d{1,2})\s?[.)-]\s+/.exec(line.trim());
+      if (m && !parts.has(m[1])) {
+        cur = m[1];
+        parts.set(cur, line);
+      } else if (cur) parts.set(cur, `${parts.get(cur)}\n${line}`);
+      else extra.push(line);
+    }
+  };
+  const flushExo = (key: string) => {
+    if (exo && pairing?.exos.has(exo)) {
+      const left = [...extra, ...parts.values()].join('\n').trim();
+      if (left) {
+        out.push(
+          <Reveal key={key} open={showAll} label={fr ? (parts.size || extra.length ? 'Voir le corrigé de cet exercice' : 'Voir le corrigé') : 'عرض تصحيح هذا التمرين'}>
+            <SujetStatement text={left} />
+          </Reveal>
+        );
+      }
+    }
+    exo = null;
+    parts = new Map();
+    extra = [];
+  };
+  items.forEach((item, i) => {
+    if (pairing && item.kind === 'seg' && (item.seg.kind === 'h2' || item.seg.kind === 'h3')) {
+      const k = exoKey(item.seg.text);
+      // Un nouveau titre ferme l'exercice en cours (un « ## » ferme aussi, un « ### » sans numéro non).
+      if (k || item.seg.kind === 'h2') flushExo(`x${i}`);
+      if (k) openExo(k);
+    }
+    out.push(<ItemView key={i} item={item} i={i} />);
+    if (!pairing || item.kind !== 'card') return;
+    if (item.body.some((b) => b.kind === 'option')) {
+      const a = queue.get(item.head.num)?.shift();
+      if (a) out.push(<Reveal key={`a${i}`} open={showAll} label={fr ? 'Voir la réponse' : 'عرض الجواب'}><AnswerRow a={a} /></Reveal>);
+    } else if (exo && parts.has(item.head.num)) {
+      // La correction de la sous-question, sans répéter son numéro.
+      const t = parts.get(item.head.num)!.replace(/^\s*\d{1,2}\s?[.)-]\s+/, '');
+      parts.delete(item.head.num);
+      out.push(
+        <Reveal key={`q${i}`} open={showAll} label={fr ? 'Voir la correction' : 'عرض التصحيح'}>
+          <SujetStatement text={t} />
+        </Reveal>
+      );
+    }
+  });
+  flushExo('xend');
+  return <div className="space-y-3.5 text-[15px] leading-[1.65] text-[#36303A] [font-variant-numeric:lining-nums_tabular-nums]">{out}</div>;
+};
 
 interface Props {
   set: QcmSet;
@@ -255,6 +319,9 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
   // Support en anglais (banque psychotechnique anglaise) : libellés en anglais.
   const en = set.contentLanguage === 'en';
   const [showCorrige, setShowCorrige] = useState(false);
+  // Corrigé rangé sous chaque question quand c'est possible (sinon : bloc unique en bas).
+  const pairing = React.useMemo(() => (set.corrige && set.statement ? pairCorrige(set.statement, set.corrige) : null), [set.statement, set.corrige]);
+  const [showAll, setShowAll] = useState(false);
   const PrevIcon = fr ? ArrowLeft : ArrowRight;
   const duration = set.durationMinutes
     ? set.durationMinutes % 60 === 0
@@ -292,11 +359,26 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
         </div>
       )}
 
+      {pairing && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-emerald-50 border border-emerald-200 px-3.5 py-2.5">
+          <p className="text-[12px] font-semibold text-emerald-900 flex items-center gap-1.5">
+            <BookOpenCheck className="w-4 h-4 shrink-0" />
+            {fr ? 'La correction est sous chaque question (corrigé proposé par KounKour, pas un corrigé officiel).' : 'التصحيح تحت كل سؤال (تصحيح مقترح من KounKour، ليس رسمياً).'}
+          </p>
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className="shrink-0 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-[12px] font-extrabold text-white active:scale-95 hover:shadow-md transition-all"
+          >
+            {showAll ? (fr ? 'Masquer les réponses' : 'إخفاء الأجوبة') : fr ? 'Afficher toutes les réponses' : 'عرض كل الأجوبة'}
+          </button>
+        </div>
+      )}
+
       <article className="bg-[#FCF8FA] border border-[#F1E5EC] rounded-3xl p-3.5 sm:p-6 shadow-xs">
-        <SujetStatement text={set.statement || ''} header />
+        <SujetStatement key={showAll ? 'all' : 'one'} text={set.statement || ''} header pairing={pairing} showAll={showAll} fr={fr} />
       </article>
 
-      {set.corrige && (
+      {set.corrige && (!pairing || pairing.rest) && (
         <section className="mt-4">
           {!showCorrige ? (
             <button
@@ -305,7 +387,7 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
             >
               <span className="flex items-center justify-center gap-2 text-sm font-extrabold">
                 <BookOpenCheck className="w-4 h-4 shrink-0" />
-                {fr ? 'Voir le corrigé proposé' : 'عرض التصحيح المقترح'}
+                {pairing ? (fr ? 'Voir le reste du corrigé' : 'عرض باقي التصحيح') : fr ? 'Voir le corrigé proposé' : 'عرض التصحيح المقترح'}
               </span>
               <span className="block text-[11px] font-semibold text-white/80 mt-0.5">
                 {fr ? 'Traitez d’abord le sujet, puis comparez' : 'عالج الموضوع أولاً ثم قارن'}
@@ -327,7 +409,7 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
                   ? 'Ce n’est pas un corrigé officiel : il a été rédigé par les administrateurs KounKour. Les points que la copie ne permet pas de trancher sont signalés.'
                   : 'ليس تصحيحاً رسمياً: حرره مشرفو KounKour.'}
               </p>
-              <SujetStatement text={set.corrige} />
+              <SujetStatement text={pairing ? pairing.rest : set.corrige} />
             </article>
           )}
         </section>

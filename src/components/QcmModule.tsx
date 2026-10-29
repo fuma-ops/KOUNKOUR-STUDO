@@ -133,6 +133,8 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   const [corrections, setCorrections] = useState<Record<string, QcmCorrection> | null>(null);
   const [grading, setGrading] = useState(false);
   const [gradeError, setGradeError] = useState(false);
+  // Questions dont le candidat a demandé la correction (affichée tout de suite sous la question).
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   // Supports : annales réelles (Supabase) puis entraînement KounKour, rangés par dossier.
   const [realSets, setRealSets] = useState<QcmSet[]>([]);
@@ -239,6 +241,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
     setTimerSeconds(0);
     setCorrections(null);
     setGradeError(false);
+    setChecked({});
   };
   const handleStartSet = (set: QcmSet) => {
     initQuiz(set);
@@ -291,6 +294,24 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
   const correctionOf = (q: QcmSet['questions'][number]): QcmCorrection => {
     if (selectedSet?.serverGraded) return corrections?.[q.id] ?? { correctOptionId: '', explanation: '', source: '' };
     return { correctOptionId: q.correctOptionId, explanation: q.explanation[language], source: q.source || '' };
+  };
+
+  // Correction d'une question, sans attendre la fin de la série. Série corrigée sur le serveur :
+  // un seul appel rapporte la correction de toute la série, gardée pour les questions suivantes.
+  const checkQuestion = async (qid: string) => {
+    if (!selectedSet || grading) return;
+    if (selectedSet.serverGraded && !corrections) {
+      setGrading(true);
+      setGradeError(false);
+      const corr = await submitQcm(selectedSet.id, userAnswers);
+      setGrading(false);
+      if (!corr) {
+        setGradeError(true);
+        return;
+      }
+      setCorrections(corr);
+    }
+    setChecked((prev) => ({ ...prev, [qid]: true }));
   };
 
   const handleSubmit = async () => {
@@ -948,18 +969,26 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
           <div className="space-y-3 mb-8" dir={contentDir(selectedSet)}>
             {currentQ.options.map((opt, oi) => {
               const isSelected = answerIds(userAnswers[currentQ.id]).includes(opt.id);
+              const shown = !!checked[currentQ.id];
+              const isRight = shown && answerIds(correctionOf(currentQ).correctOptionId).includes(opt.id);
+              const cls = shown
+                ? isRight
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-900 font-bold'
+                  : isSelected
+                  ? 'border-rose-300 bg-rose-50 text-rose-900 line-through'
+                  : 'border-[#EADCE5] bg-[#FDFAFC] text-[#6E6773]'
+                : isSelected
+                ? 'border-[#8D174B] bg-[#FDF2F7] text-[#8D174B] font-bold shadow-xs'
+                : 'border-[#EADCE5] bg-[#FDFAFC] hover:bg-[#F8F2F5] text-[#242126]';
               return (
                 <button
                   key={opt.id}
+                  disabled={shown}
                   onClick={() => handleSelectOption(currentQ.id, opt.id)}
-                  className={`w-full min-h-[52px] px-3.5 py-3 rounded-xl border text-[14.5px] sm:text-sm leading-snug font-medium text-start transition-all flex items-center justify-between gap-3 cursor-pointer active:scale-[0.98] ${
-                    isSelected
-                      ? 'border-[#8D174B] bg-[#FDF2F7] text-[#8D174B] font-bold shadow-xs'
-                      : 'border-[#EADCE5] bg-[#FDFAFC] hover:bg-[#F8F2F5] text-[#242126]'
-                  }`}
+                  className={`w-full min-h-[52px] px-3.5 py-3 rounded-xl border text-[14.5px] sm:text-sm leading-snug font-medium text-start transition-all flex items-center justify-between gap-3 cursor-pointer active:scale-[0.98] disabled:cursor-default disabled:active:scale-100 ${cls}`}
                 >
                   <span className="flex items-start gap-3 min-w-0">
-                    <OptionLetter i={oi} tone={isSelected ? 'selected' : 'idle'} />
+                    <OptionLetter i={oi} tone={shown ? (isRight ? 'right' : isSelected ? 'wrong' : 'idle') : isSelected ? 'selected' : 'idle'} />
                     <span className="pt-0.5"><QcmOptionText text={opt.text[language]} /></span>
                   </span>
                   <div className={`w-5 h-5 ${selectedSet.multiAnswer ? 'rounded-md' : 'rounded-full'} border flex items-center justify-center shrink-0 ${
@@ -971,6 +1000,38 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
               );
             })}
           </div>
+
+          {/* Correction immédiate de la question */}
+          {checked[currentQ.id] ? (
+            (() => {
+              const corr = correctionOf(currentQ);
+              const ok = !!corr.correctOptionId && userAnswers[currentQ.id] === corr.correctOptionId;
+              return (
+                <div dir={contentDir(selectedSet)} className={`-mt-4 mb-6 p-3.5 rounded-xl border text-[13px] animate-scale-in ${ok ? 'bg-emerald-50 border-emerald-200' : 'bg-[#FDF2F7] border-[#8D174B]/15'}`}>
+                  <strong className={`flex items-center gap-1.5 font-extrabold mb-1 ${ok ? 'text-emerald-800' : 'text-rose-700'}`}>
+                    {ok ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    {ok ? L('Bonne réponse', 'جواب صحيح', 'Correct') : L('Pas tout à fait : la bonne réponse est en vert', 'الجواب الصحيح باللون الأخضر', 'Not quite: the right answer is in green')}
+                  </strong>
+                  {corr.explanation && <p className="text-[#4A4350] leading-relaxed mb-1">{corr.explanation}</p>}
+                  {corr.source && <span className="text-[10px] text-[#6E6773] italic">Source : {corr.source}</span>}
+                </div>
+              );
+            })()
+          ) : (
+            userAnswers[currentQ.id] && (
+              <div className="-mt-4 mb-6">
+                <button
+                  onClick={() => checkQuestion(currentQ.id)}
+                  disabled={grading}
+                  className="w-full sm:w-auto h-11 px-4 rounded-xl border-2 border-emerald-300 bg-emerald-50 text-emerald-800 text-[13px] font-extrabold flex items-center justify-center gap-1.5 hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-60"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {grading ? L('Correction…', 'جارٍ التصحيح…', 'Checking…') : L('Vérifier ma réponse', 'تحقق من جوابي', 'Check my answer')}
+                </button>
+                {gradeError && <p className="mt-1 text-[11px] text-rose-700">{L('Correction indisponible (connexion). Réessayez.', 'تعذر التصحيح (الاتصال). أعد المحاولة.', 'Checking unavailable (connection). Please try again.')}</p>}
+              </div>
+            )
+          )}
 
           {/* Question Navigation */}
           {/* Téléphone : « précédente » réduite à sa flèche, « suivante » sur toute la largeur restante. */}
