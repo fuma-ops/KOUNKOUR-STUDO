@@ -76,3 +76,11 @@ Le premier post part tout de suite, les suivants sont programmés sur Facebook e
 **Préparation pour chaque concours** : un concours ouvert sans dossier relié contenant des QCM
 n'aura pas de post « préparation ». L'étape 6 doit donc d'abord combler ces trous (y compris les
 dossiers qui n'ont que des sujets écrits et aucun QCM).
+
+## Instagram @kounkourmaroc (tâche planifiée, 3 fois par jour)
+
+`node scripts/social/instagram.mjs publier <types> 1` reprend sur Instagram un post publié le jour
+même sur Facebook (même image, texte « lien en bio » + hashtags), jamais deux fois :
+midi `nouveau,dernier`, après-midi `preparation,liste`, soir `reel`. Les récapitulatifs
+(plusieurs concours) passent en premier. Aperçu : `instagram.mjs apercu <types> [n]`.
+Le jeton de la page (social_secret) porte aussi `instagram_basic` et `instagram_content_publish`.
