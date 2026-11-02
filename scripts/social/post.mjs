@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import { withTrack, TRACK_CREDIT } from './sounds.mjs';
+import { keywordsFor } from './keywords.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
@@ -288,7 +289,8 @@ ${dense ? `.card{max-height:820px;overflow:hidden;padding:42px 48px 40px}.org{pa
 // ---------------------------------------------------------------------------
 // Textes
 // ---------------------------------------------------------------------------
-const TAGS = '#concours #emploi #Maroc #emploipublic #مباراة #توظيف #KounKour';
+// Mots-clés et hashtags selon le grade du concours (recherches réelles des candidats) : voir keywords.mjs.
+const seo = (text, kind) => { const k = keywordsFor(text, kind); return `🔎 ${k.line}\n${k.tags}`; };
 const tidy = (lines) => lines.filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n');
 const arTitle = (c) => c.title_ar || [c.administrations?.name_ar || c.administrations?.name_fr, c.positions ? `${c.positions} ${c.positions > 10 ? 'منصبا' : 'مناصب'}` : ''].filter(Boolean).join(' – ');
 
@@ -306,7 +308,8 @@ function caption(item) {
       `🇲🇦 ${item.group.length} مباريات جديدة – ${c.administrations?.name_ar || org}`,
       '',
       'Conditions, pièces du dossier et préparation gratuite sur kounkour.com',
-      TAGS,
+      '',
+      seo(item.group.map((x) => x.c.title_fr).join(' '), 'nouveau'),
     ]);
   }
   if (item.group) {
@@ -320,7 +323,8 @@ function caption(item) {
       `🇲🇦 ${item.group.length} ${t.arPlural} – ${c.administrations?.name_ar || org}`,
       '',
       'Partagez avec les candidats concernés 🙏',
-      TAGS,
+      '',
+      seo(item.group.map((x) => x.c.title_fr).join(' '), 'liste'),
     ]);
   }
   if (kind === 'liste') {
@@ -339,7 +343,8 @@ function caption(item) {
       `🇲🇦 ${item.doc.title_ar || t.ar} : ${arTitle(c)}`,
       '',
       'Partagez avec les candidats concernés 🙏',
-      TAGS,
+      '',
+      seo(`${c.title_fr} ${c.grade_fr || ''}`, 'liste'),
     ]);
   }
   if (kind === 'preparation') {
@@ -364,7 +369,7 @@ function caption(item) {
       `🇲🇦 تحضير مجاني للمباراة : ${arTitle(c)}`,
       'أسئلة QCM مصححة ومباريات تجريبية مجانا على KounKour',
       '',
-      TAGS + ' #preparation #QCM',
+      seo(`${c.title_fr} ${c.grade_fr || ''}`, 'preparation'),
     ]);
   }
   const d = daysLeft(c.deadline_date);
@@ -386,7 +391,7 @@ function caption(item) {
     `🇲🇦 ${kind === 'dernier' ? 'آخر الأيام للترشح' : 'مباراة جديدة'} : ${arTitle(c)}`,
     `⏳ آخر أجل : ${dateAr(c.deadline_date)}`,
     '',
-    TAGS,
+    seo(`${c.title_fr} ${c.grade_fr || ''}`, kind),
   ]);
 }
 
@@ -504,7 +509,7 @@ window.setT=(t)=>{
     '',
     TRACK_CREDIT,
     '',
-    TAGS + ' #reels',
+    seo(picks.map((c) => c.title_fr).join(' '), 'reel'),
   ]);
   writeFileSync(`${f}.txt`, text);
   return { kind: 'reel', key: REEL_KEY, mp4: `${f}.mp4`, cover: `${f}.cover.png`, text };
