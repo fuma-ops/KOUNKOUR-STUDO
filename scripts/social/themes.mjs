@@ -1,5 +1,6 @@
 // Six mises en page « photo en fond » pour les posts d'un seul concours (nouveau, derniers jours, liste).
-// Le propriétaire a validé les 6 designs le 04/11/2026 et veut qu'ils alternent : un design par post, à tour de rôle.
+// Le propriétaire a retenu les 3 designs à titre centré (D, E, F) le 04/11/2026 : ils alternent, un par post.
+// Les mises en page A, B, C restent dans le fichier mais ne sont plus utilisées.
 import { join } from 'node:path';
 
 const HERE = new URL('.', import.meta.url).pathname;
@@ -21,6 +22,7 @@ export function backgroundFor(text) {
   return join(HERE, 'bg', `${hit ? hit[1] : 'k8'}.jpg`);
 }
 export const THEME_COUNT = 6;
+const ROTATION = [3, 4, 5]; // D · E · F
 
 // Taille du titre selon sa longueur (le titre ne doit jamais déborder).
 const fit = (t, sizes) => { const n = t.length; return n > 90 ? sizes[3] : n > 65 ? sizes[2] : n > 40 ? sizes[1] : sizes[0]; };
@@ -47,7 +49,7 @@ h1{font-weight:800;letter-spacing:-1.5px;display:-webkit-box;-webkit-box-orient:
   const chipsRow = (cls) => `<div class="${cls}">${P ? `<div>👤 ${esc(P)}</div>` : ''}<div class="hot">${/limite/i.test(d.stat2L) ? '⏳' : '📅'} ${esc(d.stat2L)} : ${esc(d.stat2V)}</div></div>`;
   const bottom = `<div class="pill">kounkour.com</div><div class="ar" style="font-size:32px;font-weight:700;margin-top:14px">${esc(d.ctaAr)}</div>`;
 
-  switch (theme % THEME_COUNT) {
+  switch (ROTATION[theme % ROTATION.length]) {
     case 0: // A · photo + gros titre aligné à gauche
       return page(`.sh{position:absolute;inset:0;background:linear-gradient(180deg,rgba(40,5,25,.55) 0%,rgba(40,5,25,.3) 30%,rgba(40,5,25,.88) 58%,rgba(30,3,18,.97) 100%)}
 .top{position:absolute;top:60px;left:64px;right:64px;display:flex;justify-content:space-between;align-items:center}
