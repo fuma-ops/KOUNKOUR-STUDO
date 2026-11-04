@@ -22,6 +22,7 @@ import { execFileSync } from 'node:child_process';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import { withTrack, TRACK_CREDIT } from './sounds.mjs';
 import { keywordsFor } from './keywords.mjs';
+import { themedHtml, backgroundFor } from './themes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
@@ -203,7 +204,7 @@ const THEME = {
   preparation: { badge: 'PRÉPARATION GRATUITE', bg: '#C9E3FF', fg: '#0D3A6B', soft: '#EEF6FF' },
 };
 
-function html(item, logo) {
+function html(item, logo, idx = 0) {
   const { c, kind } = item;
   const th = THEME[kind];
   const badge = kind === 'liste' ? LIST[item.doc.doc_type].badge : item.group ? 'NOUVEAUX CONCOURS' : th.badge;
@@ -238,9 +239,9 @@ function html(item, logo) {
       stat2L = exam ? 'Date de l’épreuve' : 'Publiée le';
       stat2V = dateFr(exam || localDay(item.doc.created_at)).replace(/ \d{4}$/, '');
     } else {
-      const d = daysLeft(c.deadline_date);
       stat2L = 'Date limite';
-      stat2V = kind === 'dernier' ? (d <= 0 ? "Aujourd'hui" : d === 1 ? 'Demain' : `Dans ${d} jours`) : dateFr(c.deadline_date);
+      // Toujours la date exacte, jamais « aujourd'hui / demain » (consigne du propriétaire, 04/11/2026).
+      stat2V = dateFr(c.deadline_date);
     }
     body = `<h1 style="font-size:${size}px">${esc(title)}</h1>
   <div class="stats">
@@ -249,6 +250,9 @@ function html(item, logo) {
   </div>`;
     cta = kind === 'liste' ? LIST[item.doc.doc_type].cta : 'Conditions, dossier et préparation gratuite';
     ctaAr = kind === 'liste' ? 'تحقق من اسمك في اللائحة' : 'الشروط والملف والتحضير المجاني';
+    // Posts d'un seul concours : un des 6 designs « photo en fond », à tour de rôle (choix du propriétaire, 04/11/2026).
+    return themedHtml(idx, { badge, title, org, logo: logoBox(org, logo), postes: c.positions || null, stat2L, stat2V, cta, ctaAr,
+      bg: backgroundFor(`${c.title_fr || ''} ${c.grade_fr || ''} ${org}`), fontsCss: join(HERE, 'fonts', 'fonts.css') });
   }
   return `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="file://${join(HERE, 'fonts', 'fonts.css')}"><style>
 ${BASE_CSS}
@@ -400,11 +404,12 @@ function caption(item) {
 async function render(items, outDir, browser) {
   const page = await browser.newPage({ viewport: { width: 1080, height: 1350 } });
   const logos = new Map();
+  let idx = Math.floor(Date.now() / 86400000); // le design change à chaque post et d'un jour à l'autre
   for (const item of items) {
     const url = item.c.administrations?.logo_url;
     if (!logos.has(url)) logos.set(url, await dataUri(url));
     const f = join(outDir, `${item.kind}-${item.c.slug.slice(0, 50)}-${item.key.slice(0, 6)}`);
-    writeFileSync(`${f}.html`, html(item, logos.get(url)));
+    writeFileSync(`${f}.html`, html(item, logos.get(url), !item.group && item.kind !== 'preparation' ? idx++ : 0));
     await page.goto(`file://${resolve(f)}.html`, { waitUntil: 'load' });
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: `${f}.png` });
