@@ -290,7 +290,9 @@ ${dense ? `.card{max-height:820px;overflow:hidden;padding:42px 48px 40px}.org{pa
 // Textes
 // ---------------------------------------------------------------------------
 // Mots-clés et hashtags selon le grade du concours (recherches réelles des candidats) : voir keywords.mjs.
-const seo = (text, kind) => { const k = keywordsFor(text, kind); return `🔎 ${k.line}\n${k.tags}`; };
+// Appel à suivre la page (demande du propriétaire, 04/11/2026), juste avant les mots-clés.
+const FOLLOW = '👍 تابعنا باش يوصلك الجديد ديال المباريات كل نهار';
+const seo = (text, kind) => { const k = keywordsFor(text, kind); return `${FOLLOW}\n\n🔎 ${k.line}\n${k.tags}`; };
 const tidy = (lines) => lines.filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n');
 const arTitle = (c) => c.title_ar || [c.administrations?.name_ar || c.administrations?.name_fr, c.positions ? `${c.positions} ${c.positions > 10 ? 'منصبا' : 'مناصب'}` : ''].filter(Boolean).join(' – ');
 
@@ -461,7 +463,7 @@ h1{margin-top:38px;font-size:56px;line-height:1.14;font-weight:800;color:#8D174B
 ${cards.map((k, i) => `<div class="s" id="s${i + 1}"><div class="num">${i + 1} / ${cards.length}</div><div class="card"><div class="org">${logoBox(k.org, k.logo)}<div class="orgname">${esc(k.org)}</div></div><h1>${esc(k.title)}</h1>
 <div class="stats"><div class="stat"><div class="l">Postes</div><div class="v">${k.postes ?? '—'}</div></div><div class="stat"><div class="l">Date limite</div><div class="v">${esc(k.deadline.replace(/ \d{4}$/, ''))}</div></div></div></div></div>`).join('')}
 <div class="s" id="s${cards.length + 1}"><div class="big" style="font-size:80px">Conditions, dossier<br>et préparation<br>gratuite</div><div class="pill" style="font-size:52px">kounkour.com</div><div class="ar">الشروط والملف والتحضير المجاني</div>
-<div class="sub" style="font-size:36px">Ne ratez plus aucun concours : activez vos alertes</div></div>
+<div class="sub" style="font-size:36px">Ne ratez plus aucun concours : activez vos alertes</div><div class="ar" style="font-size:44px;margin-top:18px">👍 تابعنا باش يوصلك الجديد كل نهار</div></div>
 <div class="bar" id="bar"></div>
 <script>
 const T=${T}, D=${dur}, N=${cards.length};
