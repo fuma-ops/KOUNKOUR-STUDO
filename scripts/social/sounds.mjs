@@ -39,3 +39,29 @@ export function withTrack(videoIn, videoOut, seconds) {
     '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-shortest', '-movflags', '+faststart', videoOut]);
   return videoOut;
 }
+
+// ---------------------------------------------------------------------------
+// Reels KounKour (choix du propriétaire du 05/11/2026) : trois instrumentaux de style marocain,
+// sans paroles, en rotation d'un reel à l'autre. Pas de vraies chansons : elles sont protégées
+// et les réseaux couperaient le son. La page « حين تعرف الله » garde withTrack (Floats).
+//   chaabi  : composé pour KounKour (vidIQ, libre de droits, pas de mention obligatoire) ;
+//   gnawa   : composé pour KounKour (vidIQ, libre de droits, pas de mention obligatoire) ;
+//   desert  : « Desert City » de Kevin MacLeod, CC BY 4.0 (mention obligatoire dans le texte).
+const KK_TRACKS = [
+  { id: 'chaabi', file: new URL('./audio/kk-chaabi.mp3', import.meta.url).pathname, credit: '' },
+  { id: 'gnawa', file: new URL('./audio/kk-gnawa.mp3', import.meta.url).pathname, credit: '' },
+  { id: 'desert', file: new URL('./audio/kk-desert-city.mp3', import.meta.url).pathname, start: 6,
+    credit: '🎵 Music: "Desert City" Kevin MacLeod (incompetech.com) – Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/' },
+];
+let kkTurn = Math.floor(Date.now() / 86400000);
+// Morceau suivant de la rotation (change à chaque reel et d'un jour à l'autre).
+export function nextKkTrack() { return KK_TRACKS[kkTurn++ % KK_TRACKS.length]; }
+
+// Pose le morceau `track` sur la vidéo : coupé à la durée, fondus, volume de fond.
+export function withKkTrack(videoIn, videoOut, seconds, track) {
+  const d = Math.max(6, Math.round(seconds * 10) / 10);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', videoIn, '-ss', String(track.start || 0), '-i', track.file, '-map', '0:v', '-map', '1:a',
+    '-af', `atrim=0:${d},afade=t=in:d=0.8,afade=t=out:st=${Math.max(0, d - 2.5)}:d=2.5,loudnorm=I=-18:TP=-2:LRA=7`,
+    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-shortest', '-movflags', '+faststart', videoOut]);
+  return videoOut;
+}

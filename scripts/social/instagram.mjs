@@ -39,7 +39,7 @@ const altText = (caption) => `Affiche KounKour : ${caption.split('\n').filter((l
 function igCaption(text, kind = 'nouveau') {
   const lines = (text || '').split('\n').filter((l) => !/^👉\s*https?:\/\//.test(l.trim()));
   // Les liens kounkour.com deviennent « lien en bio » ; le crédit musical (Uppbeat) garde son adresse.
-  const out = lines.map((l) => (/uppbeat/i.test(l) ? l : l.replace(/\s*:\s*https?:\/\/\S+/g, '').replace(/https?:\/\/\S+/g, 'kounkour.com'))).join('\n');
+  const out = lines.map((l) => (/uppbeat|incompetech|creativecommons/i.test(l) ? l : l.replace(/\s*:\s*https?:\/\/\S+/g, '').replace(/https?:\/\/\S+/g, 'kounkour.com'))).join('\n');
   const k = keywordsFor(text || '', kind);
   const body = out.replace(/\n#.*$/s, '').split('\n').filter((l) => !l.startsWith('🔎')).join('\n').trim();
   return `${k.line}\n\n${body}\n\n🔗 Lien en bio : kounkour.com\n\n${k.tags}`.slice(0, 2200);

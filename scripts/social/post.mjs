@@ -24,7 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
-import { withTrack, TRACK_CREDIT } from './sounds.mjs';
+import { nextKkTrack, withKkTrack } from './sounds.mjs';
 import { keywordsFor } from './keywords.mjs';
 import { themedHtml, backgroundFor } from './themes.mjs';
 
@@ -507,7 +507,8 @@ window.setT=(t)=>{
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', join(dir, 'f%04d.jpg'),
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-crf', '20', '-movflags', '+faststart', `${f}-muet.mp4`]);
   // Fond sonore : le morceau choisi par le propriétaire (sounds.mjs).
-  withTrack(`${f}-muet.mp4`, `${f}.mp4`, T);
+  const track = nextKkTrack();
+  withKkTrack(`${f}-muet.mp4`, `${f}.mp4`, T, track);
   rmSync(`${f}-muet.mp4`, { force: true });
   rmSync(dir, { recursive: true, force: true });
   const text = tidy([
@@ -518,7 +519,7 @@ window.setT=(t)=>{
     `👉 ${nOpen} concours ouverts, conditions et préparation gratuite : ${link('/', 'reel')}`,
     '🇲🇦 مباريات اليوم : الشروط والملف والتحضير المجاني على KounKour',
     '',
-    TRACK_CREDIT,
+    track.credit,
     '',
     seo(picks.map((c) => c.title_fr).join(' '), 'reel'),
   ]);
@@ -637,11 +638,12 @@ setT(0);
   await page.close();
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(REEL_FPS), '-i', join(dir, 'f%04d.jpg'),
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-crf', '21', '-movflags', '+faststart', `${base}-muet.mp4`]);
-  withTrack(`${base}-muet.mp4`, `${base}.mp4`, T);
+  const track = nextKkTrack();
+  withKkTrack(`${base}-muet.mp4`, `${base}.mp4`, T, track);
   rmSync(`${base}-muet.mp4`, { force: true });
   rmSync(dir, { recursive: true, force: true });
   // Même texte que le post image (liens, arabe, mots-clés) + crédit musical obligatoire.
-  const text = caption(item).replace(FOLLOW, `${TRACK_CREDIT}\n\n${FOLLOW}`);
+  const text = track.credit ? caption(item).replace(FOLLOW, `${track.credit}\n\n${FOLLOW}`) : caption(item);
   writeFileSync(`${base}.txt`, text);
   Object.assign(item, { mp4: `${base}.mp4`, cover: `${base}.cover.png`, text, isReel: true });
   return item;
