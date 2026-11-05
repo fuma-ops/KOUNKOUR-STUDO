@@ -69,17 +69,25 @@ const feed = (await rest('/rpc/social_feed', { p_since: since, p_network: 'faceb
 const done = new Set();
 for (const t of types) for (const k of await rest('/rpc/social_posted', { p_kind: t, p_network: 'instagram' })) done.add(`${t}:${k}`);
 // L'identifiant « page_post » du premier post n'est pas une photo réutilisable : on l'écarte.
+// Depuis le 05/11/2026 les nouveaux concours, derniers jours et questions du jour sont des reels
+// sur Facebook (les listes restent des images) : on regarde ce qu'est le post avant de le reprendre.
 const todo = feed.filter((x) => !x.keys.some((k) => done.has(`${x.kind}:${k}`)) && !String(x.post_id).includes('_'))
-  .sort((a, b) => b.keys.length - a.keys.length || Date.parse(a.posted_at) - Date.parse(b.posted_at)).slice(0, n);
+  .sort((a, b) => b.keys.length - a.keys.length || Date.parse(a.posted_at) - Date.parse(b.posted_at));
+async function asVideo(id) {
+  try { return await graph(`/${id}`, secret.token, { fields: 'source,description,status' }); } catch { return null; }
+}
 
 const out = [];
+let okCount = 0;
 for (const x of todo) {
+  if (okCount >= n) break;
   try {
     let media;
-    if (x.kind === 'reel') {
-      const v = await graph(`/${x.post_id}`, secret.token, { fields: 'source,description' });
-      if (!v.source) throw new Error('vidéo Facebook pas encore disponible');
-      media = { media_type: 'REELS', video_url: v.source, caption: igCaption(v.description, 'reel'), share_to_feed: 'true' };
+    const v = x.kind === 'liste' ? null : await asVideo(x.post_id);
+    if (v) {
+      // Reel programmé sur Facebook mais pas encore sorti : on le garde pour le passage suivant.
+      if (!v.source || (v.status && (v.status.video_status !== 'ready' || (v.status.publishing_phase && v.status.publishing_phase.publish_status !== 'published')))) { out.push({ type: x.kind, facebook: x.post_id, info: 'reel pas encore sorti sur Facebook' }); continue; }
+      media = { media_type: 'REELS', video_url: v.source, caption: igCaption(v.description, x.kind), share_to_feed: 'true' };
       // Instagram refuse souvent l'adresse de la copie Facebook : le fichier est envoyé directement.
       media.file = Buffer.from(await (await fetch(v.source)).arrayBuffer());
     } else {
@@ -112,9 +120,10 @@ for (const x of todo) {
     await waitReady(c.id, secret.token);
     const pub = await graph(`/${IG_USER}/media_publish`, secret.token, { creation_id: c.id }, 'POST');
     for (const k of x.keys) await rest('/rpc/social_record', { p_contest: k, p_kind: x.kind, p_post: pub.id, p_network: 'instagram' });
-    out.push({ type: x.kind, instagram: pub.id });
+    okCount++;
+    out.push({ type: x.kind, format: media.media_type === 'REELS' ? 'reel' : 'image', instagram: pub.id });
   } catch (e) {
     out.push({ type: x.kind, facebook: x.post_id, erreur: String(e.message || e) });
   }
 }
-console.log(JSON.stringify(out.length ? out : [{ info: 'rien à reprendre sur Instagram pour ces types aujourd’hui' }], null, 2));
+console.log(JSON.stringify(okCount || out.length ? out : [{ info: 'rien à reprendre sur Instagram pour ces types aujourd’hui' }], null, 2));

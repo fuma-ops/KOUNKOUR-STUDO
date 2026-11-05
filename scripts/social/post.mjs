@@ -4,15 +4,19 @@
 //   RADAR_KEY=… node scripts/social/post.mjs apercu [max] [dossier]   images, textes et reel ; rien n'est publié
 //   RADAR_KEY=… node scripts/social/post.mjs publier [max]            publie sur la page (jamais deux fois)
 //
-// Le programme du jour (une seule commande, lancée chaque jour) :
-//   « dernier »      concours qui ferment dans 0 à 2 jours (2 au plus) ;
-//   « liste »        un post par nouvelle liste de convoqués (écrit, oral) ou de résultats (36 h) ;
-//   « nouveau »      un post par concours publié depuis moins de 36 h ;
-//   « preparation »  concours ouverts qui ont un dossier de préparation avec QCM : une vraie
-//                    question du dossier, la réponse est sur le site (3 par jour) ;
-//   « reel »         une vidéo verticale « Concours du jour » (1 par jour).
-// Le premier post part tout de suite, les suivants sont programmés sur Facebook et répartis
-// jusqu'à 22 h (heure du Maroc). max (défaut 30) plafonne le nombre de posts photo du jour.
+// Le programme du jour (une seule commande, lancée chaque jour vers 10 h) — choix du propriétaire
+// du 05/11/2026 : les reels rapportent plus de vues que les images, on garde l'image seulement
+// pour les listes et résultats.
+//   « nouveau »      un REEL par concours publié depuis moins de 72 h (récapitulatif par organisme
+//                    dès 3 concours) : photo du métier, postes, date limite, une vraie question de
+//                    préparation dont la réponse s'affiche, puis kounkour.com ;
+//   « dernier »      un REEL pour les concours qui ferment dans 0 à 2 jours (2 au plus) ;
+//   « preparation »  un REEL question du jour pour un gros concours ouvert (1 par jour) ;
+//   « liste »        une IMAGE par nouvelle liste de convoqués (écrit, oral) ou de résultats ;
+//   « reel »         la vidéo « Concours du jour », à 18 h.
+// Créneaux (heure du Maroc, demandés par le propriétaire) : 12 h–14 h et 18 h–20 h, toutes les
+// 10 minutes ; au-delà, 20 h–22 h. SOCIAL_REELS_MAX (défaut 12) plafonne les reels du jour.
+// Les vidéos du jour sont listées dans <dossier>/tiktok-<date>.json pour l'envoi TikTok de 11 h.
 // SOCIAL_SLUG=<slug> : un seul post « nouveau » pour ce concours (test). SOCIAL_REEL=0 : sans reel.
 // Fonds personnalisés : déposer scripts/social/templates/<type>.png (1080 × 1350).
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
@@ -523,6 +527,127 @@ window.setT=(t)=>{
 }
 
 // ---------------------------------------------------------------------------
+// Reel par concours (1080 × 1920, ~15 s) : photo du métier + gros titre, une vraie question de
+// préparation (réponse révélée), puis kounkour.com. Mêmes données que la fiche, rien d'inventé.
+// ---------------------------------------------------------------------------
+const REEL_FPS = 24;
+const TAGS = { nouveau: '📢 مباراة جديدة', dernier: '⏳ آخر الأيام للترشح', preparation: '📚 تحضير مجاني' };
+async function contestReel(item, outDir, browser, data) {
+  const { c, kind, group } = item;
+  const org = c.administrations?.name_fr || '';
+  const orgAr = c.administrations?.name_ar || '';
+  const logo = await dataUri(c.administrations?.logo_url);
+  const bg = backgroundFor(`${c.title_fr || ''} ${c.grade_fr || ''} ${org}`);
+  const prep = group ? null : item.prep || prepFor(c, data);
+  const q = prep?.question;
+  // Bonne(s) réponse(s) : la correction du site (qcm_submit_v2), comme quand un candidat valide.
+  let right = [];
+  if (q) {
+    try {
+      const corr = await rest('/rpc/qcm_submit_v2', false, { p_set_id: prep.set.id, p_answers: {} });
+      const row = (corr || []).find((r) => r.question_id === q.id);
+      right = (row?.correct_indexes || []).filter((i) => Number.isInteger(i) && i >= 0 && i < q.options.length);
+    } catch { right = []; }
+  }
+  const quiz = q && right.length ? { q, right, set: prep.set } : null;
+  const postes = group ? group.reduce((t, x) => t + (x.c.positions || 0), 0) : c.positions;
+  const title = group ? `${group.length} مباريات جديدة · ${orgAr || org}` : c.title_fr;
+  const tsize = (t) => (t.length > 95 ? 46 : t.length > 70 ? 52 : t.length > 45 ? 60 : 70);
+  const tag = group ? '📢 مباريات جديدة' : TAGS[kind];
+  const deadlineLine = group ? '' : `⏳ آخر أجل للترشيح: ${dateAr(c.deadline_date)}`;
+  const quizHead = quiz ? (quiz.set.kind === 'annales' ? `🧠 سؤال من مباراة سابقة${quiz.set.exam_year ? ` (${quiz.set.exam_year})` : ''}` : '🧠 سؤال تدريبي (ماشي سؤال رسمي)') : '';
+  const details = group
+    ? group.slice(0, 4).map((x) => `<div class="row"><span>📌</span><bdi>${esc(cut(x.c.title_fr, 80))}</bdi></div>`).join('') + (group.length > 4 ? `<div class="row"><span>➕</span><bdi>${group.length - 4} ${group.length - 4 > 2 ? 'مباريات أخرى' : 'مباراة أخرى'}</bdi></div>` : '')
+    : [c.diploma_fr ? `<div class="row"><span>🎓</span><bdi>${esc(cut(c.diploma_fr, 120))}</bdi></div>` : '',
+       c.positions ? `<div class="row"><span>👥</span><bdi>${c.positions} ${c.positions > 10 ? 'منصبا' : c.positions > 2 ? 'مناصب' : c.positions === 2 ? 'منصبان' : 'منصب واحد'}</bdi></div>` : '',
+       c.exam_date && c.exam_date >= today ? `<div class="row"><span>✍️</span><bdi>المباراة: ${dateAr(c.exam_date)}</bdi></div>` : '',
+       c.region_fr ? `<div class="row"><span>📍</span><bdi>${esc(c.region_fr)}</bdi></div>` : ''].join('');
+  const T = 15.5, A = 4.6, B = 11.8, REVEAL = 9.2;
+  const scene = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="file://${join(HERE, 'fonts', 'fonts.css')}"><style>
+${BASE_CSS}
+body{width:1080px;height:1920px;font-family:'Alexandria','Plus Jakarta Sans',sans-serif;background:#0b0b0d;color:#fff;position:relative;overflow:hidden}
+#bg{position:absolute;left:0;right:0;top:0;height:1220px;background:url("file://${bg}") center 22%/cover}
+#bg:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,rgba(0,0,0,0) 25%,rgba(0,0,0,0) 65%,#0b0b0d 100%)}
+#dim{position:absolute;inset:0;background:rgba(11,11,13,.82);opacity:0}
+.top{position:absolute;top:90px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+.brand{font-family:'Plus Jakarta Sans';text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.tag{background:#E11D48;color:#fff;font-weight:800;font-size:40px;padding:14px 30px;border-radius:18px;direction:rtl}
+.s{position:absolute;left:60px;right:60px;opacity:0;direction:rtl;text-align:center}
+#s0{bottom:150px}
+.org{display:flex;align-items:center;justify-content:center;gap:22px;font-size:34px;font-weight:700;color:#e5e5ea;margin-bottom:26px}
+.org .logo{width:110px;height:110px;border-radius:24px}.org .logo img{max-width:92px;max-height:92px}.org .logo .ini{font-size:34px}
+.title{font-weight:800;line-height:1.18;unicode-bidi:plaintext}
+.num{font-size:150px;font-weight:800;color:#FFD23F;line-height:1.05;margin-top:18px;white-space:nowrap}
+.dl{display:flex;align-items:center;gap:22px;margin-top:22px}.dl i{flex:1;height:5px;background:#FFD23F;border-radius:3px}.dl span{font-size:46px;font-weight:800;white-space:nowrap}
+#s1{top:330px}
+.qh{display:inline-block;background:#FFD23F;color:#2b1a00;font-weight:800;font-size:40px;padding:12px 28px;border-radius:16px}
+.qcard{background:#fff;color:#241a22;border-radius:36px;padding:50px 48px 40px;margin-top:40px;text-align:start}
+.qq{font-size:52px;font-weight:800;line-height:1.3;unicode-bidi:plaintext;text-align:start}
+.opt{display:flex;gap:20px;align-items:center;margin-top:20px;border:3px solid #eee;border-radius:24px;padding:24px 26px;font-size:44px;font-weight:700;unicode-bidi:plaintext;transition:none}
+.opt b{flex:none;width:62px;height:62px;border-radius:50%;background:#FCE7F3;color:#8D174B;display:grid;place-items:center;font-size:34px}
+.opt.ok{border-color:#16A34A;background:#DCFCE7}.opt.ok b{background:#16A34A;color:#fff}
+.ask{margin-top:30px;font-size:44px;font-weight:800}
+.row{display:flex;gap:22px;align-items:flex-start;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.18);border-radius:26px;padding:30px 32px;margin-top:26px;font-size:46px;font-weight:700;text-align:start;line-height:1.3}
+.row bdi{unicode-bidi:plaintext}
+#s2{top:520px}
+.cta{font-size:84px;font-weight:800;line-height:1.15}
+.pill{display:inline-block;margin-top:50px;background:#fff;color:#8D174B;font-family:'Plus Jakarta Sans';font-size:64px;font-weight:800;padding:24px 56px;border-radius:999px}
+.fol{display:inline-block;margin-top:56px;background:#FFD23F;color:#2b1a00;font-size:50px;font-weight:800;padding:20px 38px;border-radius:24px;line-height:1.3}
+.bar{position:absolute;left:0;bottom:0;height:12px;background:#FFD23F;z-index:6}
+</style></head><body><div id="bg"></div><div id="dim"></div>
+<div class="top"><div class="brand"><div class="k">K</div>KounKour</div><div class="tag">${esc(tag)}</div></div>
+<div class="s" id="s0"><div class="org">${logoBox(org, logo)}<span>${esc(cut(orgAr || org, 60))}</span></div>
+<div class="title" style="font-size:${tsize(title)}px">${esc(cut(title, 120))}</div>
+${postes ? `<div class="num"><bdi>${postes}</bdi> ${postes > 10 ? 'منصبا' : postes > 2 ? 'مناصب' : postes === 2 ? 'منصبان' : 'منصب'}</div>` : ''}
+${deadlineLine ? `<div class="dl"><i></i><span>${esc(deadlineLine)}</span><i></i></div>` : ''}</div>
+<div class="s" id="s1">${quiz
+    ? `<div class="qh">${esc(quizHead)}</div><div class="qcard" dir="${/[\u0600-\u06FF]/.test(quiz.q.question) ? 'rtl' : 'ltr'}"><div class="qq">${esc(quiz.q.question)}</div>${quiz.q.options.slice(0, 5).map((o, i) => `<div class="opt" data-ok="${quiz.right.includes(i) ? 1 : 0}"><b>${'ABCDE'[i]}</b><bdi>${esc(o)}</bdi></div>`).join('')}</div><div class="ask" id="ask">جاوب فالتعليقات 👇</div>`
+    : `<div class="qh">${group ? '📋 المباريات' : '📋 الشروط باختصار'}</div>${details}`}</div>
+<div class="s" id="s2"><div class="cta">الشروط، الملف<br>والتحضير المجاني</div><div class="pill">kounkour.com</div><br><div class="fol">👍 تابعنا باش يوصلك<br>الجديد كل نهار</div></div>
+<div class="bar" id="bar"></div>
+<script>
+const T=${T},A=${A},B=${B},R=${REVEAL};
+const e=(x)=>1-Math.pow(1-Math.min(1,Math.max(0,x)),3);
+const show=(id,a,b,last)=>{const el=document.getElementById(id);const i=e((t0-a)/0.5),o=last?0:e((t0-(b-0.35))/0.35);el.style.opacity=Math.max(0,Math.min(i,1-o));el.style.transform='translateY('+((1-i)*70-o*40)+'px)';};
+let t0=0;
+window.setT=(t)=>{t0=t;
+  document.getElementById('bg').style.transform='scale('+(1.02+0.08*t/T)+')';
+  document.getElementById('dim').style.opacity=e((t-A+0.4)/0.5)*0.9;
+  show('s0',0,A,false);show('s1',A,B,false);show('s2',B,T,true);
+  document.querySelectorAll('.opt').forEach((o)=>o.classList.toggle('ok',t>=R&&o.dataset.ok==='1'));
+  const ask=document.getElementById('ask');if(ask)ask.textContent=t>=R?'✅ الجواب الصحيح':'جاوب فالتعليقات 👇';
+  document.getElementById('bar').style.width=(t/T*100)+'%';};
+setT(0);
+</script></body></html>`;
+  const base = join(outDir, `reel-${kind}-${c.slug.slice(0, 40)}-${item.key.slice(0, 6)}`);
+  const dir = `${base}-frames`;
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(`${base}.html`, scene);
+  const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+  await page.goto(`file://${resolve(base)}.html`, { waitUntil: 'load' });
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => window.setT(2.2));
+  await page.screenshot({ path: `${base}.cover.png` });
+  const frames = Math.round(T * REEL_FPS);
+  for (let i = 0; i < frames; i++) {
+    await page.evaluate((t) => window.setT(t), i / REEL_FPS);
+    await page.screenshot({ path: join(dir, `f${String(i).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 86 });
+  }
+  await page.close();
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(REEL_FPS), '-i', join(dir, 'f%04d.jpg'),
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-crf', '21', '-movflags', '+faststart', `${base}-muet.mp4`]);
+  withTrack(`${base}-muet.mp4`, `${base}.mp4`, T);
+  rmSync(`${base}-muet.mp4`, { force: true });
+  rmSync(dir, { recursive: true, force: true });
+  // Même texte que le post image (liens, arabe, mots-clés) + crédit musical obligatoire.
+  const text = caption(item).replace(FOLLOW, `${TRACK_CREDIT}\n\n${FOLLOW}`);
+  writeFileSync(`${base}.txt`, text);
+  Object.assign(item, { mp4: `${base}.mp4`, cover: `${base}.cover.png`, text, isReel: true });
+  return item;
+}
+
+// ---------------------------------------------------------------------------
 // Publication
 // ---------------------------------------------------------------------------
 async function graph(path, params, secret) {
@@ -566,7 +691,29 @@ async function publishReel(item, secret, when) {
   return video_id;
 }
 
-// Horaires : le premier tout de suite, puis réparti jusqu'à 22 h au Maroc (15 à 60 min d'écart).
+// Créneaux du propriétaire (05/11/2026) : 12 h–14 h et 18 h–20 h (toutes les 10 min), puis
+// 20 h–22 h si besoin ; jamais moins de 12 min à l'avance (Facebook : 10 min minimum).
+// `reserved` : créneaux gardés (le reel « Concours du jour » de 18 h).
+function slots(count, reserved = []) {
+  const now = Math.floor(Date.now() / 1000);
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(now * 1000)).map((x) => [x.type, x.value]));
+  const offset = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) / 1000 - now;
+  const at = (h, m) => Date.UTC(+p.year, +p.month - 1, +p.day, h, m, 0) / 1000 - offset;
+  const all = [];
+  for (const [h0, h1] of [[12, 14], [18, 20], [20, 22]]) for (let m = h0 * 60; m < h1 * 60; m += 10) all.push(at(Math.floor(m / 60), m % 60));
+  const free = all.filter((t) => t >= now + 12 * 60 && !reserved.includes(t));
+  // Tard dans la journée : à la suite, toutes les 10 min.
+  while (free.length < count) free.push(Math.max(now + 15 * 60, (free.at(-1) || now) + 600));
+  return free.slice(0, count);
+}
+// 18 h aujourd'hui (heure du Maroc), ou null s'il est trop tard pour le programmer.
+const at18 = () => {
+  const now = Math.floor(Date.now() / 1000);
+  const [h, m] = new Date().toLocaleTimeString('en-GB', { timeZone: TZ, hour12: false }).split(':').map(Number);
+  const t = now - (now % 60) + ((18 - h) * 60 - m) * 60;
+  return t >= now + 12 * 60 ? t : null;
+};
+// Ancien étalement (aperçu) : conservé pour l'affichage des horaires.
 function schedule(count) {
   const now = Math.floor(Date.now() / 1000);
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(now * 1000)).map((p) => [p.type, p.value]));
@@ -606,18 +753,25 @@ if (only) {
   if (!c) throw new Error(`concours introuvable : ${only}`);
   items = [{ c, kind: daysLeft(c.deadline_date) <= 2 ? 'dernier' : 'nouveau', key: c.id }];
 } else {
+  const reelsMax = Math.max(0, Number(process.env.SOCIAL_REELS_MAX ?? 12));
   const last = await pickContests('dernier', 2);
   const lists = await pickLists(max);
   const fresh = await pickContests('nouveau', max);
-  const prep = await pickPrep(3, new Set(fresh.map((x) => x.c.id)));
-  // Place garantie pour les nouveaux concours et la préparation ; les listes complètent.
-  const core = last.length + fresh.length + prep.length;
-  const room = Math.max(4, max - core);
-  items = [...last, ...interleave(interleave(fresh, lists.slice(0, room)), prep)].slice(0, max);
+  const prep = await pickPrep(1, new Set(fresh.map((x) => x.c.id)));
+  // Reels : nouveaux concours d'abord (les plus gros recrutements), puis derniers jours, puis la
+  // question du jour ; les listes restent en image. Ce qui dépasse passe le lendemain (72 h).
+  const reels = [...fresh, ...last, ...prep].slice(0, reelsMax);
+  items = interleave(reels, lists.slice(0, Math.max(0, max - reels.length)));
 }
 const { chromium } = await import(PW);
 const browser = await chromium.launch();
-await render(items, outDir, browser);
+const photoItems = items.filter((x) => x.kind === 'liste' || only);
+const reelItems = only ? [] : items.filter((x) => x.kind !== 'liste');
+await render(photoItems, outDir, browser);
+if (reelItems.length) {
+  const data = await prepData();
+  for (const x of reelItems) await contestReel(x, outDir, browser, data);
+}
 // SOCIAL_REEL=0 : sans reel ; SOCIAL_REEL=force : reel fabriqué même s'il est déjà publié (aperçu).
 const reelDone = process.env.SOCIAL_REEL === 'force' && cmd === 'apercu' ? false : only || process.env.SOCIAL_REEL === '0' || (await posted('reel')).has(REEL_KEY);
 const film = reelDone ? null : await reel(items, outDir, browser);
@@ -625,36 +779,41 @@ await browser.close();
 
 if (cmd === 'apercu') {
   console.log(JSON.stringify({
-    posts: items.map((x) => ({ type: x.kind, concours: x.c.title_fr, liste: x.doc?.title_fr, image: x.png })),
+    posts: items.map((x) => ({ type: x.kind, format: x.isReel ? 'reel' : 'image', concours: x.c.title_fr, liste: x.doc?.title_fr, fichier: x.mp4 || x.png })),
     reel: film && film.mp4,
-    horaires: schedule(items.length).map((t) => (t ? new Date(t * 1000).toLocaleTimeString('fr-FR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) : 'immédiat')),
+    horaires: slots(items.length, [at18()].filter(Boolean)).map((t) => new Date(t * 1000).toLocaleTimeString('fr-FR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })),
   }, null, 2));
 } else {
   const secret = await rest('/rpc/social_secret', true, {});
-  const when = schedule(items.length);
+  const t18 = film ? at18() : null;
+  const when = slots(items.length, [t18].filter(Boolean));
   const out = [];
   for (const [i, x] of items.entries()) {
     try {
-      const id = await publishPhoto(x, secret, when[i]);
+      const id = x.isReel ? await publishReel(x, secret, when[i]) : await publishPhoto(x, secret, when[i]);
       for (const k of x.keys || [x.key]) await rest('/rpc/social_record', true, { p_contest: k, p_kind: x.kind, p_post: id });
-      out.push({ type: x.kind, concours: x.c.title_fr, post: id, heure: when[i] ? new Date(when[i] * 1000).toLocaleTimeString('fr-FR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) : 'immédiat' });
+      out.push({ type: x.kind, format: x.isReel ? 'reel' : 'image', concours: x.c.title_fr, post: id, heure: new Date(when[i] * 1000).toLocaleTimeString('fr-FR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) });
     } catch (e) {
       out.push({ type: x.kind, concours: x.c.title_fr, erreur: String(e.message || e) });
     }
   }
   if (film) {
-    // Le reel sort à 19 h (forte audience) s'il reste du temps, sinon tout de suite.
-    const at = schedule(1);
-    const now = Math.floor(Date.now() / 1000);
-    const nineteen = (() => { const d = new Date(); const [h, m] = d.toLocaleTimeString('en-GB', { timeZone: TZ, hour12: false }).split(':').map(Number); return now + ((19 - h) * 60 - m) * 60; })();
-    const t = nineteen - now >= 15 * 60 ? nineteen : at[0];
+    // « Concours du jour » à 18 h (créneau du propriétaire) s'il reste du temps, sinon au plus tôt.
+    const t = t18 || slots(1, when)[0];
     try {
       const id = await publishReel(film, secret, t);
       await rest('/rpc/social_record', true, { p_contest: film.key, p_kind: 'reel', p_post: id });
-      out.push({ type: 'reel', post: id, heure: t ? '19:00' : 'immédiat' });
+      out.push({ type: 'reel', post: id, heure: new Date(t * 1000).toLocaleTimeString('fr-FR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) });
     } catch (e) {
       out.push({ type: 'reel', erreur: String(e.message || e) });
     }
   }
   console.log(JSON.stringify(out, null, 2));
+}
+// Vidéos du jour pour TikTok (envoi de 11 h) : le « Concours du jour » puis les reels concours,
+// les plus gros recrutements d'abord.
+{
+  const vids = [...(film ? [{ type: 'reel', mp4: film.mp4, text: film.text, titre: 'Les concours du jour', postes: null }] : []),
+    ...items.filter((x) => x.isReel).sort((a, b) => (b.c.positions || 0) - (a.c.positions || 0)).map((x) => ({ type: x.kind, mp4: x.mp4, text: x.text, titre: x.c.title_fr, postes: x.c.positions || null }))];
+  if (vids.length) writeFileSync(join(outDir, `tiktok-${today}.json`), JSON.stringify(vids.map((v) => ({ ...v, mp4: resolve(v.mp4) })), null, 1));
 }

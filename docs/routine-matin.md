@@ -53,34 +53,36 @@ du disque du 22/10/2026 ne peut plus se reproduire.
 8. `bilan` puis court rapport en français : publiés (dont page seule), complétés, rejetés,
    consignes traitées, sans spécialité, préparations ajoutées, liste « À traiter ».
 
-## Publications Facebook du jour (tâche planifiée, 11h37 heure du Maroc)
+## Publications Facebook du jour (tâche planifiée, 10h07 heure du Maroc)
 
 `node scripts/social/post.mjs publier 30` (clé robot en variable d'environnement, jeton de page lu
 en base via `social_secret`, jamais affiché). Une seule commande, rien n'est publié deux fois
-(`social_posts`) :
+(`social_posts`). Choix du propriétaire du 05/11/2026 : **reels** pour les concours (plus de vues),
+**images** seulement pour les listes et résultats.
 
-- **derniers jours** : concours qui ferment dans 0 à 2 jours (2 au plus) ;
-- **nouveau concours** : un post par concours publié depuis moins de 72 h (un organisme qui en
-  publie 3 ou plus : un post récapitulatif avec chaque lien) ;
-- **listes** : un post par nouvelle liste de convoqués (écrit, oral) ou de résultats
-  (`contest_documents`, récapitulatif par organisme dès 3 listes du même type) ;
-- **préparation** : 3 concours ouverts par jour avec une vraie question QCM du dossier relié
-  (mêmes règles que la fiche, `prepFolderSlugsFor`) ; la réponse est sur le site ; une question
-  d'entraînement est toujours présentée comme « pas un sujet officiel » ;
-- **reel** « Les concours du jour » (vidéo 1080 × 1920, ~20 s), programmé à 19 h.
+- **nouveau concours** : un **reel** par concours publié depuis moins de 72 h (récapitulatif par
+  organisme dès 3 concours) : photo du métier, postes, date limite, une vraie question du dossier
+  de préparation dont la réponse s'affiche (correction du site, `qcm_submit_v2`), puis kounkour.com ;
+- **derniers jours** : un **reel** pour les concours qui ferment dans 0 à 2 jours (2 au plus) ;
+- **préparation** : un **reel** « question du jour » pour un gros concours ouvert (1 par jour) ;
+  une question d'entraînement est toujours présentée comme « pas un sujet officiel » ;
+- **listes** : une **image** par nouvelle liste de convoqués (écrit, oral) ou de résultats ;
+- **reel « Les concours du jour »** à 18 h.
 
-Le premier post part tout de suite, les suivants sont programmés sur Facebook et répartis jusqu'à
-22 h. Ce qui ne trouve pas de place passe le lendemain. Aperçu sans publier :
-`node scripts/social/post.mjs apercu 30 <dossier>`.
+Créneaux : 12 h–14 h et 18 h–20 h (toutes les 10 min), puis 20 h–22 h si besoin.
+`SOCIAL_REELS_MAX` (défaut 12) plafonne les reels du jour ; le reste passe le lendemain.
+Les vidéos du jour sont listées dans `.social-out/tiktok-<date>.json` pour l'envoi TikTok de 11 h
+(brouillons sur @kounkour2026 tant que l'application TikTok n'est pas validée).
+Aperçu sans publier : `node scripts/social/post.mjs apercu 30 <dossier>`.
 
 **Préparation pour chaque concours** : un concours ouvert sans dossier relié contenant des QCM
-n'aura pas de post « préparation ». L'étape 6 doit donc d'abord combler ces trous (y compris les
-dossiers qui n'ont que des sujets écrits et aucun QCM).
+n'aura pas de question dans son reel (le reel montre alors les conditions). L'étape 6 doit donc
+d'abord combler ces trous (y compris les dossiers qui n'ont que des sujets écrits et aucun QCM).
 
 ## Instagram @kounkourmaroc (tâche planifiée, 3 fois par jour)
 
 `node scripts/social/instagram.mjs publier <types> 1` reprend sur Instagram un post publié le jour
 même sur Facebook (même image, texte « lien en bio » + hashtags), jamais deux fois :
-midi `nouveau,dernier`, après-midi `preparation,liste`, soir `reel`. Les récapitulatifs
+12h33 `nouveau,dernier` (reels), 13h33 `preparation,liste`, 18h33 `reel`. Les récapitulatifs
 (plusieurs concours) passent en premier. Aperçu : `instagram.mjs apercu <types> [n]`.
 Le jeton de la page (social_secret) porte aussi `instagram_basic` et `instagram_content_publish`.
