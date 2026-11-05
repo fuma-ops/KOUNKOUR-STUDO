@@ -5,6 +5,12 @@
 
 import { PSYCHO_FOLDER, psychoRecruiterFor } from '../content/psychoRecruiters.ts';
 
+// Dossier général « Réussir l'oral » : utile à tout concours qui a un entretien. Il est
+// proposé à part sur la fiche concours (ContestPrepLinks), pas par prepFolderSlugsFor :
+// il ne doit ni masquer un concours sans dossier métier (prep-gaps) ni fournir les
+// questions des reels (post.mjs).
+export const ORAL_FOLDER = 'concours-reussir-oral';
+
 export interface PrepMatchInput {
   title?: string | null;
   grade?: string | null;

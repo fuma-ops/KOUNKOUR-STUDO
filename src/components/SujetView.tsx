@@ -343,7 +343,9 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
           <FileText className="w-3.5 h-3.5" />
           {set.kind === 'sujet'
             ? fr ? 'Sujet d’examen écrit (réel)' : 'موضوع امتحان كتابي (حقيقي)'
-            : en ? 'Written by KounKour (not an official exam)' : fr ? 'Sujet d’entraînement rédigé par KounKour (pas un sujet réel)' : 'موضوع تدريبي من إعداد KounKour (ليس موضوعاً حقيقياً)'}
+            : /support|fiche-revision|memento|resume-cours/.test(set.slug || '')
+              ? en ? 'KounKour method sheet (not an official document)' : fr ? 'Fiche méthode KounKour (pas un document officiel)' : 'دعامة منهجية من إعداد KounKour (ليست وثيقة رسمية)'
+              : en ? 'Written by KounKour (not an official exam)' : fr ? 'Sujet d’entraînement rédigé par KounKour (pas un sujet réel)' : 'موضوع تدريبي من إعداد KounKour (ليس موضوعاً حقيقياً)'}
         </span>
         <h2 dir="auto" className="text-lg sm:text-xl font-extrabold text-[#242126] leading-snug mb-3">{set.title[language] || set.title.fr}</h2>
         <ConcoursRef set={set} language={language} variant="header" />

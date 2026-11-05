@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BookOpenCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import type { Contest, Language } from '../types';
 import { QcmFolder, fetchQcmFolders } from '../data/qcmApi';
-import { prepFolderSlugsFor } from '../utils/prepMatch';
+import { ORAL_FOLDER, prepFolderSlugsFor } from '../utils/prepMatch';
 
 // Bloc « Se préparer » d'une fiche concours : dossiers d'annales et de corrigés du même
 // métier ou du même grade (règles partagées avec le rendu serveur, src/utils/prepMatch.ts).
@@ -34,6 +34,19 @@ export const ContestPrepLinks: React.FC<{
   }, folders);
   const matched = slugs.map((s) => folders.find((f) => f.slug === s)).filter((f): f is QcmFolder => !!f);
   const Arrow = fr ? ArrowRight : ArrowLeft;
+  const oral = folders.find((f) => f.slug === ORAL_FOLDER);
+  const oralLink = onOpenFolder && oral && !slugs.includes(ORAL_FOLDER) && (
+    <button
+      onClick={() => onOpenFolder(ORAL_FOLDER)}
+      className="w-full text-start bg-white border border-[#F1E5EC] hover:border-[#8D174B]/40 hover:shadow-md rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 active:scale-95 transition-all"
+    >
+      <span className="min-w-0">
+        <span className="block text-xs font-bold text-[#242126] truncate">{fr ? 'Réussir l’oral : questions du jury, stress, CV' : 'النجاح في الشفوي: أسئلة اللجنة، التوتر، السيرة الذاتية'}</span>
+        <span className="block text-[11px] text-[#6E6773] truncate">{fr ? 'Fiches méthode en français et en arabe + QCM' : 'دعامات منهجية بالعربية والفرنسية + أسئلة تدريبية'}</span>
+      </span>
+      <Arrow className="w-4 h-4 text-[#8D174B] shrink-0" />
+    </button>
+  );
   const psyLink = onOpenPsy && (
     <button
       onClick={onOpenPsy}
@@ -48,7 +61,7 @@ export const ContestPrepLinks: React.FC<{
   );
   if (!matched.length || !onOpenFolder) {
     // Pas encore de dossier pour ce métier : entraînement général gratuit plutôt qu'un bloc vide.
-    if (!onOpenPrep && !onOpenPsy) return null;
+    if (!onOpenPrep && !onOpenPsy && !oralLink) return null;
     return (
       <section className="bg-gradient-to-r from-[#FAF0F5] to-[#FFFDFE] border border-[#F1E5EC] rounded-2xl p-4 animate-fade-in">
         <h3 className="text-sm font-extrabold text-[#242126] flex items-center gap-2 mb-1">
@@ -71,6 +84,7 @@ export const ContestPrepLinks: React.FC<{
               <Arrow className="w-4 h-4 text-[#8D174B] shrink-0" />
             </button>
           )}
+          {oralLink}
           {psyLink}
         </div>
       </section>
@@ -100,6 +114,7 @@ export const ContestPrepLinks: React.FC<{
             <Arrow className="w-4 h-4 text-[#8D174B] shrink-0" />
           </button>
         ))}
+        {oralLink}
         {psyLink}
       </div>
     </section>
