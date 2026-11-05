@@ -65,9 +65,11 @@ const n = Math.max(1, Math.min(5, Number(nArg) || 1));
 const today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
 const since = new Date(Date.parse(`${today}T00:00:00Z`) - 2 * 3600000).toISOString();
 const secret = await rest('/rpc/social_secret', {});
-const feed = (await rest('/rpc/social_feed', { p_since: since, p_network: 'facebook' })).filter((x) => types.includes(x.kind));
+// « rappel » couvre les clés hebdomadaires « rappel-<année>-S<semaine> ».
+const wanted = (kind) => types.includes(kind) || (types.includes('rappel') && kind.startsWith('rappel-'));
+const feed = (await rest('/rpc/social_feed', { p_since: since, p_network: 'facebook' })).filter((x) => wanted(x.kind));
 const done = new Set();
-for (const t of types) for (const k of await rest('/rpc/social_posted', { p_kind: t, p_network: 'instagram' })) done.add(`${t}:${k}`);
+for (const t of new Set([...types.filter((x) => x !== 'rappel'), ...feed.map((x) => x.kind)])) for (const k of await rest('/rpc/social_posted', { p_kind: t, p_network: 'instagram' })) done.add(`${t}:${k}`);
 // L'identifiant « page_post » du premier post n'est pas une photo réutilisable : on l'écarte.
 // Depuis le 05/11/2026 les nouveaux concours, derniers jours et questions du jour sont des reels
 // sur Facebook (les listes restent des images) : on regarde ce qu'est le post avant de le reprendre.

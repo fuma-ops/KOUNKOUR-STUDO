@@ -66,6 +66,9 @@ en base via `social_secret`, jamais affiché). Une seule commande, rien n'est pu
 - **derniers jours** : un **reel** pour les concours qui ferment dans 0 à 2 jours (2 au plus) ;
 - **préparation** : un **reel** « question du jour » pour un gros concours ouvert (1 par jour) ;
   une question d'entraînement est toujours présentée comme « pas un sujet officiel » ;
+- **rappel** : 2 **reels** par jour pour les gros concours (20 postes ou plus) dont l'écrit est dans
+  3 à 45 jours : date de l'épreuve + une question d'entraînement ; chaque concours au plus une fois
+  par semaine (clé `rappel-<année>-S<semaine>`) ;
 - **listes** : une **image** par nouvelle liste de convoqués (écrit, oral) ou de résultats ;
 - **reel « Les concours du jour »** à 18 h.
 
@@ -83,6 +86,6 @@ d'abord combler ces trous (y compris les dossiers qui n'ont que des sujets écri
 
 `node scripts/social/instagram.mjs publier <types> 1` reprend sur Instagram un post publié le jour
 même sur Facebook (même image, texte « lien en bio » + hashtags), jamais deux fois :
-12h33 `nouveau,dernier` (reels), 13h33 `preparation,liste`, 18h33 `reel`. Les récapitulatifs
+12h33 `nouveau,dernier` (reels), 13h33 `preparation,liste,rappel`, 18h33 `reel`. Les récapitulatifs
 (plusieurs concours) passent en premier. Aperçu : `instagram.mjs apercu <types> [n]`.
 Le jeton de la page (social_secret) porte aussi `instagram_basic` et `instagram_content_publish`.

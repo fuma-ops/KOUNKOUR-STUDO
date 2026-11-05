@@ -12,6 +12,9 @@
 //                    préparation dont la réponse s'affiche, puis kounkour.com ;
 //   « dernier »      un REEL pour les concours qui ferment dans 0 à 2 jours (2 au plus) ;
 //   « preparation »  un REEL question du jour pour un gros concours ouvert (1 par jour) ;
+//   « rappel »       un REEL de rappel pour les gros concours dont l'écrit approche (3 à 45 jours) :
+//                    date de l'épreuve + une question d'entraînement ; chaque concours au plus une fois
+//                    par semaine (clé social_posts « rappel-<année>-S<semaine> »), 2 par jour ;
 //   « liste »        une IMAGE par nouvelle liste de convoqués (écrit, oral) ou de résultats ;
 //   « reel »         la vidéo « Concours du jour », à 18 h.
 // Créneaux (heure du Maroc, demandés par le propriétaire) : 12 h–14 h et 18 h–20 h, toutes les
@@ -162,6 +165,34 @@ async function pickPrep(n, exclude) {
     if (out.length >= n) break;
     const prep = prepFor(c, data);
     if (prep) out.push({ kind: 'preparation', c, prep, key: c.id });
+  }
+  return out;
+}
+
+// Rappels « l'écrit approche » (demande du propriétaire, 05/11/2026) : gros concours (20 postes
+// ou plus) dont l'épreuve écrite est dans 3 à 45 jours, avec une question de préparation.
+// Un même concours revient au plus une fois par semaine.
+const isoWeek = (() => {
+  const d = new Date(`${today}T12:00:00Z`);
+  const day = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - day + 3);
+  const y = d.getUTCFullYear();
+  // d = jeudi de la semaine ISO ; semaine = rang de ce jeudi dans l'année.
+  const w = 1 + Math.floor((d - Date.UTC(y, 0, 1)) / 604800000);
+  return `${y}-S${String(w).padStart(2, '0')}`;
+})();
+const RAPPEL_KIND = `rappel-${isoWeek}`;
+async function pickRappel(n, exclude) {
+  const done = await posted(RAPPEL_KIND);
+  const rows = await rest(`/contests?select=${COLS}&status=in.(publie,mis_a_jour,cloture)&exam_date=gte.${today}&limit=500`);
+  const data = await prepData();
+  const out = [];
+  const cands = rows.filter((c) => !done.has(c.id) && !exclude.has(c.id) && (c.positions || 0) >= 20 && daysLeft(c.exam_date) >= 3 && daysLeft(c.exam_date) <= 45)
+    .sort((a, b) => (b.positions || 0) - (a.positions || 0));
+  for (const c of cands) {
+    if (out.length >= n) break;
+    const prep = prepFor(c, data);
+    if (prep) out.push({ kind: 'rappel', recordKind: RAPPEL_KIND, c, prep, key: c.id });
   }
   return out;
 }
@@ -357,6 +388,26 @@ function caption(item) {
       seo(`${c.title_fr} ${c.grade_fr || ''}`, 'liste'),
     ]);
   }
+  if (kind === 'rappel') {
+    const { question, set, folder, nQuestions } = item.prep;
+    return tidy([
+      `📝 Rappel : épreuve écrite le ${dateFr(c.exam_date)}`,
+      `📌 ${c.title_fr}`,
+      org ? `🏛️ ${org}` : '',
+      '',
+      `🧠 Êtes-vous prêt(e) ? ${set.kind === 'annales' ? `Question d’un ancien concours${set.exam_year ? ` (${set.exam_year})` : ''}` : 'Question d’entraînement (exemple KounKour, ce n’est pas un sujet officiel)'} :`,
+      question.question,
+      ...question.options.slice(0, 5).map((o, i) => `${'ABCDE'[i]}) ${o}`),
+      '',
+      '💬 Votre réponse en commentaire ! La bonne réponse est dans la vidéo.',
+      `👉 ${nQuestions} questions corrigées pour réviser gratuitement : ${link(`/preparation/${folder.slug}`, 'rappel')}`,
+      '',
+      `🇲🇦 📝 الامتحان الكتابي : ${dateAr(c.exam_date)} – ${arTitle(c)}`,
+      'واش واجد؟ راجع مجانا مع KounKour : أسئلة مصححة ومباريات سابقة',
+      '',
+      seo(`${c.title_fr} ${c.grade_fr || ''}`, 'preparation'),
+    ]);
+  }
   if (kind === 'preparation') {
     const { question, set, folder, nQuestions, nQcm, nSujets } = item.prep;
     const offer = [`${nQuestions} questions QCM corrigées (${nQcm} série${nQcm > 1 ? 's' : ''})`, nSujets ? `${nSujets} concours blanc${nSujets > 1 ? 's' : ''} / sujet${nSujets > 1 ? 's' : ''} avec corrigé` : ''].filter(Boolean).join(' · ');
@@ -532,7 +583,7 @@ window.setT=(t)=>{
 // préparation (réponse révélée), puis kounkour.com. Mêmes données que la fiche, rien d'inventé.
 // ---------------------------------------------------------------------------
 const REEL_FPS = 24;
-const TAGS = { nouveau: '📢 مباراة جديدة', dernier: '⏳ آخر الأيام للترشح', preparation: '📚 تحضير مجاني' };
+const TAGS = { nouveau: '📢 مباراة جديدة', dernier: '⏳ آخر الأيام للترشح', preparation: '📚 تحضير مجاني', rappel: '📝 الامتحان الكتابي قريب' };
 async function contestReel(item, outDir, browser, data) {
   const { c, kind, group } = item;
   const org = c.administrations?.name_fr || '';
@@ -555,7 +606,7 @@ async function contestReel(item, outDir, browser, data) {
   const title = group ? `${group.length} مباريات جديدة · ${orgAr || org}` : c.title_fr;
   const tsize = (t) => (t.length > 95 ? 46 : t.length > 70 ? 52 : t.length > 45 ? 60 : 70);
   const tag = group ? '📢 مباريات جديدة' : TAGS[kind];
-  const deadlineLine = group ? '' : `⏳ آخر أجل للترشيح: ${dateAr(c.deadline_date)}`;
+  const deadlineLine = group ? '' : kind === 'rappel' ? `✍️ الامتحان الكتابي: ${dateAr(c.exam_date)}` : `⏳ آخر أجل للترشيح: ${dateAr(c.deadline_date)}`;
   const quizHead = quiz ? (quiz.set.kind === 'annales' ? `🧠 سؤال من مباراة سابقة${quiz.set.exam_year ? ` (${quiz.set.exam_year})` : ''}` : '🧠 سؤال تدريبي (ماشي سؤال رسمي)') : '';
   const details = group
     ? group.slice(0, 4).map((x) => `<div class="row"><span>📌</span><bdi>${esc(cut(x.c.title_fr, 80))}</bdi></div>`).join('') + (group.length > 4 ? `<div class="row"><span>➕</span><bdi>${group.length - 4} ${group.length - 4 > 2 ? 'مباريات أخرى' : 'مباراة أخرى'}</bdi></div>` : '')
@@ -760,9 +811,12 @@ if (only) {
   const lists = await pickLists(max);
   const fresh = await pickContests('nouveau', max);
   const prep = await pickPrep(1, new Set(fresh.map((x) => x.c.id)));
+  const rappel = await pickRappel(2, new Set([...fresh, ...last].map((x) => x.c.id)));
   // Reels : nouveaux concours d'abord (les plus gros recrutements), puis derniers jours, puis la
   // question du jour ; les listes restent en image. Ce qui dépasse passe le lendemain (72 h).
-  const reels = [...fresh, ...last, ...prep].slice(0, reelsMax);
+  // SOCIAL_KINDS=rappel,nouveau… : ne garder que ces types de reels (tests, aperçus).
+  const kinds = process.env.SOCIAL_KINDS ? process.env.SOCIAL_KINDS.split(',') : null;
+  const reels = [...fresh, ...last, ...rappel, ...prep].filter((x) => !kinds || kinds.includes(x.kind)).slice(0, reelsMax);
   items = interleave(reels, lists.slice(0, Math.max(0, max - reels.length)));
 }
 const { chromium } = await import(PW);
@@ -793,7 +847,7 @@ if (cmd === 'apercu') {
   for (const [i, x] of items.entries()) {
     try {
       const id = x.isReel ? await publishReel(x, secret, when[i]) : await publishPhoto(x, secret, when[i]);
-      for (const k of x.keys || [x.key]) await rest('/rpc/social_record', true, { p_contest: k, p_kind: x.kind, p_post: id });
+      for (const k of x.keys || [x.key]) await rest('/rpc/social_record', true, { p_contest: k, p_kind: x.recordKind || x.kind, p_post: id });
       out.push({ type: x.kind, format: x.isReel ? 'reel' : 'image', concours: x.c.title_fr, post: id, heure: new Date(when[i] * 1000).toLocaleTimeString('fr-FR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) });
     } catch (e) {
       out.push({ type: x.kind, concours: x.c.title_fr, erreur: String(e.message || e) });
