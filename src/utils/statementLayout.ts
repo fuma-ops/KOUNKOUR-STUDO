@@ -24,7 +24,8 @@ export type Seg =
   | { kind: 'option'; letter: string; text: string }
   | { kind: 'table'; rows: string[][] }
   | { kind: 'code'; text: string }
-  | { kind: 'header'; lines: string[] };
+  | { kind: 'header'; lines: string[] }
+  | { kind: 'image'; src: string; alt: string };
 
 const ARABIC = /[\u0600-\u06FF]/;
 export const isArabic = (t: string) => ARABIC.test(t);
@@ -97,6 +98,12 @@ export function layoutStatement(text: string, opts: { header?: boolean } = {}): 
         return [{ kind: 'header', lines } as Seg];
       }
       for (const line of lines) {
+        // Illustration : « ![légende](/images/prep/….jpg) » (images du site uniquement).
+        const img = /^!\[([^\]]*)\]\((\/images\/prep\/[\w./-]+\.(?:jpe?g|png|webp))\)$/.exec(line);
+        if (img) {
+          out.push({ kind: 'image', alt: img[1], src: img[2] });
+          continue;
+        }
         const h = /^(#{2,3})\s+(.*)$/.exec(line);
         if (h) {
           out.push({ kind: h[1] === '##' ? 'h2' : 'h3', text: h[2] });

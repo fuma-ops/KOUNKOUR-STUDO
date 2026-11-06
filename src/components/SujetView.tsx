@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, BookOpenCheck, ExternalLink, FileText, Info } from 'lucide-react';
 import type { Language, QcmSet } from '../types';
 import { AnnaleImages } from './AnnaleImages';
-import { AnnalePhotosAdmin } from './AnnalePhotosAdmin';
 import { ConcoursRef } from './ConcoursRef';
 import { isArabic, layoutStatement } from '../utils/statementLayout';
 import { Answer, Item, Pairing, exoKey, group, pairCorrige } from '../utils/corrigePairing';
@@ -105,6 +104,13 @@ function SegView({ seg }: { seg: Seg }) {
           <span className="font-extrabold">{seg.label} : </span>
           {inline(seg.text)}
         </p>
+      );
+    case 'image':
+      return (
+        <figure className="my-2 overflow-hidden rounded-2xl border border-[#F1E5EC] bg-[#FAF7F9] animate-fade-in">
+          <img src={seg.src} alt={seg.alt} loading="lazy" className="w-full aspect-[16/9] object-cover" />
+          {seg.alt && <figcaption dir="auto" className="px-3 py-2 text-[12.5px] text-[#6E6773]">{seg.alt}</figcaption>}
+        </figure>
       );
     case 'table':
       return <Table rows={seg.rows} />;
@@ -306,15 +312,15 @@ export const SujetStatement: React.FC<{ text: string; header?: boolean; pairing?
 interface Props {
   set: QcmSet;
   language: Language;
-  isStaff: boolean;
+  isStaff?: boolean; // ajout de photos : tableau de bord admin uniquement (Réglages annales)
   onBack: () => void;
-  onImages: (images: string[]) => void;
+  onImages?: (images: string[]) => void;
   // Suite proposée sous le sujet (bloc « Et maintenant ? »).
   footer?: React.ReactNode;
 }
 
 // Écran d'un sujet d'examen écrit (pas de QCM) : sujet transcrit + photos de la copie originale.
-export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onImages, footer }) => {
+export const SujetView: React.FC<Props> = ({ set, language, onBack, footer }) => {
   const fr = language === 'fr';
   // Support en anglais (banque psychotechnique anglaise) : libellés en anglais.
   const en = set.contentLanguage === 'en';
@@ -352,12 +358,11 @@ export const SujetView: React.FC<Props> = ({ set, language, isStaff, onBack, onI
         {duration && <p className="text-[11px] font-semibold text-[#8D174B]">{fr ? `Durée de l'épreuve : ${duration}` : `مدة الاختبار: ${duration}`}</p>}
       </header>
 
-      {(!!set.sourceImages?.length || isStaff) && (
+      {!!set.sourceImages?.length && (
         <div className="mb-4 space-y-2">
           {!!set.sourceImages?.length && (
             <AnnaleImages images={set.sourceImages} language={language} sourceUrl={set.sourceUrl} sourceNote={set.sourceNote} />
           )}
-          {isStaff && <AnnalePhotosAdmin setId={set.id} slug={set.slug} images={set.sourceImages || []} onChange={onImages} sourceUrl={set.sourceUrl} />}
         </div>
       )}
 
