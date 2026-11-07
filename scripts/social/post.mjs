@@ -618,17 +618,19 @@ async function contestReel(item, outDir, browser, data) {
   const scene = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="file://${join(HERE, 'fonts', 'fonts.css')}"><style>
 ${BASE_CSS}
 body{width:1080px;height:1920px;font-family:'Alexandria','Plus Jakarta Sans',sans-serif;background:#0b0b0d;color:#fff;position:relative;overflow:hidden}
-#bg{position:absolute;left:0;right:0;top:0;height:1220px;background:url("file://${bg}") center 22%/cover}
-#bg:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,rgba(0,0,0,0) 25%,rgba(0,0,0,0) 65%,#0b0b0d 100%)}
+#bg{position:absolute;left:0;right:0;top:0;height:1120px;background:url("file://${bg}") center 22%/cover}
+#bg:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,rgba(0,0,0,0) 25%,rgba(0,0,0,0) 55%,#0b0b0d 100%)}
 #dim{position:absolute;inset:0;background:rgba(11,11,13,.82);opacity:0}
 .top{position:absolute;top:90px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center;z-index:5}
 .brand{font-family:'Plus Jakarta Sans';text-shadow:0 2px 12px rgba(0,0,0,.5)}
 .tag{background:#E11D48;color:#fff;font-weight:800;font-size:40px;padding:14px 30px;border-radius:18px;direction:rtl}
-.s{position:absolute;left:60px;right:60px;opacity:0;direction:rtl;text-align:center}
-#s0{bottom:150px}
+/* Zone sûre : le fil Facebook recadre en 4:5 (y 285–1635) et TikTok couvre le bas (légende) et la
+   colonne de droite (boutons). Tout le texte utile reste entre y 300 et 1420, à 90 px des bords. */
+.s{position:absolute;left:90px;right:90px;opacity:0;direction:rtl;text-align:center}
+#s0{bottom:540px}
 .org{display:flex;align-items:center;justify-content:center;gap:22px;font-size:34px;font-weight:700;color:#e5e5ea;margin-bottom:26px}
 .org .logo{width:110px;height:110px;border-radius:24px}.org .logo img{max-width:92px;max-height:92px}.org .logo .ini{font-size:34px}
-.title{font-weight:800;line-height:1.18;unicode-bidi:plaintext}
+.title{font-weight:800;line-height:1.18;unicode-bidi:plaintext;text-shadow:0 4px 24px rgba(0,0,0,.6)}
 .num{font-size:150px;font-weight:800;color:#FFD23F;line-height:1.05;margin-top:18px;white-space:nowrap}
 .dl{display:flex;align-items:center;gap:22px;margin-top:22px}.dl i{flex:1;height:5px;background:#FFD23F;border-radius:3px}.dl span{font-size:46px;font-weight:800;white-space:nowrap}
 #s1{top:330px}
