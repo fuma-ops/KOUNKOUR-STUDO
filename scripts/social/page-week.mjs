@@ -105,7 +105,13 @@ async function instagram(page) {
         const v = await graph(`/${q.fb_post_id}`, page.token, { fields: 'source' });
         if (!v.source) throw new Error('reel Facebook pas encore disponible');
         const buf = Buffer.from(await (await fetch(v.source)).arrayBuffer());
-        c = await graph(`/${page.ig_user_id}/media`, page.token, { media_type: 'REELS', upload_type: 'resumable', caption: q.caption, share_to_feed: 'true' }, 'POST');
+        // Couverture Instagram = la miniature choisie sur Facebook (accroche en texte),
+        // sinon Instagram prend la première image de la vidéo, sans texte.
+        const th = await graph(`/${q.fb_post_id}/thumbnails`, page.token, { fields: 'uri,is_preferred' }).catch(() => ({}));
+        const cover = (th.data || []).find((t) => t.is_preferred)?.uri;
+        const params = { media_type: 'REELS', upload_type: 'resumable', caption: q.caption, share_to_feed: 'true' };
+        if (cover) params.cover_url = cover;
+        c = await graph(`/${page.ig_user_id}/media`, page.token, params, 'POST');
         const up = await fetch(c.uri, { method: 'POST', headers: { Authorization: `OAuth ${page.token}`, offset: '0', file_size: String(buf.length) }, body: buf });
         if (!(await up.json()).success) throw new Error('envoi Instagram');
       } else {
