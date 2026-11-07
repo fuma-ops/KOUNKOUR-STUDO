@@ -4,7 +4,7 @@
 // Uniquement des données réelles lues dans Supabase (RLS publique) ; un champ
 // absent n'est jamais inventé, il est simplement omis.
 
-import { adsAllowed } from '../../src/lib/adsPolicy';
+import { adsAllowed } from '../../src/lib/adsPolicy.ts';
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import { PSY_CATS, PSY_HUB, PSY_TRAIN_PATH, psyCatBySlug, psyTrainPath, type PsyCatDoc } from '../../src/psy/content.ts';
