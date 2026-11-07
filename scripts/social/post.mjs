@@ -759,12 +759,22 @@ function slots(count, reserved = []) {
   while (free.length < count) free.push(Math.max(now + 15 * 60, (free.at(-1) || now) + 600));
   return free.slice(0, count);
 }
-// 18 h aujourd'hui (heure du Maroc), ou null s'il est trop tard pour le programmer.
-const at18 = () => {
+// H h M aujourd'hui (heure du Maroc), ou null s'il est trop tard pour le programmer.
+const atHM = (H, M = 0) => {
   const now = Math.floor(Date.now() / 1000);
-  const [h, m] = new Date().toLocaleTimeString('en-GB', { timeZone: TZ, hour12: false }).split(':').map(Number);
-  const t = now - (now % 60) + ((18 - h) * 60 - m) * 60;
+  const [h, m] = new Date(now * 1000).toLocaleTimeString('en-GB', { timeZone: TZ, hour12: false }).split(':').map(Number);
+  const t = now - (now % 60) + ((H - h) * 60 + M - m) * 60;
   return t >= now + 12 * 60 ? t : null;
+};
+const at18 = () => atHM(18);
+// Reel du matin (demande du propriétaire, 07/11/2026) : le premier reel du jour vers 10 h.
+// Si 10 h est déjà trop proche, au plus tôt tant qu'on est encore le matin (avant 11 h 30).
+const morningSlot = () => {
+  const t = atHM(10);
+  if (t) return t;
+  const now = Math.floor(Date.now() / 1000);
+  const late = atHM(11, 30);
+  return late ? now - (now % 60) + 15 * 60 : null;
 };
 // Ancien étalement (aperçu) : conservé pour l'affichage des horaires.
 function schedule(count) {
@@ -842,7 +852,10 @@ if (cmd === 'apercu') {
 } else {
   const secret = await rest('/rpc/social_secret', true, {});
   const t18 = film ? at18() : null;
-  const when = slots(items.length, [t18].filter(Boolean));
+  const r0 = items.findIndex((x) => x.isReel);
+  const t10 = r0 >= 0 ? morningSlot() : null;
+  const rest = slots(items.length - (t10 ? 1 : 0), [t18, t10].filter(Boolean));
+  const when = items.map((_, i) => (i === r0 && t10 ? t10 : rest.shift()));
   const out = [];
   for (const [i, x] of items.entries()) {
     try {

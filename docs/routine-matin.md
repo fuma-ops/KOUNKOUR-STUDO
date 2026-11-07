@@ -53,12 +53,13 @@ du disque du 22/10/2026 ne peut plus se reproduire.
 8. `bilan` puis court rapport en français : publiés (dont page seule), complétés, rejetés,
    consignes traitées, sans spécialité, préparations ajoutées, liste « À traiter ».
 
-## Publications Facebook du jour (tâche planifiée, 10h07 heure du Maroc)
+## Publications Facebook du jour (tâche planifiée, 9h07 heure du Maroc)
 
 `node scripts/social/post.mjs publier 30` (clé robot en variable d'environnement, jeton de page lu
 en base via `social_secret`, jamais affiché). Une seule commande, rien n'est publié deux fois
 (`social_posts`). Choix du propriétaire du 05/11/2026 : **reels** pour les concours (plus de vues),
-**images** seulement pour les listes et résultats.
+**images** seulement pour les listes et résultats. Depuis le 07/11/2026 : le **premier reel du jour
+sort vers 10 h** (au plus tôt avant 11 h 30 si la fabrication finit tard), le reste dans les créneaux.
 
 - **nouveau concours** : un **reel** par concours publié depuis moins de 72 h (récapitulatif par
   organisme dès 3 concours) : photo du métier, postes, date limite, une vraie question du dossier
