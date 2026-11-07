@@ -10,6 +10,11 @@
 
 export const ADSENSE_CLIENT = 'ca-pub-8156754023993120';
 
+// Bloc « display » responsive affiché sous chaque question de QCM (AdSense > Annonces >
+// Par bloc d'annonces > Annonces display). Vide = aucun bloc manuel (annonces automatiques
+// seulement).
+export const ADS_SLOT_QCM = '';
+
 // Chemins de contenu (sans ?lang) : /, /concours, /concours/<fiche>, /preparation,
 // /preparation/<dossier>, /preparation/qcm/<série>.
 const CONTENT_PATH = /^\/(?:concours(?:\/[^/]+)?|preparation(?:\/qcm)?(?:\/[^/]+)?)?\/?$/;

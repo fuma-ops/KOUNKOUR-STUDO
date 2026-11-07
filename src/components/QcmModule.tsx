@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QcmSet, Language } from '../types';
+import { AdUnit } from './AdUnit';
+import { ADS_SLOT_QCM } from '../lib/adsPolicy';
 import { AnnaleImages } from './AnnaleImages';
 import { ConcoursRef, OrgLogosBand, setOrgs } from './ConcoursRef';
 import { SujetView } from './SujetView';
@@ -1120,6 +1122,9 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
               </div>
             )}
           </div>
+
+          {/* Publicité sous la question (nouvelle annonce à chaque question), loin des boutons. */}
+          <AdUnit key={currentQ.id} slot={ADS_SLOT_QCM} label={L('Publicité', 'إعلان', 'Advertisement')} />
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@
 // contenu complète (données chargées, assez de texte). Sur les écrans sans contenu
 // (profil, admin, liste vide, chargement…), <html data-ads="off"> masque les annonces
 // automatiques déjà placées (src/index.css).
+import { useEffect, useState } from 'react';
 import { ADSENSE_CLIENT, adsAllowed, isContestPath } from './adsPolicy';
 
 const SCRIPT = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`;
@@ -42,4 +43,17 @@ export function watchAds(path: string): () => void {
   }
   const timers = [1500, 4000, 9000].map((ms) => window.setTimeout(() => updateAds(path), ms));
   return () => timers.forEach((t) => window.clearTimeout(t));
+}
+
+// État « annonces autorisées » de l'écran actuel, suivi en direct (pour les blocs manuels).
+export function useAdsOn(): boolean {
+  const read = () => typeof document !== 'undefined' && document.documentElement.dataset.ads === 'on';
+  const [on, setOn] = useState(read);
+  useEffect(() => {
+    const mo = new MutationObserver(() => setOn(read()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-ads'] });
+    setOn(read());
+    return () => mo.disconnect();
+  }, []);
+  return on;
 }
