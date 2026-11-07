@@ -1,3 +1,4 @@
+import { splitSummary, summaryItems } from '../utils/contestSummary';
 import React, { useState, useEffect } from 'react';
 import { ContestPostsTable } from './ContestPostsTable';
 import { ContestSummary } from './ContestSummary';
@@ -92,9 +93,17 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
     }
   };
 
+  // Rubriques lues dans l'arrêté (résumé en base) : candidature, pièces, épreuves.
+  const parts = splitSummary(contest.overviewSummary?.fr || '').parts;
+  const part = (k: string) => parts.find((p) => p.key === k)?.body || '';
+  const candidature = part('Candidature');
+  const pieces = part('Pièces') ? summaryItems('Pièces', part('Pièces')) : [];
+  const epreuves = part('Épreuves') ? summaryItems('Épreuves', part('Épreuves')) : [];
+  const notInArrete = language === 'fr' ? 'Non précisé dans la fiche : voir l’arrêté officiel (onglet Documents).' : 'غير مذكور في البطاقة: راجع القرار الرسمي (تبويب الوثائق).';
+
   // Check if exams exist
   const hasExams = (contest.exams?.written && contest.exams.written.length > 0) || 
-    (contest.exams?.oral && contest.exams.oral.length > 0);
+    (contest.exams?.oral && contest.exams.oral.length > 0) || epreuves.length > 0;
 
   // Available tabs (only non-empty ones!)
   const tabs: { id: 'info' | 'apply' | 'exams' | 'docs'; label: string; count?: number }[] = [
@@ -595,25 +604,32 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                   <div className="space-y-3 text-xs text-[#3E3844]">
                     <div className="p-3.5 bg-[#FAF7F9] rounded-2xl border border-[#F1E5EC] space-y-1.5">
                       <strong className="block text-[#8D174B] font-extrabold text-xs">
-                        1. {language === 'fr' ? 'Dépôt du dossier en ligne' : 'إيداع الترشيح إلكترونياً'}
+                        1. {language === 'fr' ? 'Où et comment déposer' : 'أين وكيف يتم الإيداع'}
                       </strong>
-                      <p className="leading-relaxed">
-                        {language === 'fr'
-                          ? 'Les candidatures doivent être enregistrées obligatoirement avant la date limite sur le portail officiel de recrutement.'
-                          : 'يجب تسجيل الترشيحات وجوباً عبر البوابة الرسمية المعتمدة قبل انصرام آخر أجل.'}
-                      </p>
+                      <p dir="auto" className="leading-relaxed text-[13px]">{candidature || notInArrete}</p>
+                      {contest.deadlineDate && (
+                        <p className="text-[12px] font-bold text-[#8D174B]">
+                          {language === 'fr' ? `Date limite : ${contest.deadlineDate}` : `آخر أجل: ${contest.deadlineDate}`}
+                        </p>
+                      )}
                     </div>
 
                     <div className="p-3.5 bg-[#FAF7F9] rounded-2xl border border-[#F1E5EC] space-y-1.5">
                       <strong className="block text-[#8D174B] font-extrabold text-xs">
-                        2. {language === 'fr' ? 'Pièces justificatives à joindre' : 'الوثائق والشهادات المطلوبة'}
+                        2. {language === 'fr' ? 'Pièces du dossier (selon l’arrêté)' : 'وثائق الملف (حسب القرار)'}
                       </strong>
-                      <ul className="list-disc list-inside space-y-1 text-[#6E6773] ps-1">
-                        <li>{language === 'fr' ? 'Copie de la Carte Nationale d’Identité (CNIE)' : 'نسخة من البطاقة الوطنية للتعريف الإلكترونية'}</li>
-                        <li>{language === 'fr' ? 'Copie du Diplôme exigé ou attestation de réussite' : 'نسخة من الدبلوم المطلوب أو شهادة النجاح'}</li>
-                        <li>{language === 'fr' ? 'CV actualisé avec photo d’identité' : 'سيرة ذاتية محينة مع صورة شمسية'}</li>
-                        <li>{language === 'fr' ? 'Équivalence pour les diplômes étrangers (le cas échéant)' : 'قرار المعادلة بالنسبة للشهادات الأجنبية'}</li>
-                      </ul>
+                      {pieces.length ? (
+                        <ul className="space-y-1.5">
+                          {pieces.map((x, k) => (
+                            <li key={k} dir="auto" className="flex gap-2 text-[13px] leading-snug text-[#2E2833]">
+                              <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#8D174B] shrink-0" />
+                              <span className="min-w-0">{x}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="leading-relaxed text-[13px] text-[#6E6773]">{notInArrete}</p>
+                      )}
                     </div>
                   </div>
 
@@ -642,6 +658,15 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                     <Award className="w-4 h-4 text-[#8D174B]" />
                     <span>{language === 'fr' ? 'Programme & Épreuves du concours' : 'برنامج ومواد الاختبارات'}</span>
                   </h3>
+
+                  {/* Épreuves lues dans l'arrêté (durées et coefficients tels que publiés) */}
+                  {!contest.exams?.written?.length && !contest.exams?.oral?.length && epreuves.length > 0 && (
+                    <ul className="space-y-2">
+                      {epreuves.map((x, k) => (
+                        <li key={k} dir="auto" className="p-3 bg-[#FAF7F9] rounded-2xl border border-[#F1E5EC] text-[13px] leading-snug text-[#2E2833]">{x}</li>
+                      ))}
+                    </ul>
+                  )}
 
                   {/* Written Exams */}
                   {contest.exams?.written && contest.exams.written.length > 0 && (

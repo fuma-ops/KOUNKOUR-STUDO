@@ -5,6 +5,7 @@
 // absent n'est jamais inventé, il est simplement omis.
 
 import { adsAllowed } from '../../src/lib/adsPolicy.ts';
+import { splitSummary, summaryItems } from '../../src/utils/contestSummary.ts';
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import { PSY_CATS, PSY_HUB, PSY_TRAIN_PATH, psyCatBySlug, psyTrainPath, type PsyCatDoc } from '../../src/psy/content.ts';
@@ -407,6 +408,59 @@ const STAGE_DOCS: Record<string, Record<Lang, string>> = {
   resultats: { fr: 'Résultats du concours (PDF officiel)', ar: 'نتائج المباراة (PDF رسمي)' },
 };
 
+
+// Fiche établie depuis la seule page emploi-public, en attente de son arrêté : pas indexée.
+const PAGE_ONLY = /fiche établie depuis la page emploi-public|Voir l'arrêté \(fiche établie/i;
+const ORAL_FOLDER_SLUG = 'concours-reussir-oral';
+
+// Contenu propre à la fiche, construit uniquement à partir de l'arrêté (résumé en base) :
+// rubriques lisibles, calendrier, préparation conseillée et questions fréquentes.
+function contestGuide(c: ContestRow, lang: Lang, prepFolders: FolderRow[], short: string): { html: string; faq: { q: string; a: string }[] } {
+  const fr = lang === 'fr';
+  const sum = splitSummary(c.summary_fr || '');
+  const part = (k: string) => sum.parts.find((x) => x.key === k)?.body || '';
+  const list = (k: string) => {
+    const b = part(k);
+    if (!b) return '';
+    const it = summaryItems(k, b);
+    const attr = fr ? '' : ' lang="fr" dir="ltr"';
+    return it.length > 1 ? `<ul${attr}>${it.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p${attr}>${esc(b)}</p>`;
+  };
+  const H = (fr_: string, ar: string) => `<h2>${esc(fr ? fr_ : ar)}</h2>`;
+  let html = '';
+  const who = [part('Diplôme') && `<h3>${esc(fr ? 'Diplôme exigé' : 'الشهادة المطلوبة')}</h3>${list('Diplôme')}`, part('Conditions') && `<h3>${esc(fr ? 'Conditions' : 'الشروط')}</h3>${list('Conditions')}`, part('Âge') && `<h3>${esc(fr ? 'Âge' : 'السن')}</h3>${list('Âge')}`].filter(Boolean).join('');
+  if (who) html += H('Qui peut se présenter ?', 'من يمكنه الترشح؟') + who;
+  if (part('Épreuves')) html += H('Déroulement du concours : les épreuves', 'مراحل المباراة: الاختبارات') + list('Épreuves');
+  if (part('Candidature')) html += H('Comment déposer sa candidature', 'كيفية إيداع الترشيح') + list('Candidature');
+  if (part('Pièces')) html += H('Pièces du dossier', 'وثائق ملف الترشيح') + list('Pièces');
+  // Calendrier : seulement des dates publiées.
+  const cal: string[] = [];
+  if (c.publication_date) cal.push(`${fr ? 'Publication de l’avis' : 'نشر الإعلان'} : ${fmtDate(c.publication_date, lang)}`);
+  if (c.deadline_date) cal.push(`${fr ? 'Date limite de dépôt' : 'آخر أجل للإيداع'} : ${fmtDate(c.deadline_date, lang)}`);
+  if (c.exam_date) cal.push(`${fr ? 'Date du concours' : 'تاريخ المباراة'} : ${fmtDate(c.exam_date, lang)}${part('Date du concours') ? ` (${part('Date du concours')})` : ''}`);
+  if (sum.note) cal.push(sum.note);
+  if (cal.length) html += H('Calendrier du concours', 'الجدول الزمني للمباراة') + `<ul>${cal.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  // Préparation conseillée selon les épreuves annoncées.
+  const ep = part('Épreuves').toLowerCase();
+  const prep: string[] = [];
+  for (const f of prepFolders) prep.push(`<li>${link(`/preparation/${encodeURIComponent(f.slug)}`, folderTitle(f, lang), lang)}${(fr ? f.description_fr : f.description_ar || f.description_fr) ? ` : ${esc(truncate((fr ? f.description_fr : f.description_ar || f.description_fr) || '', 160))}` : ''}</li>`);
+  if (/oral|entretien|exposé|discussion/.test(ep) && !prepFolders.some((f) => f.slug === ORAL_FOLDER_SLUG))
+    prep.push(`<li>${link(`/preparation/${ORAL_FOLDER_SLUG}`, fr ? 'Réussir l’oral : questions du jury, stress et CV' : 'النجاح في الشفوي: أسئلة اللجنة والتوتر والسيرة الذاتية', lang)}</li>`);
+  if (/qcm|choix multiples/.test(ep)) prep.push(`<li>${esc(fr ? 'L’écrit est un QCM : entraînez-vous avec les QCM corrigés des dossiers ci-dessus.' : 'الاختبار الكتابي على شكل أسئلة متعددة الاختيارات: تدرب بالأسئلة المصححة في الملفات أعلاه.')}</li>`);
+  const name = short.replace(/^Concours\s+/i, '');
+  if (prep.length) html += H(`Comment se préparer : ${name}`, `كيف تستعد لهذه المباراة`) + `<ul>${prep.join('')}</ul>`;
+  // Questions fréquentes : réponses tirées de la fiche, jamais inventées.
+  const faq: { q: string; a: string }[] = [];
+  if (c.deadline_date) faq.push({ q: fr ? 'Quelle est la date limite de dépôt des candidatures ?' : 'ما هو آخر أجل لإيداع الترشيحات؟', a: `${fmtDate(c.deadline_date, lang)}.` });
+  if (part('Diplôme')) faq.push({ q: fr ? 'Quel diplôme faut-il pour se présenter ?' : 'ما هي الشهادة المطلوبة؟', a: part('Diplôme') });
+  if (part('Âge')) faq.push({ q: fr ? 'Quelle est la limite d’âge ?' : 'ما هو السن المطلوب؟', a: part('Âge') });
+  if (part('Candidature')) faq.push({ q: fr ? 'Comment déposer le dossier ?' : 'كيف يتم إيداع الملف؟', a: part('Candidature') });
+  if (part('Épreuves')) faq.push({ q: fr ? 'Quelles sont les épreuves ?' : 'ما هي الاختبارات؟', a: part('Épreuves') });
+  if (c.exam_date) faq.push({ q: fr ? 'Quand a lieu le concours ?' : 'متى تجرى المباراة؟', a: `${fmtDate(c.exam_date, lang)}${part('Date du concours') ? ` (${part('Date du concours')})` : ''}.` });
+  if (faq.length >= 2) html += H('Questions fréquentes', 'أسئلة متكررة') + faq.map((x) => `<h3>${esc(x.q)}</h3><p${fr || !/[a-zé]/i.test(x.a) ? '' : ' lang="fr" dir="ltr"'}>${esc(x.a)}</p>`).join('');
+  return { html, faq: faq.length >= 2 ? faq : [] };
+}
+
 export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], base: string, today: string, prepFolders: FolderRow[] = []): Page {
   const t = L[lang];
   const st = contestState(c, today);
@@ -454,6 +508,9 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
     description = truncate(stageLine + bits.filter(Boolean).join(' '), 158);
   }
 
+  const guide = contestGuide(c, lang, prepFolders, short);
+  const pageOnly = PAGE_ONLY.test(`${c.summary_fr || ''} ${c.summary_ar || ''}`);
+
   const officialLinks = [
     c.source_url ? `<li><a href="${esc(c.source_url)}" rel="nofollow noopener" target="_blank">${esc(t.seeOfficial)}</a></li>` : '',
     c.apply_url && c.apply_url !== c.source_url ? `<li><a href="${esc(c.apply_url)}" rel="nofollow noopener" target="_blank">${esc(t.apply)}</a></li>` : '',
@@ -470,13 +527,16 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
             .join('')}</ul>`
         : '') +
       postsTable(c, lang) +
-      (summary ? `<h2>${lang === 'ar' ? 'ملخص' : 'Résumé'}</h2><p${summaryIsFallback ? ' lang="fr" dir="ltr"' : ''}>${esc(summary)}</p>` : '') +
+      (guide.html ? (summary && splitSummary(summary).intro ? `<p${summaryIsFallback ? ' lang="fr" dir="ltr"' : ''}>${esc(splitSummary(summary).intro)}</p>` : '') + guide.html
+        : summary ? `<h2>${lang === 'ar' ? 'ملخص' : 'Résumé'}</h2><p${summaryIsFallback ? ' lang="fr" dir="ltr"' : ''}>${esc(summary)}</p>` : '') +
       `<h2>${esc(t.source)}</h2>` +
       (c.source_org ? `<p>${esc(c.source_org)}</p>` : '') +
       (officialLinks ? `<ul>${officialLinks}</ul>` : '') +
       (c.verified_at ? `<p class="muted">${esc(t.verified)} ${esc(fmtDate(c.verified_at, lang))}</p>` : '') +
       `<p class="muted">${esc(t.prevails)}</p>` +
-      (prepFolders.length
+      (prepFolders.length && guide.html.includes('/preparation/')
+        ? ''
+        : prepFolders.length
         ? `<h2>${esc(t.prepLink)}</h2><ul>${prepFolders.map((f) => `<li>${link(`/preparation/${encodeURIComponent(f.slug)}`, folderTitle(f, lang), lang)}</li>`).join('')}</ul>`
         : `<p>${link('/preparation', t.prepLink, lang)}</p>`) +
       `<p>${link('/communaute', t.discuss, lang)}</p>` +
@@ -510,13 +570,21 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
     });
   }
 
+  if (guide.faq.length)
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: guide.faq.map((x) => ({ '@type': 'Question', name: x.q, acceptedAnswer: { '@type': 'Answer', text: x.a } })),
+    });
+
   return {
     status: 200,
     lang,
     title: `${truncate(pageTitle, 62)} | KounKour`,
     description,
     path: `/concours/${encodeURIComponent(c.slug)}`,
-    indexable: true,
+    // Fiche « page seule » (pas encore lue dans son arrêté) : visible, mais pas indexée.
+    indexable: !pageOnly,
     ogType: 'article',
     jsonLd,
     body,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Award, CalendarDays, FileCheck2, GraduationCap, Info, ListChecks, Send, UserCheck } from 'lucide-react';
+import { splitSummary, summaryItems } from '../utils/contestSummary';
 
 // Résumé d'un concours lu dans l'arrêté (texte en base : « Postes : … Diplôme : … Conditions : … »),
 // présenté en rubriques titrées et en puces : plus de bloc de texte continu sur téléphone.
@@ -15,35 +16,8 @@ const SECTIONS: { key: string; label: string; icon: React.ElementType }[] = [
   { key: 'Pièces', label: 'Pièces du dossier', icon: FileCheck2 },
   { key: 'Date du concours', label: 'Date du concours', icon: CalendarDays },
 ];
-const RE = new RegExp(`(?:^|\\.\\s+)(${SECTIONS.map((s) => s.key).join('|')}) : `, 'g');
-
-export function splitSummary(text: string): { intro: string; parts: { key: string; body: string }[]; note: string } {
-  const hits = [...text.matchAll(RE)];
-  if (!hits.length) return { intro: text, parts: [], note: '' };
-  const intro = text.slice(0, hits[0].index).trim();
-  const parts = hits.map((m, i) => {
-    const start = (m.index || 0) + m[0].length;
-    const end = i + 1 < hits.length ? hits[i + 1].index || text.length : text.length;
-    return { key: m[1], body: text.slice(start, end).trim().replace(/\.$/, '') };
-  });
-  // La dernière rubrique peut être suivie d'une note libre (« Date et lieu communiqués… ») : on la sépare
-  // à la première fin de phrase suivie d'une majuscule.
-  let note = '';
-  const last = parts[parts.length - 1];
-  const cut = /^(.+?)\.\s+(?=[A-ZÉÈÀÂÎÔ])([\s\S]+)$/.exec(last.body);
-  if (cut) {
-    last.body = cut[1];
-    note = cut[2];
-  }
-  return { intro, parts, note };
-}
-
-// Une rubrique devient une liste quand elle énumère (« ; », ou beaucoup de virgules pour les pièces).
-const items = (key: string, body: string) => {
-  let list = body.split(/\s*;\s*/).filter(Boolean);
-  if (list.length < 2 && key === 'Pièces' && (body.match(/,/g) || []).length >= 3) list = body.split(/,\s+(?![^()]*\))/);
-  return list.map((x) => x.trim().replace(/\.$/, ''));
-};
+export { splitSummary };
+const items = summaryItems;
 
 export const ContestSummary: React.FC<{ text: string; hidePostes?: boolean }> = ({ text, hidePostes }) => {
   const { intro, parts, note } = splitSummary(text);
