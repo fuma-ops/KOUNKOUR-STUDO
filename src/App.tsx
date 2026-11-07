@@ -38,6 +38,7 @@ import { buildMatchFeed } from './utils/matchFeed';
 import { getContestDiscussionCounts } from './data/communityApi';
 import { trackPageView } from './lib/visits';
 import { gaPageView } from './lib/analytics';
+import { watchAds } from './lib/ads';
 import { 
   Filter, SlidersHorizontal, Sparkles, AlertTriangle, 
   ArrowRight, ArrowLeft, Bookmark, CheckCircle2, Calendar, Radio,
@@ -287,6 +288,8 @@ export default function App() {
     trackPageView(currentPath);
     gaPageView(currentPath);
   }, [currentPath]);
+  // Google AdSense : seulement sur les pages de contenu complètes (src/lib/adsPolicy.ts).
+  useEffect(() => watchAds(currentPath), [currentPath]);
   useEffect(() => {
     const onPop = () => {
       const r = parsePath(window.location.pathname);

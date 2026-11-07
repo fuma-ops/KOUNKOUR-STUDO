@@ -109,7 +109,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
   const orgName = contest.administration?.name?.[language] || contest.administration?.name?.fr || 'Administration';
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/60 backdrop-blur-xs flex justify-center items-start sm:items-center p-0 sm:p-4 animate-fade-in">
+    <div data-ads-content className="fixed inset-0 z-[60] overflow-y-auto bg-black/60 backdrop-blur-xs flex justify-center items-start sm:items-center p-0 sm:p-4 animate-fade-in">
       <div className="bg-white w-full max-w-3xl min-h-screen sm:min-h-0 sm:max-h-[92vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col justify-between my-auto border border-[#F1E5EC]">
         
         {/* Sticky Top App Bar */}

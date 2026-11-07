@@ -4,6 +4,7 @@
 // Uniquement des données réelles lues dans Supabase (RLS publique) ; un champ
 // absent n'est jamais inventé, il est simplement omis.
 
+import { adsAllowed } from '../../src/lib/adsPolicy';
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import { PSY_CATS, PSY_HUB, PSY_TRAIN_PATH, psyCatBySlug, psyTrainPath, type PsyCatDoc } from '../../src/psy/content.ts';
@@ -914,7 +915,10 @@ export function renderDocument(template: string, p: Page, base: string): string 
     .replace(/<meta\s+(name|property)="(description|robots|og:[^"]*|twitter:[^"]*)"[^>]*>\s*/gi, '')
     .replace(/<link\s+rel="(canonical|alternate)"[^>]*>\s*/gi, '');
   const withGa0 = cleaned.includes('googletagmanager.com/gtag/js') ? cleaned : cleaned.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${GA_TAG}`);
-  const withGa = withGa0.includes('adsbygoogle.js') ? withGa0 : withGa0.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${ADSENSE_TAG}`);
+  // AdSense seulement sur une page de contenu complète (même règle que l'application).
+  const bodyText = p.body.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ');
+  const ads = p.status === 200 && p.indexable && !p.redirect && adsAllowed(p.path, bodyText);
+  const withGa = !ads || withGa0.includes('adsbygoogle.js') ? withGa0 : withGa0.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${ADSENSE_TAG}`);
   return withGa
     .replace(/<html[^>]*>/i, `<html lang="${p.lang}" dir="${p.lang === 'ar' ? 'rtl' : 'ltr'}">`)
     .replace(/<\/head>/i, `    ${headTags(p, base)}\n  </head>`)

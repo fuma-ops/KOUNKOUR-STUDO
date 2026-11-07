@@ -61,3 +61,10 @@
 /* Rangée de puces qui défile sans barre visible (filtres de la préparation) */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Google AdSense : aucune annonce automatique sur un écran sans contenu (src/lib/ads.ts). */
+html[data-ads='off'] .google-auto-placed,
+html[data-ads='off'] ins.adsbygoogle,
+html[data-ads='off'] .adsbygoogle-noablate {
+  display: none !important;
+}
