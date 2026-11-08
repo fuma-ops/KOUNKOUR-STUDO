@@ -105,7 +105,11 @@ for (const x of todo) {
     }
     let c;
     if (media.file) {
-      c = await graph(`/${IG_USER}/media`, secret.token, { media_type: 'REELS', upload_type: 'resumable', caption: media.caption, share_to_feed: 'true' }, 'POST');
+      // Couverture = la miniature choisie sur Facebook (titre visible), sinon Instagram prend la
+      // première image de la vidéo, où le texte n'est pas encore apparu.
+      const th = await graph(`/${x.post_id}/thumbnails`, secret.token, { fields: 'uri,is_preferred' }).catch(() => ({}));
+      const cover = (th.data || []).find((t) => t.is_preferred)?.uri;
+      c = await graph(`/${IG_USER}/media`, secret.token, { media_type: 'REELS', upload_type: 'resumable', caption: media.caption, share_to_feed: 'true', ...(cover ? { cover_url: cover } : {}) }, 'POST');
       const up = await fetch(c.uri, { method: 'POST', headers: { Authorization: `OAuth ${secret.token}`, offset: '0', file_size: String(media.file.length) }, body: media.file });
       const uj = await up.json();
       if (!up.ok || !uj.success) throw new Error(`envoi Instagram : ${JSON.stringify(uj).slice(0, 200)}`);
@@ -123,7 +127,8 @@ for (const x of todo) {
     const pub = await graph(`/${IG_USER}/media_publish`, secret.token, { creation_id: c.id }, 'POST');
     for (const k of x.keys) await rest('/rpc/social_record', { p_contest: k, p_kind: x.kind, p_post: pub.id, p_network: 'instagram' });
     okCount++;
-    out.push({ type: x.kind, format: media.media_type === 'REELS' ? 'reel' : 'image', instagram: pub.id });
+    const link = await graph(`/${pub.id}`, secret.token, { fields: 'permalink' }).then((m) => m.permalink).catch(() => pub.id);
+    out.push({ type: x.kind, format: media.media_type === 'REELS' ? 'reel' : 'image', instagram: link });
   } catch (e) {
     out.push({ type: x.kind, facebook: x.post_id, erreur: String(e.message || e) });
   }
