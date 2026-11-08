@@ -856,8 +856,8 @@ if (cmd === 'apercu') {
   const t18 = film ? at18() : null;
   const r0 = items.findIndex((x) => x.isReel);
   const t10 = r0 >= 0 ? morningSlot() : null;
-  const rest = slots(items.length - (t10 ? 1 : 0), [t18, t10].filter(Boolean));
-  const when = items.map((_, i) => (i === r0 && t10 ? t10 : rest.shift()));
+  const pool = slots(items.length - (t10 ? 1 : 0), [t18, t10].filter(Boolean));
+  const when = items.map((_, i) => (i === r0 && t10 ? t10 : pool.shift()));
   const out = [];
   for (const [i, x] of items.entries()) {
     try {
