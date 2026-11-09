@@ -435,7 +435,8 @@ function caption(item) {
   }
   const d = daysLeft(c.deadline_date);
   const head = kind === 'dernier'
-    ? `⏰ ${d <= 0 ? "Dernier jour aujourd'hui" : d === 1 ? 'Clôture demain' : `Plus que ${d} jours`} pour postuler !`
+    // Date exacte, jamais « aujourd'hui / demain » (consigne du propriétaire, 04/11/2026).
+    ? (d <= 1 ? `⏰ Dernier délai pour postuler : ${dateFr(c.deadline_date)} !` : `⏰ Plus que ${d} jours pour postuler !`)
     : '📢 Nouveau concours';
   return tidy([
     head,
