@@ -16,6 +16,8 @@ import { ContestPrepLinks } from './ContestPrepLinks';
 import { ContestStageTracker } from './ContestStageTracker';
 import { ContestAlertButton } from './AlertMe';
 import { SimilarContests } from './SimilarContests';
+import { ContestHubLinks } from './HubPage';
+import type { HubKind } from '../content/hubs';
 import { loadCandidateProfile, checkEligibility } from '../utils/candidateStorage';
 import { isProfileReady, MATCH_DISCLAIMER } from '../utils/smartMatch';
 import { OrgLogo } from './OrgLogo';
@@ -37,6 +39,7 @@ interface ContestDetailModalProps {
   onOpenPsyTrain?: () => void;
   allContests?: Contest[];
   onOpenContest?: (c: Contest) => void;
+  onOpenHub?: (kind: HubKind, slug: string) => void;
 }
 
 // Identifiant du concours SUR emploi-public.ma (pour l'arrêté et les listes officielles).
@@ -62,6 +65,7 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
   onOpenPsyTrain,
   allContests = [],
   onOpenContest,
+  onOpenHub,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'apply' | 'exams' | 'docs'>('info');
   const [commentCount, setCommentCount] = useState(0);
@@ -813,6 +817,19 @@ export const ContestDetailModal: React.FC<ContestDetailModalProps> = ({
                 onOpen={(c) => {
                   onOpenContest(c);
                   document.getElementById('kk-contest-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            )}
+
+            {/* Pages de regroupement : tous les concours du même organisme, grade ou région */}
+            {onOpenHub && allContests.length > 0 && (
+              <ContestHubLinks
+                contest={contest}
+                all={allContests}
+                language={language}
+                onOpenHub={(kind, slug) => {
+                  onClose();
+                  onOpenHub(kind, slug);
                 }}
               />
             )}

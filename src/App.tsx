@@ -32,6 +32,8 @@ import { AuthModal, PasswordRecoveryModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { LegalPage } from './components/LegalPage';
 import { PsychoRecruiterPage } from './components/PsychoRecruiterPage';
+import { HubPage } from './components/HubPage';
+import type { HubKind } from './content/hubs';
 import { PsyTrainer } from './components/PsyTrainer';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { buildMatchFeed } from './utils/matchFeed';
@@ -68,6 +70,11 @@ export default function App() {
   const [psyCat, setPsyCat] = useState<string | null>(() => {
     const r = parsePath(window.location.pathname);
     return r.name === 'psytrain' ? r.slug : null;
+  });
+  // Pages de regroupement (organisme, région, grade) ; slug null = page d'index.
+  const [hubRoute, setHubRoute] = useState<{ kind: HubKind; slug: string | null }>(() => {
+    const r = parsePath(window.location.pathname);
+    return r.name === 'hub' ? { kind: r.kind, slug: r.slug } : { kind: 'organisme', slug: null };
   });
   const [contestsLoaded, setContestsLoaded] = useState(false);
   // Chargement des concours impossible (réseau) même après les nouveaux essais.
@@ -268,9 +275,10 @@ export default function App() {
     else if (activeTab === 'terms') r = { name: 'terms' };
     else if (activeTab === 'psycho') r = { name: 'psycho', slug: psychoSlug };
     else if (activeTab === 'psytrain') r = { name: 'psytrain', slug: psyCat };
+    else if (activeTab === 'hub') r = { name: 'hub', kind: hubRoute.kind, slug: hubRoute.slug };
     else r = { name: 'home' };
     return withLang(routePath(r), language);
-  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, psychoSlug, psyCat, language]);
+  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, psychoSlug, psyCat, hubRoute, language]);
   const firstSync = React.useRef(true);
   useEffect(() => {
     const here = window.location.pathname + window.location.search;
@@ -298,6 +306,7 @@ export default function App() {
       setQcmRoute({ folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null });
       setPsychoSlug(r.name === 'psycho' ? r.slug : null);
       setPsyCat(r.name === 'psytrain' ? r.slug : null);
+      if (r.name === 'hub') setHubRoute({ kind: r.kind, slug: r.slug });
       setSelectedContest(null);
       setPendingContestSlug(r.name === 'contest' ? r.slug : null);
     };
@@ -605,6 +614,29 @@ export default function App() {
               );
             })()}
 
+            {/* Pages de regroupement : parcourir par organisme, région ou grade */}
+            <nav className="mb-3 flex flex-wrap gap-2" aria-label={language === 'fr' ? 'Parcourir les concours' : 'تصفح المباريات'}>
+              {([
+                ['organisme', '/organismes', 'Par organisme', 'حسب الإدارة'],
+                ['region', '/regions', 'Par région', 'حسب الجهة'],
+                ['grade', '/grades', 'Par grade', 'حسب الدرجة'],
+              ] as const).map(([kind, href, fr, ar]) => (
+                <a
+                  key={kind}
+                  href={language === 'fr' ? href : `${href}?lang=ar`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setHubRoute({ kind, slug: null });
+                    setActiveTab('hub');
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#8D174B] bg-[#FDF2F7] border border-[#8D174B]/10 hover-scale active:scale-95"
+                >
+                  {language === 'fr' ? fr : ar}
+                </a>
+              ))}
+            </nav>
+
             {/* Active search bar */}
             <div className="mb-6">
               <input
@@ -750,6 +782,27 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'hub' && (
+          <HubPage
+            kind={hubRoute.kind}
+            slug={hubRoute.slug}
+            language={language}
+            contests={allActiveContests}
+            contestsLoaded={contestsLoaded || contestsFailed}
+            onOpenHub={(kind, slug) => setHubRoute({ kind, slug })}
+            onOpenContest={setSelectedContest}
+            onOpenFolder={(folder) => {
+              setQcmRoute({ folder: folder || null, set: null });
+              setActiveTab('preparation');
+              window.scrollTo({ top: 0 });
+            }}
+            onOpenAlerts={() => {
+              setProfileInitialTab('recommendations');
+              goTab('profile');
+            }}
+          />
+        )}
+
         {activeTab === 'psytrain' && (
           <PsyTrainer
             language={language}
@@ -850,6 +903,13 @@ export default function App() {
         onRequestLogin={() => setAuthOpen(true)}
         allContests={allActiveContests}
         onOpenContest={setSelectedContest}
+        onOpenHub={(kind, slug) => {
+          setSelectedContest(null);
+          setPendingContestSlug(null);
+          setHubRoute({ kind, slug });
+          setActiveTab('hub');
+          window.scrollTo({ top: 0 });
+        }}
         onOpenPrepHome={() => {
           setSelectedContest(null);
           setPendingContestSlug(null);

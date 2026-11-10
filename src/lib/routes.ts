@@ -16,6 +16,7 @@ export type Route =
   | { name: 'terms' }
   | { name: 'psycho'; slug: string | null }
   | { name: 'psytrain'; slug: string | null }
+  | { name: 'hub'; kind: 'organisme' | 'region' | 'grade'; slug: string | null }
   | { name: 'notfound' };
 
 const seg = (s: string) => {
@@ -45,6 +46,10 @@ export function parsePath(pathname: string): Route {
   if (a === 'tests-psychotechniques' && b === 'en-ligne' && parts.length <= 3) return { name: 'psytrain', slug: c || null };
   // Pages « tests psychotechniques » par recruteur (ONCF, RAM…), reliées au dossier d'entraînement.
   if (a === 'tests-psychotechniques' && parts.length <= 2) return { name: 'psycho', slug: b || null };
+  // Pages de regroupement : tous les concours d'un organisme, d'une région ou d'un grade.
+  if ((a === 'organismes' || a === 'regions' || a === 'grades') && parts.length === 1)
+    return { name: 'hub', kind: a.slice(0, -1) as 'organisme' | 'region' | 'grade', slug: null };
+  if ((a === 'organisme' || a === 'region' || a === 'grade') && parts.length === 2) return { name: 'hub', kind: a, slug: b };
   return { name: 'notfound' };
 }
 
@@ -78,6 +83,8 @@ export function routePath(r: Route): string {
       return r.slug ? `/tests-psychotechniques/${e(r.slug)}` : '/tests-psychotechniques';
     case 'psytrain':
       return r.slug ? `/tests-psychotechniques/en-ligne/${e(r.slug)}` : '/tests-psychotechniques/en-ligne';
+    case 'hub':
+      return r.slug ? `/${r.kind}/${e(r.slug)}` : `/${r.kind}s`;
   }
 }
 
@@ -105,6 +112,8 @@ export function tabOf(r: Route): string {
       return 'psycho';
     case 'psytrain':
       return 'psytrain';
+    case 'hub':
+      return 'hub';
     default:
       return 'home';
   }

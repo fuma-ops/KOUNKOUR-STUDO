@@ -29,6 +29,8 @@ import {
   todayMorocco,
   renderPsycho,
   renderPsyTrain,
+  renderHub,
+  hubLinksFor,
 } from './_lib/seo.ts';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './_lib/supabaseEnv.ts';
 
@@ -147,7 +149,7 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
       const c = all.find((x) => x.slug === r.slug);
       if (!c) return renderNotFound(lang, pathname);
       const related = c.administration_id ? all.filter((x) => x.administration_id === c.administration_id && x.id !== c.id).slice(0, 6) : [];
-      return renderContest(lang, c, related, base, today, prepFoldersFor(c, f, s));
+      return renderContest(lang, c, related, base, today, prepFoldersFor(c, f, s), hubLinksFor(c, all, today, lang));
     }
     case 'prep': {
       const [f, s] = await Promise.all([folders(), sets()]);
@@ -183,6 +185,10 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
     }
     case 'psycho':
       return renderPsycho(lang, r.slug, base, await contests(), today) || renderNotFound(lang, pathname);
+    case 'hub': {
+      const [c, f, s] = await Promise.all([contests(), folders(), sets()]);
+      return renderHub(lang, r.kind, r.slug, base, c, f, s, today) || renderNotFound(lang, pathname);
+    }
     case 'psytrain':
       return renderPsyTrain(r.slug, base) || renderNotFound(lang, pathname);
     case 'community':
@@ -233,7 +239,7 @@ export default async function handler(req: any, res: any) {
       const [c, f, s] = await Promise.all([contests(), folders(), sets()]);
       res.setHeader('Content-Type', 'application/xml; charset=utf-8');
       res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-      res.status(200).send(renderSitemap(base, c, f, s));
+      res.status(200).send(renderSitemap(base, c, f, s, todayMorocco()));
       return;
     }
 

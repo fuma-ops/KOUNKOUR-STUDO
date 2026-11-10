@@ -8,6 +8,22 @@ import { adsAllowed } from '../../src/lib/adsPolicy.ts';
 import { splitSummary, summaryItems } from '../../src/utils/contestSummary.ts';
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
+import {
+  HUB_INDEX,
+  buildHubs,
+  hubDate,
+  hubIndexView,
+  hubIndexable,
+  hubLinksOf,
+  hubPath,
+  hubPrepSlugs,
+  hubShortTitle,
+  hubView,
+  toHubContest,
+  type Hub,
+  type HubContest,
+  type HubKind,
+} from '../../src/content/hubs.ts';
 import { PSY_CATS, PSY_HUB, PSY_TRAIN_PATH, psyCatBySlug, psyTrainPath, type PsyCatDoc } from '../../src/psy/content.ts';
 import { generate } from '../../src/psy/generators.ts';
 import { PSY_CSS, optionHtml, questionHtml } from '../../src/psy/render.ts';
@@ -272,6 +288,9 @@ function frame(lang: Lang, crumbs: { href?: string; text: string }[], inner: str
   const t = L[lang];
   return `<div class="kk-ssr" lang="${lang}" dir="${lang === 'ar' ? 'rtl' : 'ltr'}">${STYLE}<nav aria-label="breadcrumb">${trail}</nav>${inner}<nav style="margin-top:32px">${[
     link('/concours', t.allContests, lang),
+    link(HUB_INDEX.organisme, lang === 'ar' ? 'حسب الإدارة' : 'Par organisme', lang),
+    link(HUB_INDEX.region, lang === 'ar' ? 'حسب الجهة' : 'Par région', lang),
+    link(HUB_INDEX.grade, lang === 'ar' ? 'حسب الدرجة' : 'Par grade', lang),
     link('/preparation', t.prep, lang),
     link('/communaute', t.community, lang),
   ].join(' · ')}</nav></div>`;
@@ -461,7 +480,7 @@ function contestGuide(c: ContestRow, lang: Lang, prepFolders: FolderRow[], short
   return { html, faq: faq.length >= 2 ? faq : [] };
 }
 
-export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], base: string, today: string, prepFolders: FolderRow[] = []): Page {
+export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], base: string, today: string, prepFolders: FolderRow[] = [], hubLinks: { href: string; text: string }[] = []): Page {
   const t = L[lang];
   const st = contestState(c, today);
   const title = contestTitle(c, lang);
@@ -540,7 +559,8 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
         ? `<h2>${esc(t.prepLink)}</h2><ul>${prepFolders.map((f) => `<li>${link(`/preparation/${encodeURIComponent(f.slug)}`, folderTitle(f, lang), lang)}</li>`).join('')}</ul>`
         : `<p>${link('/preparation', t.prepLink, lang)}</p>`) +
       `<p>${link('/communaute', t.discuss, lang)}</p>` +
-      (related.length ? `<h2>${esc(t.others)}</h2><ul>${related.map((r) => contestLi(r, lang, today)).join('')}</ul>` : '')
+      (related.length ? `<h2>${esc(t.others)}</h2><ul>${related.map((r) => contestLi(r, lang, today)).join('')}</ul>` : '') +
+      (hubLinks.length ? `<h2>${esc(lang === 'ar' ? 'مباريات مشابهة' : 'Concours similaires')}</h2><ul>${hubLinks.map((h) => `<li>${link(h.href, h.text, lang)}</li>`).join('')}</ul>` : '')
   );
 
   const jsonLd: object[] = [
@@ -833,6 +853,132 @@ export function renderPsycho(lang: Lang, slug: string | null, base: string, cont
   return { status: 200, lang, title: `${truncate(doc.title, 72)} | KounKour`, description: truncate(doc.description, 158), path, indexable: true, jsonLd, body };
 }
 
+// ─── Pages de regroupement : organisme, région, grade ─────────────────────────
+
+export function hubContests(contests: ContestRow[], today: string): HubContest[] {
+  return contests
+    .map((c) =>
+      toHubContest(
+        {
+          slug: c.slug,
+          status: c.status,
+          stage: c.stage || null,
+          title_fr: c.title_fr,
+          title_ar: c.title_ar,
+          title_original: c.title_original,
+          admin_fr: c.administrations?.name_fr || c.source_org || '',
+          admin_ar: c.administrations?.name_ar || '',
+          grade_fr: c.grade_fr,
+          region_fr: c.region_fr,
+          positions: c.positions,
+          deadline_date: c.deadline_date,
+          publication_date: c.publication_date,
+          published_at: c.published_at,
+        },
+        today,
+      ),
+    )
+    .filter((x): x is HubContest => !!x);
+}
+
+// Une seule construction par lot de données (les fiches et le sitemap la réutilisent).
+let hubsMemo: { src: ContestRow[]; today: string; hubs: Record<HubKind, Map<string, Hub>> } | null = null;
+export function hubsFor(contests: ContestRow[], today: string): Record<HubKind, Map<string, Hub>> {
+  if (hubsMemo && hubsMemo.src === contests && hubsMemo.today === today) return hubsMemo.hubs;
+  const hubs = buildHubs(hubContests(contests, today));
+  hubsMemo = { src: contests, today, hubs };
+  return hubs;
+}
+
+const HUB_INDEX_LABEL: Record<HubKind, Record<Lang, string>> = {
+  organisme: { fr: 'Concours par organisme', ar: 'المباريات حسب الإدارة' },
+  region: { fr: 'Concours par région', ar: 'المباريات حسب الجهة' },
+  grade: { fr: 'Concours par grade', ar: 'المباريات حسب الدرجة' },
+};
+
+const HUB_STATE: Record<HubContest['state'], Record<Lang, string>> = {
+  open: { fr: 'Candidatures ouvertes', ar: 'الترشيح مفتوح' },
+  published: { fr: 'Publié', ar: 'منشور' },
+  closed: { fr: 'Clôturé', ar: 'منتهي' },
+  results: { fr: 'Résultats publiés', ar: 'النتائج منشورة' },
+  cancelled: { fr: 'Annulé', ar: 'ملغى' },
+};
+
+function hubLi(c: HubContest, lang: Lang, deadlineLabel: string, showAdmin: boolean) {
+  const bits = [showAdmin ? (lang === 'ar' ? c.adminAr : c.adminFr) : '', HUB_STATE[c.state][lang], c.deadline ? `${deadlineLabel} : ${hubDate(c.deadline, lang)}` : '', c.positions ? (lang === 'ar' ? `${c.positions} ${c.positions > 1 ? 'مناصب' : 'منصب'}` : `${c.positions} poste${c.positions > 1 ? 's' : ''}`) : '']
+    .filter(Boolean);
+  return `<li>${link(`/concours/${encodeURIComponent(c.slug)}`, hubShortTitle(c, lang), lang)} <span class="muted">— ${esc(bits.join(' · '))}</span></li>`;
+}
+
+const hubPrepMatch = (folders: FolderRow[]) => {
+  const terms = folders.map((f) => ({ slug: f.slug, matchTerms: f.match_terms }));
+  return (c: HubContest) => prepFolderSlugsFor({ title: c.titleFr, grade: c.grade, admin: c.adminFr }, terms);
+};
+
+/** Dossiers de préparation d'une page de regroupement (dossiers publiés et non vides seulement). */
+export function hubPrepFolders(hub: Hub, folders: FolderRow[], sets: QcmSetRow[]): FolderRow[] {
+  return hubPrepSlugs(hub, hubPrepMatch(folders), 6)
+    .map((slug) => folders.find((f) => f.slug === slug))
+    .filter((f): f is FolderRow => !!f && sets.some((s) => s.folder_slug === f.slug && hasContent(s)))
+    .slice(0, 4);
+}
+
+export function renderHub(lang: Lang, kind: HubKind, slug: string | null, base: string, contests: ContestRow[], folders: FolderRow[], sets: QcmSetRow[], today: string): Page | null {
+  const t = L[lang];
+  const hubs = hubsFor(contests, today);
+  const indexCrumb = { href: HUB_INDEX[kind], text: HUB_INDEX_LABEL[kind][lang] };
+  if (!slug) {
+    const v = hubIndexView(kind, hubs, lang, today);
+    const crumbs = [{ href: '/', text: t.home }, { href: '/concours', text: t.contests }, indexCrumb];
+    const others = (['organisme', 'region', 'grade'] as HubKind[]).filter((k) => k !== kind).map((k) => link(HUB_INDEX[k], HUB_INDEX_LABEL[k][lang], lang)).join(' · ');
+    const items = v.list
+      .map((h) => `<li>${link(hubPath(kind, h.slug), h.name, lang)} <span class="muted">— ${esc(lang === 'ar' ? `${h.count} مباراة${h.open ? ` · ${h.open} مفتوحة` : ''}` : `${h.count} concours${h.open ? ` · ${h.open} ouvert${h.open > 1 ? 's' : ''}` : ''}`)}</span></li>`)
+      .join('');
+    const body = frame(lang, crumbs.map((c, i) => (i === crumbs.length - 1 ? { text: c.text } : c)), `<h1>${esc(v.h1)}</h1><p>${esc(v.description)}</p><ul>${items}</ul><p>${others}</p>`);
+    return { status: 200, lang, title: v.title, description: truncate(v.description, 158), path: v.path, indexable: v.list.length > 0, jsonLd: [breadcrumbLd(base, lang, crumbs)], body };
+  }
+  const hub = hubs[kind].get(slug);
+  if (!hub) return null;
+  const v = hubView(hub, hubs, lang, today);
+  const crumbs = [{ href: '/', text: t.home }, { href: '/concours', text: t.contests }, indexCrumb, { href: v.path, text: hub.name[lang] || hub.name.fr }];
+  const showAdmin = kind !== 'organisme';
+  const facts = `<dl>${v.facts.map((f) => `<dt>${esc(f.label)}</dt><dd>${esc(f.value)}</dd>`).join('')}</dl>`;
+  const openHtml = `<h2>${esc(v.labels.open)} (${v.open.length})</h2>${v.open.length ? `<ul>${v.open.map((c) => hubLi(c, lang, v.labels.deadline, showAdmin)).join('')}</ul>` : `<p>${esc(v.labels.none)}</p>`}`;
+  const recentHtml = v.recent.length ? `<h2>${esc(v.labels.recent)}</h2><ul>${v.recent.map((c) => hubLi(c, lang, v.labels.deadline, showAdmin)).join('')}</ul>` : '';
+  const prep = hubPrepFolders(hub, folders, sets);
+  const prepHtml = prep.length
+    ? `<h2>${esc(v.labels.prep)}</h2><ul>${prep.map((f) => `<li>${link(`/preparation/${encodeURIComponent(f.slug)}`, folderTitle(f, lang), lang)}</li>`).join('')}</ul>`
+    : `<p>${link('/preparation', v.labels.prep, lang)}</p>`;
+  const relHtml = v.related.length
+    ? `<h2>${esc(v.labels.related)}</h2><ul>${v.related.map((r) => `<li>${link(hubPath(r.kind, r.slug), r.name, lang)}</li>`).join('')}</ul>`
+    : '';
+  const faqHtml = `<h2>${esc(v.labels.faq)}</h2>${v.faq.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('')}`;
+  const all = `<p>${(['organisme', 'region', 'grade'] as HubKind[]).map((k) => link(HUB_INDEX[k], HUB_INDEX_LABEL[k][lang], lang)).join(' · ')}</p>`;
+  const body = frame(
+    lang,
+    crumbs.map((c, i) => (i === crumbs.length - 1 ? { text: c.text } : c)),
+    `<h1>${esc(v.h1)}</h1>${v.intro.map((x) => `<p>${esc(x)}</p>`).join('')}${facts}${openHtml}${prepHtml}${recentHtml}${relHtml}${faqHtml}${all}`,
+  );
+  const jsonLd: object[] = [
+    breadcrumbLd(base, lang, crumbs),
+    { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: v.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
+  ];
+  if (v.open.length)
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: v.labels.open,
+      itemListElement: v.open.slice(0, 20).map((c, i) => ({ '@type': 'ListItem', position: i + 1, url: base + withLangPath(`/concours/${encodeURIComponent(c.slug)}`, lang), name: hubShortTitle(c, lang) })),
+    });
+  return { status: 200, lang, title: `${truncate(v.title, 66)} | KounKour`, description: truncate(v.description, 158), path: v.path, indexable: v.indexable, jsonLd, body };
+}
+
+/** Liens d'une fiche vers ses pages de regroupement indexables (organisme, grades, régions). */
+export function hubLinksFor(c: ContestRow, contests: ContestRow[], today: string, lang: Lang): { href: string; text: string }[] {
+  const hc = hubContests([c], today)[0];
+  return hc ? hubLinksOf(hc, hubsFor(contests, today), lang) : [];
+}
+
 // ─── Tests psychotechniques interactifs (français) ───────────────────────────
 const LEVEL_FR = { facile: 'facile', moyen: 'moyen', difficile: 'difficile' } as const;
 const PSY_SSR_CSS = `<style>${PSY_CSS}.psy-ex{border:1px solid #F1E5EC;border-radius:16px;padding:14px;margin:14px 0;background:#fff}.psy-ex-fig{margin:10px 0}.psy-ex-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:10px 0}.psy-ex-opts>div{border:2px solid #EDE6EF;border-radius:14px;padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;gap:4px}.psy-ex-opts>div>b{font-size:12px;color:#8E8694;align-self:flex-start;text-transform:uppercase}.psy-ex details{background:#F4FBF6;border-radius:12px;padding:8px 12px}.psy-ex summary{cursor:pointer;font-weight:700;color:#1F8A4C}.psy-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:0;list-style:none}.psy-cats li{border:1px solid #F1E5EC;border-radius:14px;padding:12px;margin:0}</style>`;
@@ -1025,7 +1171,7 @@ export function renderRobots(base: string): string {
   return ['User-agent: *', 'Allow: /', 'Disallow: /admin', 'Disallow: /profil', 'Disallow: /api/', '', `Sitemap: ${base}/sitemap.xml`, ''].join('\n');
 }
 
-export function renderSitemap(base: string, contests: ContestRow[], folders: FolderRow[], sets: QcmSetRow[]): string {
+export function renderSitemap(base: string, contests: ContestRow[], folders: FolderRow[], sets: QcmSetRow[], today = todayMorocco()): string {
   const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/concours' }, { loc: '/preparation' }, { loc: '/communaute' }, { loc: LEGAL_PATH.privacy }, { loc: LEGAL_PATH.terms }];
   for (const c of contests) urls.push({ loc: `/concours/${encodeURIComponent(c.slug)}`, lastmod: (c.updated_at || '').slice(0, 10) || undefined });
   for (const f of folders) if (sets.some((s) => s.folder_slug === f.slug)) urls.push({ loc: `/preparation/${encodeURIComponent(f.slug)}` });
@@ -1033,6 +1179,14 @@ export function renderSitemap(base: string, contests: ContestRow[], folders: Fol
   for (const s of sets) if (hasContent(s)) urls.push({ loc: `/preparation/qcm/${encodeURIComponent(s.slug)}` });
   urls.push({ loc: PSYCHO_INDEX_PATH }, ...PSYCHO_RECRUITERS.map((r) => ({ loc: psychoPath(r.slug) })));
   urls.push({ loc: PSY_TRAIN_PATH }, ...PSY_CATS.map((c) => ({ loc: psyTrainPath(c.slug) })));
+  // Pages de regroupement : seulement celles qui ont assez de concours pour être indexées.
+  const hubs = hubsFor(contests, today);
+  for (const kind of ['organisme', 'region', 'grade'] as HubKind[]) {
+    const list = [...hubs[kind].values()].filter(hubIndexable);
+    if (!list.length) continue;
+    urls.push({ loc: HUB_INDEX[kind] });
+    for (const h of list) urls.push({ loc: hubPath(kind, h.slug), lastmod: h.contests.map((c) => c.published || '').sort().pop() || undefined });
+  }
   const x = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
     .map((u) => `  <url><loc>${x(base + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`)

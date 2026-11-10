@@ -84,6 +84,8 @@ export interface Contest {
   publicationDate: string;
   deadlineDate: string;
   deadlineISO?: string; // AAAA-MM-JJ (date limite brute, pour les rappels)
+  // Champs bruts de la base, pour les pages de regroupement (mêmes chiffres que le rendu serveur).
+  hubRaw?: import('../content/hubs').HubRaw;
   daysRemaining: number;
   contestDate?: string;
   isVerifiedSource: boolean;
