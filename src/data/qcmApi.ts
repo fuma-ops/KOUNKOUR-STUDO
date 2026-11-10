@@ -418,3 +418,10 @@ export async function setFolderCover(slug: string, url: string | null): Promise<
   const { data, error } = await sb.from('qcm_folders').update({ cover_image: url }).eq('slug', slug).select('slug');
   if (error || !data?.length) throw new Error('Mise à jour refusée (compte équipe requis).');
 }
+
+/** Vignette carrée (logo de l'organisme sur fond blanc) associée à une image de dossier
+ *  « /images/prep/covers/<slug>.jpg » ; null si l'image n'a pas de vignette dédiée. */
+export function coverThumb(url?: string | null): string | null {
+  const m = /^(\/images\/prep\/covers\/[a-z0-9-]+)\.jpg(\?.*)?$/.exec(url || '');
+  return m ? `${m[1]}-thumb.jpg${m[2] || ''}` : null;
+}

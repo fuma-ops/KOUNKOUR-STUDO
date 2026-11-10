@@ -3,6 +3,7 @@ import { PsyTrainBanner } from './PsyTrainBanner';
 import { ArrowLeft, ArrowRight, Brain, Briefcase, Building2, CalendarClock, Cpu, FolderOpen, GraduationCap, HardHat, HeartPulse, PlayCircle, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import type { Contest, Language, QcmSet } from '../types';
 import type { QcmFolder } from '../data/qcmApi';
+import { coverThumb } from '../data/qcmApi';
 import { prepFolderSlugsFor } from '../utils/prepMatch';
 import { gaEvent } from '../lib/analytics';
 
@@ -117,7 +118,7 @@ export const PrepHome: React.FC<Props> = ({ rows, language, loading, contests, f
         style={{ animationDelay: `${Math.min(i, 10) * 50}ms` }}
       >
         {r.f.coverImage ? (
-          <img src={r.f.coverImage} alt="" loading="lazy" className="w-14 h-14 rounded-xl object-cover shrink-0" />
+          <img src={coverThumb(r.f.coverImage) || r.f.coverImage} onError={(e) => { if (r.f.coverImage && e.currentTarget.src !== new URL(r.f.coverImage, location.href).href) e.currentTarget.src = r.f.coverImage; }} alt="" loading="lazy" className="w-14 h-14 rounded-xl object-cover shrink-0 border border-[#F1E5EC] bg-white" />
         ) : (
           <span className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0">
             {React.createElement(FAMILIES.find((x) => x.id === familyOf(r.f.slug))!.Icon, { className: 'w-6 h-6' })}

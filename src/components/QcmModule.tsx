@@ -7,7 +7,7 @@ import { ConcoursRef } from './ConcoursRef';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
-import { FALLBACK_FOLDERS, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
+import { FALLBACK_FOLDERS, coverThumb, QcmCorrection, QcmFolder, QcmProgress, fetchQcmFolders, fetchQcmSets, loadQcmProgress, recordQcmProgress, answerIds, joinAnswer, seenCount, submitQcm, isWrittenSet, contentType, CONTENT_TYPES, ContentType } from '../data/qcmApi';
 import { TYPE_META, TypeBadge } from './prepTypes';
 import { PrepNextSteps } from './PrepNextSteps';
 import { PrepHome } from './PrepHome';
@@ -525,7 +525,7 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
             accessible sans pousser le contenu utile sous la ligne de flottaison (mobile). */}
         <header className="flex items-center gap-3 sm:gap-4 rounded-2xl border border-[#F1E5EC] bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] p-3 sm:p-4 mb-4">
           {folder?.coverImage ? (
-            <img src={folder.coverImage} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0 shadow-sm" />
+            <img src={coverThumb(folder.coverImage) || folder.coverImage} onError={(e) => { if (folder.coverImage && e.currentTarget.src !== new URL(folder.coverImage, location.href).href) e.currentTarget.src = folder.coverImage; }} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0 shadow-sm border border-[#F1E5EC] bg-white" />
           ) : (
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0">
               <FolderOpen className="w-7 h-7" />
