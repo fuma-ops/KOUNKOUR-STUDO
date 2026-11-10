@@ -39,6 +39,9 @@ const RULES: { slug: string; test: (t: string, admin: string) => boolean }[] = [
   { slug: 'concours-dgsn-commissaire-de-police', test: (t, a) => /surete nationale|dgsn|\bpolice\b/.test(a + ' ' + t) && /commissaire/.test(t) },
   // SRM / ONEE / régies : un dossier ingénieurs-cadres et un dossier techniciens-agents ;
   // une annonce mixte (ou sans grade lisible) reçoit les deux.
+  // Ministère de l'Économie et des Finances : dossier dédié au technicien des finances (spécialités
+  // comptabilité, secrétariat, informatique, topographie, génie civil), avant les dossiers généraux.
+  { slug: 'concours-technicien-finances-mef', test: (t, a) => /techniciens? (des|de) finances/.test(t) || (/economie.*finances/.test(a) && /technicien/.test(t)) },
   { slug: 'concours-srm-techniciens-agents', test: (t, a) => SRM.test(a + ' ' + t) && (SRM_TECH.test(t) || !SRM_CADRE.test(t)) },
   { slug: 'concours-srm-onee-ingenieur-technicien-cadre', test: (t, a) => SRM.test(a + ' ' + t) && (SRM_CADRE.test(t) || !SRM_TECH.test(t)) },
   { slug: 'concours-infirmier-technicien-sante', test: (t) => /infirmi|sage-femme|sages-femmes|technicien(s)? de sante|\bide\b|kinesitherap|aide-soignant/.test(t) },
