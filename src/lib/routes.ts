@@ -2,6 +2,10 @@
 // stable, partageable et indexable. Le même découpage sert au client (barre
 // d'adresse, bouton retour) et au rendu serveur (api/seo.ts).
 
+// Pages de regroupement (src/content/hubs.ts) : /organisme/<slug>, index /organismes, etc.
+export type HubKindRoute = 'organisme' | 'region' | 'ville' | 'grade' | 'specialite' | 'niveau';
+const HUB_INDEX_PATH: Record<HubKindRoute, string> = { organisme: 'organismes', region: 'regions', ville: 'villes', grade: 'grades', specialite: 'specialites', niveau: 'niveaux' };
+
 export type Route =
   | { name: 'home' }
   | { name: 'contests' }
@@ -16,7 +20,7 @@ export type Route =
   | { name: 'terms' }
   | { name: 'psycho'; slug: string | null }
   | { name: 'psytrain'; slug: string | null }
-  | { name: 'hub'; kind: 'organisme' | 'region' | 'grade'; slug: string | null }
+  | { name: 'hub'; kind: HubKindRoute; slug: string | null }
   | { name: 'notfound' };
 
 const seg = (s: string) => {
@@ -47,9 +51,9 @@ export function parsePath(pathname: string): Route {
   // Pages « tests psychotechniques » par recruteur (ONCF, RAM…), reliées au dossier d'entraînement.
   if (a === 'tests-psychotechniques' && parts.length <= 2) return { name: 'psycho', slug: b || null };
   // Pages de regroupement : tous les concours d'un organisme, d'une région ou d'un grade.
-  if ((a === 'organismes' || a === 'regions' || a === 'grades') && parts.length === 1)
-    return { name: 'hub', kind: a.slice(0, -1) as 'organisme' | 'region' | 'grade', slug: null };
-  if ((a === 'organisme' || a === 'region' || a === 'grade') && parts.length === 2) return { name: 'hub', kind: a, slug: b };
+  const idx = (Object.keys(HUB_INDEX_PATH) as HubKindRoute[]).find((k) => HUB_INDEX_PATH[k] === a);
+  if (idx && parts.length === 1) return { name: 'hub', kind: idx, slug: null };
+  if (Object.prototype.hasOwnProperty.call(HUB_INDEX_PATH, a) && parts.length === 2) return { name: 'hub', kind: a as HubKindRoute, slug: b };
   return { name: 'notfound' };
 }
 
@@ -84,7 +88,7 @@ export function routePath(r: Route): string {
     case 'psytrain':
       return r.slug ? `/tests-psychotechniques/en-ligne/${e(r.slug)}` : '/tests-psychotechniques/en-ligne';
     case 'hub':
-      return r.slug ? `/${r.kind}/${e(r.slug)}` : `/${r.kind}s`;
+      return r.slug ? `/${r.kind}/${e(r.slug)}` : `/${HUB_INDEX_PATH[r.kind]}`;
   }
 }
 

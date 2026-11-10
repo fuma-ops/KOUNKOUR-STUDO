@@ -10,6 +10,9 @@ import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import {
   HUB_INDEX,
+  HUB_INDEX_LABEL,
+  HUB_KINDS,
+  HUB_SHORT_LABEL,
   buildHubs,
   hubDate,
   hubIndexView,
@@ -288,9 +291,7 @@ function frame(lang: Lang, crumbs: { href?: string; text: string }[], inner: str
   const t = L[lang];
   return `<div class="kk-ssr" lang="${lang}" dir="${lang === 'ar' ? 'rtl' : 'ltr'}">${STYLE}<nav aria-label="breadcrumb">${trail}</nav>${inner}<nav style="margin-top:32px">${[
     link('/concours', t.allContests, lang),
-    link(HUB_INDEX.organisme, lang === 'ar' ? 'حسب الإدارة' : 'Par organisme', lang),
-    link(HUB_INDEX.region, lang === 'ar' ? 'حسب الجهة' : 'Par région', lang),
-    link(HUB_INDEX.grade, lang === 'ar' ? 'حسب الدرجة' : 'Par grade', lang),
+    ...HUB_KINDS.map((k) => link(HUB_INDEX[k], HUB_SHORT_LABEL[k][lang], lang)),
     link('/preparation', t.prep, lang),
     link('/communaute', t.community, lang),
   ].join(' · ')}</nav></div>`;
@@ -874,6 +875,8 @@ export function hubContests(contests: ContestRow[], today: string): HubContest[]
           deadline_date: c.deadline_date,
           publication_date: c.publication_date,
           published_at: c.published_at,
+          diploma_fr: c.diploma_fr,
+          posts: c.contest_positions || [],
         },
         today,
       ),
@@ -889,12 +892,6 @@ export function hubsFor(contests: ContestRow[], today: string): Record<HubKind, 
   hubsMemo = { src: contests, today, hubs };
   return hubs;
 }
-
-const HUB_INDEX_LABEL: Record<HubKind, Record<Lang, string>> = {
-  organisme: { fr: 'Concours par organisme', ar: 'المباريات حسب الإدارة' },
-  region: { fr: 'Concours par région', ar: 'المباريات حسب الجهة' },
-  grade: { fr: 'Concours par grade', ar: 'المباريات حسب الدرجة' },
-};
 
 const HUB_STATE: Record<HubContest['state'], Record<Lang, string>> = {
   open: { fr: 'Candidatures ouvertes', ar: 'الترشيح مفتوح' },
@@ -930,7 +927,7 @@ export function renderHub(lang: Lang, kind: HubKind, slug: string | null, base: 
   if (!slug) {
     const v = hubIndexView(kind, hubs, lang, today);
     const crumbs = [{ href: '/', text: t.home }, { href: '/concours', text: t.contests }, indexCrumb];
-    const others = (['organisme', 'region', 'grade'] as HubKind[]).filter((k) => k !== kind).map((k) => link(HUB_INDEX[k], HUB_INDEX_LABEL[k][lang], lang)).join(' · ');
+    const others = HUB_KINDS.filter((k) => k !== kind).map((k) => link(HUB_INDEX[k], HUB_INDEX_LABEL[k][lang], lang)).join(' · ');
     const items = v.list
       .map((h) => `<li>${link(hubPath(kind, h.slug), h.name, lang)} <span class="muted">— ${esc(lang === 'ar' ? `${h.count} مباراة${h.open ? ` · ${h.open} مفتوحة` : ''}` : `${h.count} concours${h.open ? ` · ${h.open} ouvert${h.open > 1 ? 's' : ''}` : ''}`)}</span></li>`)
       .join('');
@@ -953,7 +950,7 @@ export function renderHub(lang: Lang, kind: HubKind, slug: string | null, base: 
     ? `<h2>${esc(v.labels.related)}</h2><ul>${v.related.map((r) => `<li>${link(hubPath(r.kind, r.slug), r.name, lang)}</li>`).join('')}</ul>`
     : '';
   const faqHtml = `<h2>${esc(v.labels.faq)}</h2>${v.faq.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('')}`;
-  const all = `<p>${(['organisme', 'region', 'grade'] as HubKind[]).map((k) => link(HUB_INDEX[k], HUB_INDEX_LABEL[k][lang], lang)).join(' · ')}</p>`;
+  const all = `<p>${HUB_KINDS.map((k) => link(HUB_INDEX[k], HUB_INDEX_LABEL[k][lang], lang)).join(' · ')}</p>`;
   const body = frame(
     lang,
     crumbs.map((c, i) => (i === crumbs.length - 1 ? { text: c.text } : c)),
@@ -1181,7 +1178,7 @@ export function renderSitemap(base: string, contests: ContestRow[], folders: Fol
   urls.push({ loc: PSY_TRAIN_PATH }, ...PSY_CATS.map((c) => ({ loc: psyTrainPath(c.slug) })));
   // Pages de regroupement : seulement celles qui ont assez de concours pour être indexées.
   const hubs = hubsFor(contests, today);
-  for (const kind of ['organisme', 'region', 'grade'] as HubKind[]) {
+  for (const kind of HUB_KINDS) {
     const list = [...hubs[kind].values()].filter(hubIndexable);
     if (!list.length) continue;
     urls.push({ loc: HUB_INDEX[kind] });

@@ -127,6 +127,8 @@ function mapRow(row: any): Contest {
       deadline_date: row.deadline_date,
       publication_date: row.publication_date,
       published_at: row.published_at,
+      diploma_fr: row.diploma_fr,
+      posts: row.contest_positions || [],
     },
     daysRemaining: daysFromISO(row.deadline_date),
     contestDate: formatFr(row.exam_date),

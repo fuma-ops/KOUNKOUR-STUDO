@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Building2, CalendarDays, GraduationCap, MapPin, BellRing } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Award, BookOpen, Briefcase, Building2, CalendarDays, GraduationCap, Landmark, MapPin, BellRing } from 'lucide-react';
 import type { Contest, Language } from '../types';
 import {
   HUB_INDEX,
+  HUB_INDEX_LABEL,
+  HUB_KINDS,
+  HUB_SHORT_LABEL,
   buildHubs,
   hubDate,
   hubIndexView,
@@ -32,12 +35,15 @@ interface Props {
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Casablanca' }).format(new Date());
 
-const KIND_ICON: Record<HubKind, React.ComponentType<{ className?: string }>> = { organisme: Building2, region: MapPin, grade: GraduationCap };
-const INDEX_LABEL: Record<HubKind, { fr: string; ar: string }> = {
-  organisme: { fr: 'Concours par organisme', ar: 'المباريات حسب الإدارة' },
-  region: { fr: 'Concours par région', ar: 'المباريات حسب الجهة' },
-  grade: { fr: 'Concours par grade', ar: 'المباريات حسب الدرجة' },
+const KIND_ICON: Record<HubKind, React.ComponentType<{ className?: string }>> = {
+  organisme: Building2,
+  ville: Landmark,
+  region: MapPin,
+  specialite: Briefcase,
+  niveau: GraduationCap,
+  grade: Award,
 };
+const INDEX_LABEL = HUB_SHORT_LABEL;
 const STATE: Record<HubContest['state'], { fr: string; ar: string; cls: string }> = {
   open: { fr: 'Ouvert', ar: 'مفتوح', cls: 'bg-emerald-50 text-emerald-700' },
   published: { fr: 'Publié', ar: 'منشور', cls: 'bg-emerald-50 text-emerald-700' },
@@ -82,7 +88,7 @@ export const HubPage: React.FC<Props> = ({ kind, slug, language, contests, conte
   const Icon = KIND_ICON[kind];
   const indexLinks = (
     <nav className="flex flex-wrap gap-2">
-      {(['organisme', 'region', 'grade'] as HubKind[]).map((k) => {
+      {HUB_KINDS.map((k) => {
         const I = KIND_ICON[k];
         return (
           <a
@@ -210,7 +216,7 @@ export const HubPage: React.FC<Props> = ({ kind, slug, language, contests, conte
           }}
           className="font-bold text-[#8D174B] hover:underline"
         >
-          {INDEX_LABEL[kind][lang]}
+          {HUB_INDEX_LABEL[kind][lang]}
         </a>
         <span>{fr ? '›' : '‹'}</span>
         <span className="line-clamp-1">{hub.name[lang] || hub.name.fr}</span>
@@ -222,11 +228,7 @@ export const HubPage: React.FC<Props> = ({ kind, slug, language, contests, conte
           </div>
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-extrabold text-[#8D174B] leading-snug">{v.h1}</h1>
-            {v.intro.map((p, i) => (
-              <p key={i} className="text-[13px] sm:text-sm text-[#4A4250] mt-2 leading-relaxed">
-                {p}
-              </p>
-            ))}
+            <p className="text-[13px] sm:text-sm text-[#4A4250] mt-2 leading-relaxed">{v.intro[0]}</p>
           </div>
         </div>
         {(() => {
@@ -234,7 +236,7 @@ export const HubPage: React.FC<Props> = ({ kind, slug, language, contests, conte
           const lists = v.facts.filter((f) => !/^\d+$/.test(f.value));
           return (
             <>
-              <dl className={`mt-4 grid gap-2 ${nums.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+              <dl className={`mt-4 grid gap-2 ${nums.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : nums.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 {nums.map((f, i) => (
                   <div key={f.label} className="rounded-2xl bg-white border border-[#F1E5EC] p-3 animate-scale-in" style={{ animationDelay: `${i * 80}ms` }}>
                     <dt className="text-[11px] text-[#6E6773] font-semibold leading-tight">{f.label}</dt>
@@ -242,12 +244,16 @@ export const HubPage: React.FC<Props> = ({ kind, slug, language, contests, conte
                   </div>
                 ))}
               </dl>
-              {lists.map((f) => (
-                <dl key={f.label} className="mt-2 rounded-2xl bg-white border border-[#F1E5EC] p-3 animate-fade-in">
-                  <dt className="text-[11px] text-[#6E6773] font-semibold">{f.label}</dt>
-                  <dd className="text-[13px] font-bold text-[#242126] leading-snug mt-0.5">{f.value}</dd>
+              {lists.length > 0 && (
+                <dl className="mt-2 rounded-2xl bg-white border border-[#F1E5EC] p-3 space-y-1.5 animate-fade-in">
+                  {lists.map((f) => (
+                    <div key={f.label} className="text-[12px] leading-snug">
+                      <dt className="inline text-[#6E6773] font-semibold">{f.label} : </dt>
+                      <dd className="inline font-bold text-[#242126]">{f.value}</dd>
+                    </div>
+                  ))}
                 </dl>
-              ))}
+              )}
             </>
           );
         })()}
@@ -288,6 +294,11 @@ export const HubPage: React.FC<Props> = ({ kind, slug, language, contests, conte
               </div>
             ))}
           </section>
+          {v.intro.slice(1).map((p, i) => (
+            <p key={i} className="text-[12.5px] text-[#6E6773] leading-relaxed">
+              {p}
+            </p>
+          ))}
         </div>
 
         <aside className="lg:col-span-2 space-y-4 lg:sticky lg:top-4 self-start">

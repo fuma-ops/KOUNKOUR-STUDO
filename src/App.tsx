@@ -33,7 +33,7 @@ import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { LegalPage } from './components/LegalPage';
 import { PsychoRecruiterPage } from './components/PsychoRecruiterPage';
 import { HubPage } from './components/HubPage';
-import type { HubKind } from './content/hubs';
+import { HUB_INDEX, HUB_KINDS, HUB_SHORT_LABEL, type HubKind } from './content/hubs';
 import { PsyTrainer } from './components/PsyTrainer';
 import { loadCandidateProfile, checkEligibility } from './utils/candidateStorage';
 import { buildMatchFeed } from './utils/matchFeed';
@@ -616,11 +616,7 @@ export default function App() {
 
             {/* Pages de regroupement : parcourir par organisme, région ou grade */}
             <nav className="mb-3 flex flex-wrap gap-2" aria-label={language === 'fr' ? 'Parcourir les concours' : 'تصفح المباريات'}>
-              {([
-                ['organisme', '/organismes', 'Par organisme', 'حسب الإدارة'],
-                ['region', '/regions', 'Par région', 'حسب الجهة'],
-                ['grade', '/grades', 'Par grade', 'حسب الدرجة'],
-              ] as const).map(([kind, href, fr, ar]) => (
+              {HUB_KINDS.map((kind) => [kind, HUB_INDEX[kind], HUB_SHORT_LABEL[kind].fr, HUB_SHORT_LABEL[kind].ar] as const).map(([kind, href, fr, ar]) => (
                 <a
                   key={kind}
                   href={language === 'fr' ? href : `${href}?lang=ar`}
