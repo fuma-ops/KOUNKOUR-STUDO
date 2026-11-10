@@ -95,7 +95,7 @@ export const slugify = (s: string) =>
 // ─── Régions (12 régions officielles ; villes et provinces rattachées) ──────────────────────
 export const REGIONS: { slug: string; fr: string; ar: string; re: RegExp }[] = [
   { slug: 'tanger-tetouan-al-hoceima', fr: 'Tanger-Tétouan-Al Hoceïma', ar: 'طنجة تطوان الحسيمة', re: /tanger|tetouan|hoceima|larache|ouezzane|chefchaouen|fnideq|m'diq|ksar el kebir/ },
-  { slug: 'oriental', fr: "L'Oriental", ar: 'الشرق', re: /oriental|oujda|nador|berkane|figuig|taourirt|jerada|driouch|guercif/ },
+  { slug: 'oriental', fr: 'Oriental', ar: 'الشرق', re: /oriental|oujda|nador|berkane|figuig|taourirt|jerada|driouch|guercif/ },
   { slug: 'fes-meknes', fr: 'Fès-Meknès', ar: 'فاس مكناس', re: /\bfes\b|meknes|\btaza\b|taounate|ifrane|sefrou|boulemane|el hajeb|moulay yacoub/ },
   { slug: 'rabat-sale-kenitra', fr: 'Rabat-Salé-Kénitra', ar: 'الرباط سلا القنيطرة', re: /rabat|\bsale\b|kenitra|khemisset|sidi kacem|sidi slimane|skhirat|temara/ },
   { slug: 'beni-mellal-khenifra', fr: 'Béni Mellal-Khénifra', ar: 'بني ملال خنيفرة', re: /beni mellal|khenifra|khouribga|fquih ben salah|azilal/ },
@@ -185,7 +185,7 @@ export function buildHubs(all: HubContest[]): Record<HubKind, Map<string, Hub>> 
 export function hubLabel(h: Hub, lang: HubLang): string {
   const n = h.name[lang] || h.name.fr;
   if (lang === 'ar') return h.kind === 'region' ? `مباريات جهة ${n}` : `مباريات ${n}`;
-  return h.kind === 'region' ? `Concours région ${n}` : `Concours ${n}`;
+  return h.kind === 'region' ? `Concours région ${h.slug === 'oriental' ? 'de l’Oriental' : n}` : `Concours ${n}`;
 }
 
 export const hubIndexable = (h: Hub) => h.contests.length >= MIN_INDEX;
@@ -268,10 +268,10 @@ export function hubView(hub: Hub, hubs: Record<HubKind, Map<string, Hub>>, lang:
 
   const lc = name.charAt(0).toLowerCase() + name.slice(1);
   const what = fr
-    ? hub.kind === 'organisme' ? `de l’organisme ${name}` : hub.kind === 'region' ? `dans la région ${name}` : `${/^[aeiouyhéèêâîôû]/i.test(lc) ? 'd’' : 'de '}${lc}`
+    ? hub.kind === 'organisme' ? `de l’organisme ${name}` : hub.kind === 'region' ? `dans la région ${hub.slug === 'oriental' ? 'de l’Oriental' : name}` : `${/^[aeiouyhéèêâîôû]/i.test(lc) ? 'd’' : 'de '}${lc}`
     : hub.kind === 'organisme' ? `${name}` : hub.kind === 'region' ? `بجهة ${name}` : `${name}`;
   const h1 = fr
-    ? hub.kind === 'organisme' ? `Concours ${name} ${year}` : hub.kind === 'region' ? `Concours dans la région ${name} ${year}` : `Concours ${lc} ${year}`
+    ? hub.kind === 'organisme' ? `Concours ${name} ${year}` : hub.kind === 'region' ? `Concours dans la région ${hub.slug === 'oriental' ? 'de l’Oriental' : name} ${year}` : `Concours ${lc} ${year}`
     : hub.kind === 'region' ? `مباريات جهة ${name} ${year}` : `مباريات ${name} ${year}`;
 
   const intro: string[] = [];
