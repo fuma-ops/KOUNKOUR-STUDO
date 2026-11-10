@@ -3,7 +3,7 @@ import { QcmSet, Language } from '../types';
 import { AdUnit } from './AdUnit';
 import { ADS_SLOT_QCM } from '../lib/adsPolicy';
 import { AnnaleImages } from './AnnaleImages';
-import { ConcoursRef, OrgLogosBand, setOrgs } from './ConcoursRef';
+import { ConcoursRef } from './ConcoursRef';
 import { SujetView } from './SujetView';
 import { useSession } from '../lib/useSession';
 import { translations } from '../i18n/translations';
@@ -512,41 +512,45 @@ export const QcmModule: React.FC<QcmModuleProps> = ({
               );
     };
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
+      <div className="max-w-4xl mx-auto px-4 py-4 sm:py-8 animate-fade-in">
         <button
           onClick={() => navigate(null, null)}
-          className="mb-4 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF4F7] text-[#8D174B] border border-[#8D174B]/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95"
+          className="mb-3 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF4F7] text-[#8D174B] border border-[#8D174B]/20 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
           <PrevIcon className="w-4 h-4" />
           {L('Tous les concours', 'كل المباريات', 'All exams')}
         </button>
 
-        {folder?.coverImage ? (
-          <div className="relative h-36 sm:h-48 rounded-3xl overflow-hidden mb-3 animate-fade-in">
-            <img src={folder.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
-          </div>
-        ) : (
-          <OrgLogosBand orgs={setOrgs(sets)} className="h-32 sm:h-40 rounded-3xl border border-[#F1E5EC] mb-3 animate-fade-in" />
-        )}
-        <div className="bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] rounded-3xl border border-[#F1E5EC] p-5 sm:p-6 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0">
-              <FolderOpen className="w-6 h-6" />
+        {/* En-tête unique et compact : vignette, titre, progression. La description reste
+            accessible sans pousser le contenu utile sous la ligne de flottaison (mobile). */}
+        <header className="flex items-center gap-3 sm:gap-4 rounded-2xl border border-[#F1E5EC] bg-gradient-to-r from-[#FAF0F5] via-[#FFFDFE] to-[#FDF2F7] p-3 sm:p-4 mb-4">
+          {folder?.coverImage ? (
+            <img src={folder.coverImage} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0 shadow-sm" />
+          ) : (
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-[#8D174B] to-[#C73578] text-white flex items-center justify-center shrink-0">
+              <FolderOpen className="w-7 h-7" />
             </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-[#8D174B]">{folder ? folder.title[language] || folder.title.fr : (fr ? 'Autres supports' : 'دعامات أخرى')}</h2>
-              {folder?.organization && <p className="text-xs text-[#6E6773]">{folder.organization}</p>}
-              {folder?.description.fr && <p className="text-xs text-[#6E6773] mt-1">{folder.description[language] || folder.description.fr}</p>}
-              <div className="mt-3 max-w-sm">
-                {progressBar(st.pct)}
-                <p className="text-[11px] text-[#6E6773] mt-1">
-                  {L(`Progression du dossier : ${st.seen}/${st.total} questions vues (${st.pct} %)`, `تقدم الملف: ${st.seen}/${st.total} (${st.pct}٪)`, `Your progress: ${st.seen}/${st.total} questions seen (${st.pct}%)`)}
-                </p>
+          )}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base sm:text-xl font-extrabold text-[#8D174B] leading-snug line-clamp-2">{folder ? folder.title[language] || folder.title.fr : (fr ? 'Autres supports' : 'دعامات أخرى')}</h2>
+            {folder?.organization && <p className="text-[11px] sm:text-xs text-[#6E6773] truncate">{folder.organization}</p>}
+            {st.total > 0 && (
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="flex-1 max-w-[180px]">{progressBar(st.pct)}</div>
+                <span className="text-[11px] font-bold text-[#6E6773] whitespace-nowrap">{st.seen}/{st.total} · {st.pct} %</span>
               </div>
-            </div>
+            )}
           </div>
-        </div>
+        </header>
+        {folder?.description.fr && (
+          <details className="group -mt-2 mb-4 text-xs text-[#6E6773]">
+            <summary className="cursor-pointer select-none font-bold text-[#8D174B] list-none inline-flex items-center gap-1">
+              <span className="group-open:hidden">{L('À propos de ce dossier', 'حول هذا الملف', 'About this folder')}</span>
+              <span className="hidden group-open:inline">{L('Masquer', 'إخفاء', 'Hide')}</span>
+            </summary>
+            <p className="mt-1.5 leading-relaxed">{folder.description[language] || folder.description.fr}</p>
+          </details>
+        )}
 
         {selectedFolder === PSYCHO_FOLDER && onOpenPsyTrain && <PsyTrainBanner language={language} onOpen={onOpenPsyTrain} className="mb-4" />}
 
