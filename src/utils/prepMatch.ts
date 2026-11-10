@@ -42,6 +42,8 @@ const RULES: { slug: string; test: (t: string, admin: string) => boolean }[] = [
   // Ministère de l'Économie et des Finances : dossier dédié au technicien des finances (spécialités
   // comptabilité, secrétariat, informatique, topographie, génie civil), avant les dossiers généraux.
   { slug: 'concours-technicien-finances-mef', test: (t, a) => /techniciens? (des|de) finances/.test(t) || (/economie.*finances/.test(a) && /technicien/.test(t)) },
+  // Écrit « QCM ou sujet général » : dossier dissertation (méthode + sujets corrigés FR/AR).
+  { slug: 'concours-dissertation-finances', test: (t, a) => /techniciens? (des|de) finances/.test(t) || (/economie.*finances/.test(a) && /technicien/.test(t)) },
   { slug: 'concours-srm-techniciens-agents', test: (t, a) => SRM.test(a + ' ' + t) && (SRM_TECH.test(t) || !SRM_CADRE.test(t)) },
   { slug: 'concours-srm-onee-ingenieur-technicien-cadre', test: (t, a) => SRM.test(a + ' ' + t) && (SRM_CADRE.test(t) || !SRM_TECH.test(t)) },
   { slug: 'concours-infirmier-technicien-sante', test: (t) => /infirmi|sage-femme|sages-femmes|technicien(s)? de sante|\bide\b|kinesitherap|aide-soignant/.test(t) },
