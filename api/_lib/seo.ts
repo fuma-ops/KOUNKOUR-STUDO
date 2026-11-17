@@ -7,7 +7,7 @@
 import { adsAllowed } from '../../src/lib/adsPolicy.ts';
 import { splitSummary, summaryItems } from '../../src/utils/contestSummary.ts';
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
-import { GUIDES, GUIDES_PATH, guidePath, findGuide } from '../../src/content/guides.ts';
+import { GUIDES, GUIDES_PATH, guidePath, findGuide, guideText } from '../../src/content/guides.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import {
   HUB_INDEX,
@@ -675,7 +675,7 @@ export function renderPrep(lang: Lang, folders: FolderRow[], sets: QcmSetRow[]):
     .filter((x) => x.n.length > 0)
     .map(({ f, n }) => `<li>${link(`/preparation/${encodeURIComponent(f.slug)}`, folderTitle(f, lang), lang)} <span class="muted">— ${n.length} ${lang === 'ar' ? 'دعامة' : n.length > 1 ? 'supports' : 'support'}, ${n.reduce((a, s) => a + qCount(s), 0)} ${esc(t.questions)}</span></li>`)
     .join('');
-  const guides = `<h2>${lang === 'ar' ? 'أدلة التحضير (بالفرنسية)' : 'Guides de préparation'}</h2><ul>${GUIDES.map((g) => `<li>${link(guidePath(g.slug), g.title, lang)} <span class="muted">— ${esc(truncate(g.description, 140))}</span></li>`).join('')}</ul>`;
+  const guides = `<h2>${lang === 'ar' ? 'أدلة التحضير' : 'Guides de préparation'}</h2><ul>${GUIDES.map((g) => `<li>${link(guidePath(g.slug), guideText(g, lang).title, lang)} <span class="muted">— ${esc(truncate(guideText(g, lang).description, 140))}</span></li>`).join('')}</ul>`;
   const body = frame(lang, [{ href: '/', text: t.home }, { text: t.prep }], `<h1>${esc(h1)}</h1><p>${esc(desc)}</p>${guides}${items ? `<h2>${lang === 'ar' ? 'ملفات التحضير' : 'Dossiers par concours'}</h2><ul>${items}</ul>` : ''}`);
   return { status: 200, lang, title: lang === 'ar' ? 'التحضير للمباريات: نماذج حقيقية | كونكور' : 'Préparation concours Maroc : annales réelles et QCM | KounKour', description: truncate(desc, 158), path: '/preparation', indexable: true, body };
 }
@@ -1197,24 +1197,29 @@ export function renderSitemap(base: string, contests: ContestRow[], folders: Fol
     .join('\n')}\n</urlset>\n`;
 }
 
-// ─── Guides de préparation (contenu éditorial KounKour, en français) ─────────
+// ─── Guides de préparation (contenu éditorial KounKour, français et arabe) ──
 
 export function renderGuide(lang: Lang, slug: string | null): Page | null {
   const t = L[lang];
-  const arNote = lang === 'ar' ? '<p class="muted">هذا الدليل متوفر حاليا باللغة الفرنسية فقط.</p>' : '';
+  const ar = lang === 'ar';
+  const gl = ar ? 'أدلة التحضير' : 'Guides';
   if (!slug) {
-    const h1 = 'Guides de préparation aux concours';
-    const desc = 'Des guides pratiques pour comprendre les concours de la fonction publique marocaine, préparer son dossier de candidature et réussir l’écrit et l’oral.';
-    const inner = `<h1>${esc(h1)}</h1><p>${esc(desc)}</p>${arNote}<ul>${GUIDES.map((g) => `<li>${link(guidePath(g.slug), g.title, lang)}<p>${esc(g.description)}</p></li>`).join('')}</ul>`;
-    return { status: 200, lang, title: `${h1} | KounKour`, description: truncate(desc, 158), path: GUIDES_PATH, indexable: true, frOnly: true, body: frame(lang, [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { text: 'Guides' }], inner) };
+    const h1 = ar ? 'أدلة التحضير للمباريات' : 'Guides de préparation aux concours';
+    const desc = ar
+      ? 'أدلة عملية لتفهم مباريات الوظيفة العمومية بالمغرب، وتُعدّ ملف ترشيحك، وتستعد للاختبار الكتابي والشفوي.'
+      : 'Des guides pratiques pour comprendre les concours de la fonction publique marocaine, préparer son dossier de candidature et réussir l’écrit et l’oral.';
+    const inner = `<h1>${esc(h1)}</h1><p>${esc(desc)}</p><ul>${GUIDES.map((g) => `<li>${link(guidePath(g.slug), guideText(g, lang).title, lang)}<p>${esc(guideText(g, lang).description)}</p></li>`).join('')}</ul>`;
+    return { status: 200, lang, title: `${h1} | ${ar ? 'كونكور' : 'KounKour'}`, description: truncate(desc, 158), path: GUIDES_PATH, indexable: true, body: frame(lang, [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { text: gl }], inner) };
   }
   const g = findGuide(slug);
   if (!g) return null;
-  const sections = g.sections
+  const tx = guideText(g, lang);
+  const sections = tx.sections
     .map((s) => `<h2>${esc(s.title)}</h2>${(s.paragraphs || []).map((p) => `<p>${esc(p)}</p>`).join('')}${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}`)
     .join('');
   const date = g.updatedAt.split('-').reverse().join('/');
-  const inner = `<h1>${esc(g.title)}</h1><p>${esc(g.description)}</p><p class="muted">Mis à jour le ${date} · Rédaction KounKour</p>${arNote}${sections}<ul>${g.links.map((l) => `<li>${link(l.href, l.text, lang)}</li>`).join('')}</ul>`;
-  const jsonLd = [{ '@context': 'https://schema.org', '@type': 'Article', headline: g.title, description: g.description, inLanguage: 'fr', dateModified: g.updatedAt, author: { '@type': 'Organization', name: 'KounKour' }, publisher: { '@type': 'Organization', name: 'KounKour' } }];
-  return { status: 200, lang, title: `${truncate(g.title, 62)} | KounKour`, description: truncate(g.description, 158), path: guidePath(g.slug), indexable: true, frOnly: true, ogType: 'article', jsonLd, body: frame(lang, [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { href: GUIDES_PATH, text: 'Guides' }, { text: g.title }], inner) };
+  const meta = ar ? `آخر تحديث: ${date} · تحرير كونكور` : `Mis à jour le ${date} · Rédaction KounKour`;
+  const inner = `<h1>${esc(tx.title)}</h1><p>${esc(tx.description)}</p><p class="muted">${esc(meta)}</p>${sections}<ul>${tx.links.map((l) => `<li>${link(l.href, l.text, lang)}</li>`).join('')}</ul>`;
+  const jsonLd = [{ '@context': 'https://schema.org', '@type': 'Article', headline: tx.title, description: tx.description, inLanguage: lang, dateModified: g.updatedAt, author: { '@type': 'Organization', name: 'KounKour' }, publisher: { '@type': 'Organization', name: 'KounKour' } }];
+  return { status: 200, lang, title: `${truncate(tx.title, 62)} | ${ar ? 'كونكور' : 'KounKour'}`, description: truncate(tx.description, 158), path: guidePath(g.slug), indexable: true, ogType: 'article', jsonLd, body: frame(lang, [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { href: GUIDES_PATH, text: gl }, { text: tx.title }], inner) };
 }
