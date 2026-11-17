@@ -7,6 +7,7 @@
 import { adsAllowed } from '../../src/lib/adsPolicy.ts';
 import { splitSummary, summaryItems } from '../../src/utils/contestSummary.ts';
 import { legalDoc, LEGAL_PATH, type LegalKind } from '../../src/content/legal.ts';
+import { GUIDES, GUIDES_PATH, guidePath, findGuide } from '../../src/content/guides.ts';
 import { prepFolderSlugsFor } from '../../src/utils/prepMatch.ts';
 import {
   HUB_INDEX,
@@ -294,6 +295,7 @@ function frame(lang: Lang, crumbs: { href?: string; text: string }[], inner: str
     link('/concours', t.allContests, lang),
     ...HUB_KINDS.map((k) => link(HUB_INDEX[k], HUB_SHORT_LABEL[k][lang], lang)),
     link('/preparation', t.prep, lang),
+    link(GUIDES_PATH, lang === 'ar' ? 'أدلة التحضير' : 'Guides', lang),
     link('/communaute', t.community, lang),
     link(LEGAL_PATH.about, legalDoc('about', lang).title, lang),
     link(LEGAL_PATH.contact, legalDoc('contact', lang).title, lang),
@@ -673,7 +675,8 @@ export function renderPrep(lang: Lang, folders: FolderRow[], sets: QcmSetRow[]):
     .filter((x) => x.n.length > 0)
     .map(({ f, n }) => `<li>${link(`/preparation/${encodeURIComponent(f.slug)}`, folderTitle(f, lang), lang)} <span class="muted">— ${n.length} ${lang === 'ar' ? 'دعامة' : n.length > 1 ? 'supports' : 'support'}, ${n.reduce((a, s) => a + qCount(s), 0)} ${esc(t.questions)}</span></li>`)
     .join('');
-  const body = frame(lang, [{ href: '/', text: t.home }, { text: t.prep }], `<h1>${esc(h1)}</h1><p>${esc(desc)}</p>${items ? `<ul>${items}</ul>` : ''}`);
+  const guides = `<h2>${lang === 'ar' ? 'أدلة التحضير (بالفرنسية)' : 'Guides de préparation'}</h2><ul>${GUIDES.map((g) => `<li>${link(guidePath(g.slug), g.title, lang)} <span class="muted">— ${esc(truncate(g.description, 140))}</span></li>`).join('')}</ul>`;
+  const body = frame(lang, [{ href: '/', text: t.home }, { text: t.prep }], `<h1>${esc(h1)}</h1><p>${esc(desc)}</p>${guides}${items ? `<h2>${lang === 'ar' ? 'ملفات التحضير' : 'Dossiers par concours'}</h2><ul>${items}</ul>` : ''}`);
   return { status: 200, lang, title: lang === 'ar' ? 'التحضير للمباريات: نماذج حقيقية | كونكور' : 'Préparation concours Maroc : annales réelles et QCM | KounKour', description: truncate(desc, 158), path: '/preparation', indexable: true, body };
 }
 
@@ -1173,7 +1176,7 @@ export function renderRobots(base: string): string {
 }
 
 export function renderSitemap(base: string, contests: ContestRow[], folders: FolderRow[], sets: QcmSetRow[], today = todayMorocco()): string {
-  const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/concours' }, { loc: '/preparation' }, { loc: '/communaute' }, { loc: LEGAL_PATH.privacy }, { loc: LEGAL_PATH.terms }, { loc: LEGAL_PATH.about }, { loc: LEGAL_PATH.contact }];
+  const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/concours' }, { loc: '/preparation' }, { loc: '/communaute' }, { loc: LEGAL_PATH.privacy }, { loc: LEGAL_PATH.terms }, { loc: LEGAL_PATH.about }, { loc: LEGAL_PATH.contact }, { loc: GUIDES_PATH }, ...GUIDES.map((g) => ({ loc: guidePath(g.slug), lastmod: g.updatedAt }))];
   for (const c of contests) urls.push({ loc: `/concours/${encodeURIComponent(c.slug)}`, lastmod: (c.updated_at || '').slice(0, 10) || undefined });
   for (const f of folders) if (sets.some((s) => s.folder_slug === f.slug)) urls.push({ loc: `/preparation/${encodeURIComponent(f.slug)}` });
   // Pas de lastmod pour les QCM : aucune date de modification fiable n'est stockée.
@@ -1192,4 +1195,26 @@ export function renderSitemap(base: string, contests: ContestRow[], folders: Fol
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
     .map((u) => `  <url><loc>${x(base + u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`)
     .join('\n')}\n</urlset>\n`;
+}
+
+// ─── Guides de préparation (contenu éditorial KounKour, en français) ─────────
+
+export function renderGuide(lang: Lang, slug: string | null): Page | null {
+  const t = L[lang];
+  const arNote = lang === 'ar' ? '<p class="muted">هذا الدليل متوفر حاليا باللغة الفرنسية فقط.</p>' : '';
+  if (!slug) {
+    const h1 = 'Guides de préparation aux concours';
+    const desc = 'Des guides pratiques pour comprendre les concours de la fonction publique marocaine, préparer son dossier de candidature et réussir l’écrit et l’oral.';
+    const inner = `<h1>${esc(h1)}</h1><p>${esc(desc)}</p>${arNote}<ul>${GUIDES.map((g) => `<li>${link(guidePath(g.slug), g.title, lang)}<p>${esc(g.description)}</p></li>`).join('')}</ul>`;
+    return { status: 200, lang, title: `${h1} | KounKour`, description: truncate(desc, 158), path: GUIDES_PATH, indexable: true, frOnly: true, body: frame(lang, [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { text: 'Guides' }], inner) };
+  }
+  const g = findGuide(slug);
+  if (!g) return null;
+  const sections = g.sections
+    .map((s) => `<h2>${esc(s.title)}</h2>${(s.paragraphs || []).map((p) => `<p>${esc(p)}</p>`).join('')}${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}`)
+    .join('');
+  const date = g.updatedAt.split('-').reverse().join('/');
+  const inner = `<h1>${esc(g.title)}</h1><p>${esc(g.description)}</p><p class="muted">Mis à jour le ${date} · Rédaction KounKour</p>${arNote}${sections}<ul>${g.links.map((l) => `<li>${link(l.href, l.text, lang)}</li>`).join('')}</ul>`;
+  const jsonLd = [{ '@context': 'https://schema.org', '@type': 'Article', headline: g.title, description: g.description, inLanguage: 'fr', dateModified: g.updatedAt, author: { '@type': 'Organization', name: 'KounKour' }, publisher: { '@type': 'Organization', name: 'KounKour' } }];
+  return { status: 200, lang, title: `${truncate(g.title, 62)} | KounKour`, description: truncate(g.description, 158), path: guidePath(g.slug), indexable: true, frOnly: true, ogType: 'article', jsonLd, body: frame(lang, [{ href: '/', text: t.home }, { href: '/preparation', text: t.prep }, { href: GUIDES_PATH, text: 'Guides' }, { text: g.title }], inner) };
 }

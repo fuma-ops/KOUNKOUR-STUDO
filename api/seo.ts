@@ -23,6 +23,7 @@ import {
   renderPrep,
   renderPrivate,
   renderLegal,
+  renderGuide,
   renderQcm,
   renderRobots,
   renderSitemap,
@@ -198,6 +199,8 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
     case 'about':
     case 'contact':
       return renderLegal(lang, r.name);
+    case 'guide':
+      return renderGuide(lang, r.slug) || renderNotFound(lang, pathname);
     case 'profile':
     case 'admin':
       return renderPrivate(lang, pathname);

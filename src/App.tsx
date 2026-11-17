@@ -31,6 +31,7 @@ import { useSession } from './lib/useSession';
 import { AuthModal, PasswordRecoveryModal } from './components/AuthModal';
 import { Route, parsePath, routePath, tabOf, withLang } from './lib/routes';
 import { LegalPage } from './components/LegalPage';
+import { GuidePage, GuidesStrip } from './components/GuidePage';
 import { PsychoRecruiterPage } from './components/PsychoRecruiterPage';
 import { HubPage } from './components/HubPage';
 import { HUB_INDEX, HUB_KINDS, HUB_SHORT_LABEL, type HubKind } from './content/hubs';
@@ -65,6 +66,11 @@ export default function App() {
   const [psychoSlug, setPsychoSlug] = useState<string | null>(() => {
     const r = parsePath(window.location.pathname);
     return r.name === 'psycho' ? r.slug : null;
+  });
+  // Guide de préparation ouvert (null = liste des guides).
+  const [guideSlug, setGuideSlug] = useState<string | null>(() => {
+    const r = parsePath(window.location.pathname);
+    return r.name === 'guide' ? r.slug : null;
   });
   // Entraînement interactif : famille ouverte (null = accueil des tests).
   const [psyCat, setPsyCat] = useState<string | null>(() => {
@@ -275,12 +281,13 @@ export default function App() {
     else if (activeTab === 'terms') r = { name: 'terms' };
     else if (activeTab === 'about') r = { name: 'about' };
     else if (activeTab === 'contact') r = { name: 'contact' };
+    else if (activeTab === 'guide') r = { name: 'guide', slug: guideSlug };
     else if (activeTab === 'psycho') r = { name: 'psycho', slug: psychoSlug };
     else if (activeTab === 'psytrain') r = { name: 'psytrain', slug: psyCat };
     else if (activeTab === 'hub') r = { name: 'hub', kind: hubRoute.kind, slug: hubRoute.slug };
     else r = { name: 'home' };
     return withLang(routePath(r), language);
-  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, psychoSlug, psyCat, hubRoute, language]);
+  }, [activeTab, selectedContest, pendingContestSlug, qcmRoute, psychoSlug, psyCat, hubRoute, guideSlug, language]);
   const firstSync = React.useRef(true);
   useEffect(() => {
     const here = window.location.pathname + window.location.search;
@@ -307,6 +314,7 @@ export default function App() {
       setActiveTab(tabOf(r));
       setQcmRoute({ folder: r.name === 'folder' ? r.slug : null, set: r.name === 'qcm' ? r.slug : null });
       setPsychoSlug(r.name === 'psycho' ? r.slug : null);
+      setGuideSlug(r.name === 'guide' ? r.slug : null);
       setPsyCat(r.name === 'psytrain' ? r.slug : null);
       if (r.name === 'hub') setHubRoute({ kind: r.kind, slug: r.slug });
       setSelectedContest(null);
@@ -492,7 +500,7 @@ export default function App() {
       <Header
         language={language}
         onLanguageChange={setLanguage}
-        activeTab={activeTab === 'psycho' || activeTab === 'psytrain' ? 'preparation' : activeTab}
+        activeTab={activeTab === 'psycho' || activeTab === 'psytrain' || activeTab === 'guide' ? 'preparation' : activeTab}
         setActiveTab={goTab}
         savedCount={bookmarkedIds.length}
         isAuthed={!!session.user}
@@ -691,6 +699,12 @@ export default function App() {
         )}
 
         {/* Preparation / QCM Tab */}
+        {activeTab === 'preparation' && !qcmRoute.folder && !qcmRoute.set && (
+          <GuidesStrip language={language} onOpen={(slug) => { setGuideSlug(slug); setActiveTab('guide'); window.scrollTo({ top: 0 }); }} />
+        )}
+        {activeTab === 'guide' && (
+          <GuidePage slug={guideSlug} language={language} onOpen={(slug) => setGuideSlug(slug)} />
+        )}
         {activeTab === 'preparation' && (
           <QcmModule
             language={language}
@@ -953,7 +967,7 @@ export default function App() {
 
       <BottomNav
         language={language}
-        activeTab={activeTab === 'psycho' || activeTab === 'psytrain' ? 'preparation' : activeTab}
+        activeTab={activeTab === 'psycho' || activeTab === 'psytrain' || activeTab === 'guide' ? 'preparation' : activeTab}
         setActiveTab={goTab}
         isAuthed={!!session.user}
         onAuthClick={() => setAuthOpen(true)}

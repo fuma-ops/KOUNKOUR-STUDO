@@ -20,7 +20,7 @@ export const ADS_SLOT_QCM = '';
 // pub sur l'accueil, les concours ouverts, la préparation et les QCM). Une fiche clôturée,
 // annulée ou dont les résultats sont publiés n'a pas de pub (Page.noAds côté serveur,
 // data-no-ads dans l'application).
-const CONTENT_PATH = /^\/(?:concours(?:\/[^/]+)?|preparation(?:\/qcm)?(?:\/[^/]+)?)?\/?$/;
+const CONTENT_PATH = /^\/(?:concours(?:\/[^/]+)?|preparation(?:\/qcm)?(?:\/[^/]+)?|guides(?:\/[^/]+)?)?\/?$/;
 
 // Texte visible minimal d'une page « bien faite » (hors menus). Une page de QCM n'affiche
 // qu'une question à la fois (énoncé, propositions, corrigé) : seuil propre.
