@@ -18,6 +18,8 @@ export type Route =
   | { name: 'admin' }
   | { name: 'privacy' }
   | { name: 'terms' }
+  | { name: 'about' }
+  | { name: 'contact' }
   | { name: 'psycho'; slug: string | null }
   | { name: 'psytrain'; slug: string | null }
   | { name: 'hub'; kind: HubKindRoute; slug: string | null }
@@ -46,6 +48,8 @@ export function parsePath(pathname: string): Route {
   if (a === 'admin') return { name: 'admin' };
   if (a === 'confidentialite' && parts.length === 1) return { name: 'privacy' };
   if (a === 'conditions' && parts.length === 1) return { name: 'terms' };
+  if (a === 'a-propos' && parts.length === 1) return { name: 'about' };
+  if (a === 'contact' && parts.length === 1) return { name: 'contact' };
   // Entraînement interactif (matrices, dominos, cubes…) : avant les pages par recruteur.
   if (a === 'tests-psychotechniques' && b === 'en-ligne' && parts.length <= 3) return { name: 'psytrain', slug: c || null };
   // Pages « tests psychotechniques » par recruteur (ONCF, RAM…), reliées au dossier d'entraînement.
@@ -83,6 +87,10 @@ export function routePath(r: Route): string {
       return '/confidentialite';
     case 'terms':
       return '/conditions';
+    case 'about':
+      return '/a-propos';
+    case 'contact':
+      return '/contact';
     case 'psycho':
       return r.slug ? `/tests-psychotechniques/${e(r.slug)}` : '/tests-psychotechniques';
     case 'psytrain':
@@ -112,6 +120,10 @@ export function tabOf(r: Route): string {
       return 'privacy';
     case 'terms':
       return 'terms';
+    case 'about':
+      return 'about';
+    case 'contact':
+      return 'contact';
     case 'psycho':
       return 'psycho';
     case 'psytrain':

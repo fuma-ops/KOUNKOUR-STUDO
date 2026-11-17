@@ -1,14 +1,14 @@
 import React from 'react';
-import { ShieldCheck, FileText } from 'lucide-react';
+import { ShieldCheck, FileText, Info, Mail } from 'lucide-react';
 import type { Language } from '../types';
 import { legalDoc, type LegalKind } from '../content/legal';
 
 // Politique de confidentialité / conditions d'utilisation (même texte que le rendu serveur).
 export const LegalPage: React.FC<{ kind: LegalKind; language: Language; onOpen: (kind: LegalKind) => void }> = ({ kind, language, onOpen }) => {
   const doc = legalDoc(kind, language);
-  const other: LegalKind = kind === 'privacy' ? 'terms' : 'privacy';
+  const other: LegalKind = ({ privacy: 'terms', terms: 'privacy', about: 'contact', contact: 'about' } as const)[kind];
   const otherTitle = legalDoc(other, language).title;
-  const Icon = kind === 'privacy' ? ShieldCheck : FileText;
+  const Icon = ({ privacy: ShieldCheck, terms: FileText, about: Info, contact: Mail } as const)[kind];
   return (
     <article className="max-w-3xl mx-auto px-4 py-6 sm:py-10 pb-28 md:pb-10 animate-fade-in" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <header className="mb-6 flex items-start gap-3">

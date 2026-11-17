@@ -15,13 +15,17 @@ export const ADSENSE_CLIENT = 'ca-pub-8156754023993120';
 // seulement).
 export const ADS_SLOT_QCM = '';
 
-// Chemins de contenu (sans ?lang) : /, /concours, /concours/<fiche>, /preparation,
-// /preparation/<dossier>, /preparation/qcm/<série>.
-const CONTENT_PATH = /^\/(?:concours(?:\/[^/]+)?|preparation(?:\/qcm)?(?:\/[^/]+)?)?\/?$/;
+// Second refus (17/11/2026, mêmes motifs) : les pages de navigation (accueil, liste des
+// concours, index de la préparation, pages par ville/organisme…) sont des listes de liens :
+// plus de pub dessus. Chemins de contenu (sans ?lang) : /concours/<fiche>,
+// /preparation/<dossier>, /preparation/qcm/<série>. Une fiche clôturée, annulée ou dont les
+// résultats sont publiés n'a plus de pub non plus (Page.noAds côté serveur, data-no-ads
+// dans l'application).
+const CONTENT_PATH = /^\/(?:concours\/[^/]+|preparation\/(?!qcm\/?$)[^/]+|preparation\/qcm\/[^/]+)\/?$/;
 
 // Texte visible minimal d'une page « bien faite » (hors menus). Une page de QCM n'affiche
 // qu'une question à la fois (énoncé, propositions, corrigé) : seuil propre.
-export const ADS_MIN_TEXT = 1200;
+export const ADS_MIN_TEXT = 2500;
 export const ADS_MIN_TEXT_QCM = 500;
 
 // Fiche établie depuis la seule page emploi-public, en attente de son arrêté.

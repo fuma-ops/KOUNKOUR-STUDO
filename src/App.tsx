@@ -273,6 +273,8 @@ export default function App() {
     else if (activeTab === 'profile') r = { name: 'profile' };
     else if (activeTab === 'privacy') r = { name: 'privacy' };
     else if (activeTab === 'terms') r = { name: 'terms' };
+    else if (activeTab === 'about') r = { name: 'about' };
+    else if (activeTab === 'contact') r = { name: 'contact' };
     else if (activeTab === 'psycho') r = { name: 'psycho', slug: psychoSlug };
     else if (activeTab === 'psytrain') r = { name: 'psytrain', slug: psyCat };
     else if (activeTab === 'hub') r = { name: 'hub', kind: hubRoute.kind, slug: hubRoute.slug };
@@ -735,7 +737,7 @@ export default function App() {
         )}
 
         {/* Profile Tab */}
-        {(activeTab === 'privacy' || activeTab === 'terms') && (
+        {(activeTab === 'privacy' || activeTab === 'terms' || activeTab === 'about' || activeTab === 'contact') && (
           <LegalPage
             kind={activeTab}
             language={language}
@@ -967,6 +969,14 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3 text-[11px] text-[#6E6773]">
             <span>{language === 'fr' ? 'Plateforme d’information indépendante' : 'منصة إخبارية مستقلة'}</span>
+            <span>•</span>
+            <button type="button" onClick={() => { goTab('about'); window.scrollTo({ top: 0 }); }} className="hover:text-[#8D174B] hover:underline cursor-pointer">
+              {language === 'fr' ? 'À propos' : 'من نحن'}
+            </button>
+            <span>•</span>
+            <button type="button" onClick={() => { goTab('contact'); window.scrollTo({ top: 0 }); }} className="hover:text-[#8D174B] hover:underline cursor-pointer">
+              {language === 'fr' ? 'Contact' : 'اتصل بنا'}
+            </button>
             <span>•</span>
             <button type="button" onClick={() => { goTab('privacy'); window.scrollTo({ top: 0 }); }} className="hover:text-[#8D174B] hover:underline cursor-pointer">
               {language === 'fr' ? 'Confidentialité' : 'الخصوصية'}

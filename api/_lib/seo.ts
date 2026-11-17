@@ -110,6 +110,7 @@ export interface Page {
   body: string;
   redirect?: string; // chemin cible d'une redirection permanente (ancienne adresse)
   frOnly?: boolean; // page en français seulement : pas de version ?lang=ar
+  noAds?: boolean; // contenu périmé (concours clôturé, annulé, résultats) : pas de pub
 }
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
@@ -294,6 +295,8 @@ function frame(lang: Lang, crumbs: { href?: string; text: string }[], inner: str
     ...HUB_KINDS.map((k) => link(HUB_INDEX[k], HUB_SHORT_LABEL[k][lang], lang)),
     link('/preparation', t.prep, lang),
     link('/communaute', t.community, lang),
+    link(LEGAL_PATH.about, legalDoc('about', lang).title, lang),
+    link(LEGAL_PATH.contact, legalDoc('contact', lang).title, lang),
   ].join(' · ')}</nav></div>`;
 }
 
@@ -606,6 +609,7 @@ export function renderContest(lang: Lang, c: ContestRow, related: ContestRow[], 
     path: `/concours/${encodeURIComponent(c.slug)}`,
     // Fiche « page seule » (pas encore lue dans son arrêté) : visible, mais pas indexée.
     indexable: !pageOnly,
+    noAds: st === 'closed' || st === 'cancelled' || st === 'results',
     ogType: 'article',
     jsonLd,
     body,
@@ -1128,7 +1132,7 @@ export function renderDocument(template: string, p: Page, base: string): string 
   const withGa0 = cleaned.includes('googletagmanager.com/gtag/js') ? cleaned : cleaned.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${GA_TAG}`);
   // AdSense seulement sur une page de contenu complète (même règle que l'application).
   const bodyText = p.body.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ');
-  const ads = p.status === 200 && p.indexable && !p.redirect && adsAllowed(p.path, bodyText);
+  const ads = p.status === 200 && p.indexable && !p.redirect && !p.noAds && adsAllowed(p.path, bodyText);
   const withGa = !ads || withGa0.includes('adsbygoogle.js') ? withGa0 : withGa0.replace(/(<meta charset="UTF-8"\s*\/?>\n)/i, `$1${ADSENSE_TAG}`);
   return withGa
     .replace(/<html[^>]*>/i, `<html lang="${p.lang}" dir="${p.lang === 'ar' ? 'rtl' : 'ltr'}">`)
@@ -1169,7 +1173,7 @@ export function renderRobots(base: string): string {
 }
 
 export function renderSitemap(base: string, contests: ContestRow[], folders: FolderRow[], sets: QcmSetRow[], today = todayMorocco()): string {
-  const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/concours' }, { loc: '/preparation' }, { loc: '/communaute' }, { loc: LEGAL_PATH.privacy }, { loc: LEGAL_PATH.terms }];
+  const urls: { loc: string; lastmod?: string }[] = [{ loc: '/' }, { loc: '/concours' }, { loc: '/preparation' }, { loc: '/communaute' }, { loc: LEGAL_PATH.privacy }, { loc: LEGAL_PATH.terms }, { loc: LEGAL_PATH.about }, { loc: LEGAL_PATH.contact }];
   for (const c of contests) urls.push({ loc: `/concours/${encodeURIComponent(c.slug)}`, lastmod: (c.updated_at || '').slice(0, 10) || undefined });
   for (const f of folders) if (sets.some((s) => s.folder_slug === f.slug)) urls.push({ loc: `/preparation/${encodeURIComponent(f.slug)}` });
   // Pas de lastmod pour les QCM : aucune date de modification fiable n'est stockée.

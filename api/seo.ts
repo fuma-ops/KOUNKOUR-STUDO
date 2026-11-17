@@ -195,6 +195,8 @@ export async function buildPage(pathname: string, lang: Lang, base: string): Pro
       return renderCommunity(lang);
     case 'privacy':
     case 'terms':
+    case 'about':
+    case 'contact':
       return renderLegal(lang, r.name);
     case 'profile':
     case 'admin':

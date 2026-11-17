@@ -10,7 +10,7 @@ export const LEGAL_INFO = {
   updatedAt: '2026-10-28',
 };
 
-export type LegalKind = 'privacy' | 'terms';
+export type LegalKind = 'privacy' | 'terms' | 'about' | 'contact';
 type Lang = 'fr' | 'ar';
 export interface LegalSection {
   title: string;
@@ -29,6 +29,8 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
   const contactSection: LegalSection[] = email ? [{ title: lang === 'ar' ? 'التواصل' : 'Contact', paragraphs: [email] }] : [];
   const date = LEGAL_INFO.updatedAt.split('-').reverse().join('/');
 
+  if (kind === 'about') return aboutDoc(lang, email);
+  if (kind === 'contact') return contactDoc(lang, email);
   if (kind === 'privacy' && lang === 'fr') {
     return {
       title: 'Politique de confidentialité',
@@ -197,4 +199,80 @@ export function legalDoc(kind: LegalKind, lang: Lang): LegalDoc {
   };
 }
 
-export const LEGAL_PATH: Record<LegalKind, string> = { privacy: '/confidentialite', terms: '/conditions' };
+export const LEGAL_PATH: Record<LegalKind, string> = { privacy: '/confidentialite', terms: '/conditions', about: '/a-propos', contact: '/contact' };
+
+// « À propos » et « Contact » (ajoutés après le second refus AdSense du 17/11/2026) :
+// qui publie le site, comment les fiches sont établies, comment nous joindre.
+function aboutDoc(lang: Lang, email: string): LegalDoc {
+  if (lang === 'ar') {
+    return {
+      title: 'من نحن',
+      intro: 'كونكور (KounKour) منصة مستقلة ومجانية تساعد المترشحين لمباريات التوظيف في القطاع العام بالمغرب على إيجاد المباريات المفتوحة، والتحقق من شروطها، والاستعداد لها.',
+      sections: [
+        { title: 'ماذا نقدم', paragraphs: [
+          'نرصد كل يوم إعلانات المباريات التي تنشرها الإدارات والمؤسسات العمومية والجماعات الترابية، ونخصص لكل مباراة بطاقة واضحة: عدد المناصب، الشهادة المطلوبة، السن، الاختبارات، الوثائق، طريقة الإيداع والآجال.',
+          'نوفر للتحضير نماذج حقيقية منقولة مع ذكر مصدرها، وأسئلة متعددة الاختيارات للتدرب مع أجوبة مشروحة، واختبارات نفسية تقنية تفاعلية، وتنبيهات بالمباريات الجديدة والآجال القريبة.',
+        ] },
+        { title: 'كيف نُعدّ بطاقة المباراة', paragraphs: [
+          'تُحرَّر كل بطاقة انطلاقا من القرار أو الإعلان الرسمي المنشور على بوابة التشغيل العمومي (emploi-public.ma) أو على موقع الإدارة المعنية. تُنقل المعلومات من النص الرسمي ولا تُخمَّن أبدا: ما لم نتمكن من قراءته يُشار إليه في البطاقة مع رابط القرار.',
+          'البطاقة المُعدّة من صفحة الإعلان فقط تُستكمل بمجرد قراءة القرار الكامل. ويُحدَّث وضع كل مباراة (مفتوحة، منتهية، نتائج منشورة) باستمرار.',
+        ] },
+        { title: 'الاستقلالية', paragraphs: [
+          'كونكور ليس موقعا رسميا ولا يرتبط بأي إدارة. يتم الترشيح دائما عبر الموقع الذي تحدده الإدارة؛ لا نجمع ملفات الترشيح ولا نطلب أي مقابل مالي للترشح.',
+        ] },
+        { title: 'محتوى التحضير', paragraphs: [
+          'يحرر فريق كونكور أسئلة التدريب ويتحقق من أجوبتها في مصادر موثوقة (نصوص رسمية، مواقع مؤسساتية، مراجع معروفة) مع شرح لكل جواب. سؤال التدريب ليس موضوعا رسميا؛ أما النماذج الحقيقية فتُنقل كما هي مع ذكر مصدرها.',
+        ] },
+        { title: 'التمويل', paragraphs: ['الموقع مجاني بالكامل، ويُموَّل بإعلانات Google AdSense المعروضة في صفحات المحتوى.'] },
+        { title: 'خطأ في بطاقة؟', paragraphs: [`راسلنا${email ? ` على ${email}` : ''} مع رابط البطاقة والمصدر الرسمي، وسنصححها بعد التحقق.`] },
+      ],
+    };
+  }
+  return {
+    title: 'À propos de KounKour',
+    intro: 'KounKour (كونكور) est une plateforme indépendante et gratuite qui aide les candidats aux concours de la fonction publique marocaine à trouver les concours ouverts, à vérifier les conditions et à se préparer.',
+    sections: [
+      { title: 'Ce que nous faisons', paragraphs: [
+        'Chaque jour, nous recensons les avis de concours publiés par les administrations, les établissements publics et les collectivités territoriales. Chaque concours a sa fiche : nombre de postes, diplôme exigé, âge, épreuves, pièces du dossier, mode de dépôt et dates.',
+        'Pour la préparation, nous proposons de vraies annales transcrites avec leur source, des QCM d\'entraînement corrigés et expliqués, des tests psychotechniques interactifs et des alertes sur les nouveaux concours et les dates limites proches.',
+      ] },
+      { title: 'Comment une fiche est établie', paragraphs: [
+        'Chaque fiche est rédigée à partir de l\'arrêté ou de l\'avis officiel publié sur le portail de l\'emploi public (emploi-public.ma) ou sur le site de l\'administration. Les informations sont relevées dans le texte officiel, jamais devinées : ce qui n\'a pas pu être lu est signalé sur la fiche, avec le lien vers l\'arrêté.',
+        'Une fiche établie à partir de la seule page d\'annonce est complétée dès que l\'arrêté complet est lu. Le statut de chaque concours (ouvert, clôturé, résultats publiés) est mis à jour en continu.',
+      ] },
+      { title: 'Indépendance', paragraphs: [
+        'KounKour n\'est pas un site officiel et n\'est lié à aucune administration. La candidature se fait toujours sur le site indiqué par l\'administration : nous ne collectons aucun dossier et ne demandons jamais d\'argent pour candidater.',
+      ] },
+      { title: 'Le contenu de préparation', paragraphs: [
+        'Les QCM d\'entraînement sont rédigés par l\'équipe KounKour ; chaque réponse est vérifiée dans une source fiable (texte officiel, site institutionnel, ouvrage de référence) et expliquée. Un QCM d\'entraînement n\'est pas un sujet officiel ; les vraies annales sont recopiées telles quelles, avec leur source.',
+      ] },
+      { title: 'Financement', paragraphs: ['Le site est entièrement gratuit. Il est financé par la publicité Google AdSense affichée sur les pages de contenu.'] },
+      { title: 'Une erreur sur une fiche ?', paragraphs: [`Écrivez-nous${email ? ` à ${email}` : ''} avec l\'adresse de la fiche et la source officielle : nous corrigeons après vérification.`] },
+    ],
+  };
+}
+
+function contactDoc(lang: Lang, email: string): LegalDoc {
+  if (lang === 'ar') {
+    return {
+      title: 'اتصل بنا',
+      intro: 'سؤال، خطأ في بطاقة مباراة، أو اقتراح؟ راسل فريق كونكور.',
+      sections: [
+        ...(email ? [{ title: 'البريد الإلكتروني', paragraphs: [email] }] : []),
+        { title: 'للإبلاغ عن خطأ', paragraphs: ['أرسل رابط البطاقة المعنية، والمعلومة الخاطئة، ورابط المصدر الرسمي (القرار أو الإعلان). نصحح البطاقة بعد التحقق.'] },
+        { title: 'ما لا يمكننا القيام به', paragraphs: ['لا نستقبل ملفات الترشيح ولا نعرف النتائج قبل نشرها رسميا. لكل سؤال يخص ملفك أو استدعاءك، تواصل مباشرة مع الإدارة المنظمة للمباراة.'] },
+        { title: 'المجتمع', paragraphs: ['يمكنك أيضا طرح أسئلتك على باقي المترشحين في صفحة المجتمع.'] },
+      ],
+    };
+  }
+  return {
+    title: 'Contact',
+    intro: 'Une question, une erreur sur une fiche de concours, une suggestion ? Écrivez à l\'équipe KounKour.',
+    sections: [
+      ...(email ? [{ title: 'E-mail', paragraphs: [email] }] : []),
+      { title: 'Signaler une erreur', paragraphs: ['Indiquez l\'adresse de la fiche concernée, l\'information erronée et le lien vers la source officielle (arrêté ou avis). Nous corrigeons la fiche après vérification.'] },
+      { title: 'Ce que nous ne pouvons pas faire', paragraphs: ['Nous ne recevons aucun dossier de candidature et ne connaissons pas les résultats avant leur publication officielle. Pour toute question sur votre dossier ou votre convocation, contactez directement l\'administration qui organise le concours.'] },
+      { title: 'Communauté', paragraphs: ['Vous pouvez aussi poser vos questions aux autres candidats dans la page Communauté.'] },
+    ],
+  };
+}
