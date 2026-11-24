@@ -1,5 +1,6 @@
 import { withRetry } from '../lib/retry';
 import { getSupabase } from '../lib/supabase';
+import { fetchPublicCache, PUBLIC_CONTEST_STATUSES, PUBLIC_CONTESTS_SELECT } from './publicSelects';
 import { Contest, ContestCategory, ContestStatus } from '../types';
 import { removeImportedContest } from '../utils/radarStorage';
 
@@ -173,14 +174,14 @@ async function fetchPublishedContestsOnce(): Promise<Contest[] | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
   try {
+    const cachedRows = await fetchPublicCache('contests');
+    if (cachedRows) return cachedRows.map(mapRow);
     const { data, error } = await supabase
       .from('contests')
-      .select(
-        '*, administrations ( name_fr, name_ar, category, official_site, logo_url ), contest_criteria ( criterion_type, value_fr, value_ar ), contest_positions ( position, province, category, diploma, specialty, count, note ), contest_documents ( doc_type, title_fr, title_ar, url, position, created_at )'
-      )
+      .select(PUBLIC_CONTESTS_SELECT)
       // Statuts publics uniquement : un admin connecté ne doit pas voir sur le site
       // les brouillons ou concours archivés (lisibles par lui via les RLS staff).
-      .in('status', ['publie', 'mis_a_jour', 'cloture', 'annule', 'resultats_publies'])
+      .in('status', PUBLIC_CONTEST_STATUSES)
       .order('published_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (error || !data) return null;

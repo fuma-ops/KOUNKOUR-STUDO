@@ -52,7 +52,8 @@ const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persist
 // Cache en mémoire de la fonction (réutilisée entre requêtes) : une vague de visites (aperçus
 // Facebook, robots) ne relance pas les mêmes grosses lectures ; en cas d'erreur, la dernière
 // version connue est servie.
-const TTL = 5 * 60 * 1000;
+// 30 min (au lieu de 5) : limite le trafic Supabase, quota gratuit dépassé le 24/11/2026.
+const TTL = 30 * 60 * 1000;
 const memo = new Map<string, { at: number; value?: unknown; pending?: Promise<unknown> }>();
 function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   const e = memo.get(key) || { at: 0 };

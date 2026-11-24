@@ -1,6 +1,7 @@
 import { getSupabase } from '../lib/supabase';
 import { QcmSet } from '../types';
 import { withRetry } from '../lib/retry';
+import { fetchPublicCache, PUBLIC_QCM_SELECT } from './publicSelects';
 
 export interface QcmFolder {
   slug: string;
@@ -29,7 +30,9 @@ export function fetchQcmFolders(): Promise<QcmFolder[]> {
 async function fetchQcmFoldersOnce(): Promise<QcmFolder[] | null> {
   const sb = getSupabase();
   if (!sb) return null;
-  const { data, error } = await sb.from('qcm_folders').select('*').eq('status', 'published').order('position');
+  let data: any[] | null = await fetchPublicCache('folders');
+  let error: unknown = null;
+  if (!data) ({ data, error } = await sb.from('qcm_folders').select('*').eq('status', 'published').order('position'));
   if (error || !data || data.length === 0) return null;
   return data.map((f: any) => ({
     slug: f.slug,
@@ -58,11 +61,11 @@ export function fetchQcmSets(): Promise<QcmSet[]> {
 async function fetchQcmSetsOnce(): Promise<QcmSet[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data, error } = await sb
-    .from('qcm_sets')
-    .select('id, slug, folder_slug, title_fr, title_ar, description_fr, description_ar, language, kind, category, concours_label, exam_year, source_note, source_images, source_url, statement, corrige, old_slugs, duration_minutes, difficulty, position, multi_answer, theme, administrations(name_fr, logo_url), qcm_questions(id, position, source_number, question, options)')
-    .eq('status', 'published')
-    .order('position', { ascending: true });
+  let data: any[] | null = await fetchPublicCache('qcm');
+  let error: unknown = null;
+  if (!data) {
+    ({ data, error } = await sb.from('qcm_sets').select(PUBLIC_QCM_SELECT).eq('status', 'published').order('position', { ascending: true }));
+  }
   if (error || !data) return [];
 
   return data
