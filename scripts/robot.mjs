@@ -19,8 +19,8 @@
 //   bilan                      chiffres du jour pour le rapport
 import { readFileSync } from 'node:fs';
 
-const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
-const ANON = 'sb_publishable_4tlFDcDCPj4lfV92NARBLg_VdBLPInr';
+const URL = 'https://twevhkhtpfbytrecfbse.supabase.co/rest/v1';
+const ANON = 'sb_publishable_NDfSoclOWPEYipwD4JNVKw_L3lZwqJp';
 const KEY = process.env.RADAR_KEY;
 const SITE = 'https://kounkour.com';
 if (!KEY) {

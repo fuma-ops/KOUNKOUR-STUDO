@@ -1,6 +1,6 @@
 # Routine du matin (Claude, 6h00 heure du Maroc) — sans intervention du propriétaire
 
-Depuis le 26/10/2026 (base `kounkour-v2`, projet `aqnxeiylhgxfvhbkftbx`), la routine passe
+Depuis le 24/11/2026 (base `kounkour-v3`, projet `twevhkhtpfbytrecfbse`), la routine passe
 d'abord par la **clé robot** via `scripts/robot.mjs` (variable `RADAR_KEY`). Depuis le 28/10/2026,
 le connecteur Supabase (`execute_sql`) est autorisé sans confirmation (`.claude/settings.json`)
 pour ce que la clé robot ne couvre pas (rouvrir une fiche prolongée, compléter un critère, etc.).

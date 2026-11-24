@@ -5,11 +5,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 // Repli en dur pour que le site fonctionne sans config Vercel ; surchargeable
 // par variables d'environnement VITE_ si besoin.
 // L'ancien projet (zcxkxqsqzwtdnrupxlah) est hors service depuis le 22/10/2026 : une
-// variable VITE_ qui pointe encore dessus est ignorée.
+// variable VITE_ qui pointe encore dessus est ignorée. Idem pour kounkour-v2
+// (aqnxeiylhgxfvhbkftbx), bloqué le 24/11/2026 (quota) : base copiée dans kounkour-v3.
 const ENV_URL: string = import.meta.env.VITE_SUPABASE_URL || '';
-const USE_ENV = Boolean(ENV_URL && import.meta.env.VITE_SUPABASE_ANON_KEY && !ENV_URL.includes('zcxkxqsqzwtdnrupxlah'));
-const SUPABASE_URL = USE_ENV ? ENV_URL : 'https://aqnxeiylhgxfvhbkftbx.supabase.co';
-const SUPABASE_ANON_KEY: string = USE_ENV ? import.meta.env.VITE_SUPABASE_ANON_KEY : 'sb_publishable_4tlFDcDCPj4lfV92NARBLg_VdBLPInr';
+const USE_ENV = Boolean(ENV_URL && import.meta.env.VITE_SUPABASE_ANON_KEY && !/zcxkxqsqzwtdnrupxlah|aqnxeiylhgxfvhbkftbx/.test(ENV_URL));
+const SUPABASE_URL = USE_ENV ? ENV_URL : 'https://twevhkhtpfbytrecfbse.supabase.co';
+const SUPABASE_ANON_KEY: string = USE_ENV ? import.meta.env.VITE_SUPABASE_ANON_KEY : 'sb_publishable_NDfSoclOWPEYipwD4JNVKw_L3lZwqJp';
 
 let client: SupabaseClient | null = null;
 

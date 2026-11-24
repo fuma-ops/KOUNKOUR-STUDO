@@ -8,8 +8,8 @@
 // <types> : nouveau,liste,dernier,preparation ou reel (séparés par des virgules).
 // Les récapitulatifs (plusieurs concours dans un post) passent en premier.
 import { keywordsFor } from './keywords.mjs';
-const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
-const ANON = 'sb_publishable_4tlFDcDCPj4lfV92NARBLg_VdBLPInr';
+const URL = 'https://twevhkhtpfbytrecfbse.supabase.co/rest/v1';
+const ANON = 'sb_publishable_NDfSoclOWPEYipwD4JNVKw_L3lZwqJp';
 const GRAPH = 'https://graph.facebook.com/v26.0';
 const IG_USER = '17841464381628855'; // @kounkourmaroc
 const KEY = process.env.RADAR_KEY;

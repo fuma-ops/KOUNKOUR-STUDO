@@ -10,8 +10,8 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
-const ANON = 'sb_publishable_4tlFDcDCPj4lfV92NARBLg_VdBLPInr';
+const URL = 'https://twevhkhtpfbytrecfbse.supabase.co/rest/v1';
+const ANON = 'sb_publishable_NDfSoclOWPEYipwD4JNVKw_L3lZwqJp';
 const GRAPH = 'https://graph.facebook.com/v26.0';
 const RUPLOAD = 'https://rupload.facebook.com/video-upload/v26.0';
 const KEY = process.env.RADAR_KEY;

@@ -32,8 +32,8 @@ import { keywordsFor } from './keywords.mjs';
 import { themedHtml, backgroundFor } from './themes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const URL = 'https://aqnxeiylhgxfvhbkftbx.supabase.co/rest/v1';
-const ANON = 'sb_publishable_4tlFDcDCPj4lfV92NARBLg_VdBLPInr';
+const URL = 'https://twevhkhtpfbytrecfbse.supabase.co/rest/v1';
+const ANON = 'sb_publishable_NDfSoclOWPEYipwD4JNVKw_L3lZwqJp';
 const SITE = 'https://kounkour.com';
 const GRAPH = 'https://graph.facebook.com/v26.0';
 const RUPLOAD = 'https://rupload.facebook.com/video-upload/v26.0';
