@@ -90,3 +90,10 @@ même sur Facebook (même image, texte « lien en bio » + hashtags), jamais deu
 12h33 `nouveau,dernier` (reels), 13h33 `preparation,liste,rappel`, 18h33 `reel`. Les récapitulatifs
 (plusieurs concours) passent en premier. Aperçu : `instagram.mjs apercu <types> [n]`.
 Le jeton de la page (social_secret) porte aussi `instagram_basic` et `instagram_content_publish`.
+
+## Trafic Supabase (chaque matin, avant le bilan)
+Quota gratuit : 5 Go/mois pour l'organisation « kounkour » (dépassé le 24/11/2026 → projet bloqué).
+Via execute_sql : `select calls, rows, left(query,120) from extensions.pg_stat_statements where query like 'WITH pgrst_source%' order by calls desc limit 5;`
+puis `select extensions.pg_stat_statements_reset();` (compteurs remis à zéro chaque jour).
+Si une requête de liste (contests, qcm_sets, qcm_folders) dépasse ~300 appels par jour, c'est que le cache
+`/api/public-data` est contourné : le signaler dans le rapport avec la requête en cause.

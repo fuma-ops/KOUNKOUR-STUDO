@@ -1,6 +1,6 @@
 // Copie publique, mise en cache par le CDN de Vercel, des listes que le site affiche à
 // tous les visiteurs (concours, séries de QCM, dossiers). Supabase n'est relu qu'à
-// l'expiration du cache (30 min) au lieu d'une fois par visiteur : c'est ce trafic qui a
+// l'expiration du cache (1 h pour les concours, 6 h pour les QCM) au lieu d'une fois par visiteur : c'est ce trafic qui a
 // dépassé le quota gratuit de Supabase le 24/11/2026.
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './_lib/supabaseEnv.ts';
@@ -37,7 +37,7 @@ const loaders: Record<string, () => Promise<unknown[]>> = {
 };
 
 // Cache en mémoire de l'instance, en plus du CDN : une rafale de requêtes ne relance pas la lecture.
-const TTL = 30 * 60 * 1000;
+const TTL = 60 * 60 * 1000;
 const memo = new Map<string, { at: number; value: unknown[] }>();
 
 export default async function handler(req: any, res: any) {
@@ -51,7 +51,9 @@ export default async function handler(req: any, res: any) {
   try {
     const value = hit && Date.now() - hit.at < TTL ? hit.value : await load();
     if (!hit || hit.value !== value) memo.set(kind, { at: Date.now(), value });
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=86400');
+    // Concours : 1 h (la routine du matin publie une fois par jour). QCM et dossiers : 6 h.
+    const sMax = kind === 'contests' ? 3600 : 21600;
+    res.setHeader('Cache-Control', `public, max-age=300, s-maxage=${sMax}, stale-while-revalidate=86400`);
     res.status(200).json(value);
   } catch (e: any) {
     if (hit) {

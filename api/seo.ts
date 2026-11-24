@@ -77,14 +77,36 @@ function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   return e.pending as Promise<T>;
 }
 
+// Les listes sont lues d'abord dans la copie publique mise en cache par le CDN
+// (/api/public-data) : une instance qui démarre ne relit plus toute la base dans Supabase.
+// C'est ce trafic (quota gratuit de 5 Go/mois) qui a bloqué l'ancien projet le 24/11/2026.
+async function fromCdn<T>(kind: 'contests' | 'qcm' | 'folders'): Promise<T[] | null> {
+  try {
+    const r = await fetch(`${CANONICAL_ORIGIN}/api/public-data?kind=${kind}`, { headers: { 'user-agent': 'kounkour-ssr' } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) && j.length > 0 ? (j as T[]) : null;
+  } catch {
+    return null;
+  }
+}
+const cdnQcm = () => cached('cdn:qcm', () => fromCdn<any>('qcm'));
+
 const contests = () =>
   cached('contests', async (): Promise<ContestRow[]> => {
+    const fromCache = await fromCdn<ContestRow>('contests');
+    if (fromCache) {
+      const d = (x: ContestRow) => ((x as any).deadline_date as string | null) || '';
+      return fromCache.sort((a, b) => (d(a) === d(b) ? 0 : !d(a) ? 1 : !d(b) ? -1 : d(a) < d(b) ? 1 : -1));
+    }
     const { data, error } = await sb().from('contests').select(CONTEST_COLS).order('deadline_date', { ascending: false, nullsFirst: false });
     if (error) throw new Error(error.message);
     return (data || []) as unknown as ContestRow[];
   });
 const folders = () =>
   cached('folders', async (): Promise<FolderRow[]> => {
+    const fromCache = await fromCdn<FolderRow>('folders');
+    if (fromCache) return fromCache;
     const { data, error } = await sb().from('qcm_folders').select('slug,title_fr,title_ar,organization,description_fr,description_ar,cover_image,old_slugs,match_terms').eq('status', 'published').order('position');
     if (error) throw new Error(error.message);
     return (data || []) as FolderRow[];
@@ -93,6 +115,13 @@ const folders = () =>
 // les tests « a un contenu / est un sujet » s'en servent hors de la page de la série.
 const sets = () =>
   cached('sets', async (): Promise<QcmSetRow[]> => {
+    const full = await cdnQcm();
+    if (full) {
+      return full.map((x: any) => {
+        const { corrige: _c, qcm_questions, ...rest } = x;
+        return { ...rest, qcm_questions: (qcm_questions || []).map((q: any) => ({ id: q.id })), statement: x.statement ? '1' : null } as QcmSetRow;
+      });
+    }
     const [all, withStatement] = await Promise.all([
       sb().from('qcm_sets').select(SET_LIGHT_COLS).eq('status', 'published').order('position'),
       sb().from('qcm_sets').select('id').eq('status', 'published').not('statement', 'is', null).neq('statement', ''),
@@ -105,6 +134,9 @@ const sets = () =>
 // Une série complète (énoncé, corrigé, questions) pour sa propre page.
 const fullSet = (id: string) =>
   cached(`set:${id}`, async (): Promise<QcmSetRow | null> => {
+    const full = await cdnQcm();
+    const hit = full?.find((x: any) => x.id === id);
+    if (hit) return hit as QcmSetRow;
     const { data, error } = await sb().from('qcm_sets').select(SET_COLS).eq('id', id).maybeSingle();
     if (error) throw new Error(error.message);
     return (data || null) as unknown as QcmSetRow | null;
